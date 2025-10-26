@@ -62,57 +62,98 @@ export default function HigherSteakMenu() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f9f7f1] text-black font-mono p-2 max-w-[424px] mx-auto">
-      <div className="bg-[#fefdfb] border-2 border-black p-3">
-        {/* ASCII Art Header - Scaled to fit 424px */}
-        <div className="text-center mb-3 -ml-2">
-          <pre className="text-[0.25rem] leading-[0.28rem] font-mono whitespace-pre overflow-hidden">
-            {`@@@@@@@@   @@@@@@@@@ @@@@@@@@        @@@@@@   @   @@@@@@@@   @@@@@@@@ @@@@@@@@@@@@@@@  @@@@@@@@@@              
-      @@@        @@@      @@@        @@        @@@     +@@         @@@      @@        @@     @@     @@@@          
-      @@@        @@@      @@@      @@@           @      @@         @@       @@         @     @@      @@@@         
-      @@@        @@@      @@@     @@@                   @@         @@       @@       %       @@      @@@@         
-      @@*        @@@      @@@    @@@                    @@         @@       @@       @       @@      @@@          
-      @@@@@@@@@@@@@@      @@@    @@@           @@@@     @@@@@@@@@@@@@       @@@@@@@@@@       @@@@@@@@             
-      @@*        @@@      @@@    @@@@          @@@      @@         @@       @@       @       @@   @@@             
-      @@@        @@@      @@@     @@@          @@@      @@         @@       @@     @@        @@@    @@@           
-      @@@        @@@      @@@      @@@         @@@      @@         @@       @@@   @#@@@@@@@@-@@@  @  @@@          
-      @@@        @@@      @@@       @@@@       @@@     #@@         @@@     @@@@ =.     @-#:  @@@-  @  @@@         
-   @@@@@@@@   @@@@@@@@@ @@@@@@@@        @@@@@@@      @@@@@@@@   @@@@@@@@@@@@@@@@@@@@@@@@  @@@@@@@@ @@   @@@@@`}
-          </pre>
-        </div>
-
-        {/* Compact Header */}
-        <div className="text-center mb-3 pb-2 border-b-2 border-black">
-          <p className="text-xs text-gray-600 mb-1">Premium Cuts & Fine Dining</p>
-          <p className="text-xs">Est. 2025</p>
-        </div>
-
-        {/* Menu Items - Compact */}
-        <div className="space-y-2 mt-3">
-          {menuItems.map((item, index) => (
-            <div key={index} className="flex items-center text-xs leading-tight">
-              <span className="flex-1 truncate">{item.name}</span>
-              <span className="ml-2 font-bold whitespace-nowrap">{item.price}</span>
+    <main className="min-h-screen bg-[#f9f7f1] text-black p-4 md:p-8 font-mono">
+      <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-6 md:p-12 border border-[#e5e3db]">
+        {/* Authentication Status */}
+        {user && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+            <p className="text-sm text-blue-800">✓ Authenticated as Farcaster user</p>
+          </div>
+        )}
+        
+        <div className="border-2 border-black p-4 md:p-6">
+          <div className="text-center mb-6 md:mb-10">
+            <div className="flex justify-center">
+              <pre className="text-[0.4rem] leading-[0.45rem] sm:text-[0.5rem] sm:leading-[0.55rem] md:text-[0.6rem] md:leading-[0.65rem] lg:text-[0.7rem] lg:leading-[0.75rem] whitespace-pre">
+                {` @@@@@@@@   @@@@@@@@@ @@@@@@@@        @@@@@@   @   @@@@@@@@   @@@@@@@@ @@@@@@@@@@@@@@@  @@@@@@@@@@              
+          @@@        @@@      @@@        @@        @@@     +@@         @@@      @@        @@     @@     @@@@          
+          @@@        @@@      @@@      @@@           @      @@         @@       @@         @     @@      @@@@         
+          @@@        @@@      @@@     @@@                   @@         @@       @@       %       @@      @@@@         
+          @@*        @@@      @@@    @@@                    @@         @@       @@       @       @@      @@@          
+          @@@@@@@@@@@@@@      @@@    @@@           @@@@     @@@@@@@@@@@@@       @@@@@@@@@@       @@@@@@@@             
+          @@*        @@@      @@@    @@@@          @@@      @@         @@       @@       @       @@   @@@             
+          @@@        @@@      @@@     @@@          @@@      @@         @@       @@     @@        @@@    @@@           
+          @@@        @@@      @@@      @@@         @@@      @@         @@       @@@   @#@@@@@@@@-@@@  @  @@@          
+          @@@        @@@      @@@       @@@@       @@@     #@@         @@@     @@@@ =.     @-#:  @@@-  @  @@@         
+       @@@@@@@@   @@@@@@@@@ @@@@@@@@        @@@@@@@      @@@@@@@@   @@@@@@@@@@@@@@@@@@@@@@@@  @@@@@@@@ @@   @@@@@     
+                                                                       @   @         .@       @ @   -   @@            
+                                       @     @      @               @@@@@@@# ::-=-- @.         #@=+=@  @@@@           
+                                   @ @@@@@@@@@@@@@@   @@@@@@@@@@@@@@@#+:.::-===-- @@@   @ @@ @@@*++@@  @@*@           
+                                   @@@:..::-=-::. @@@@@  @@@-  .::::::-=====-:.:@@@  @@@@@@@@@%*+*@@   @**@@          
+                               @ @@@.--==========-:..:@@@@  @@@=.:-======--:.@@@@  @@@*%%.:::..#+@@   @@***@          
+                              @ @@#.-================-::.@@@#@ @@@# :::::.*@@@   @@@%#.::-====.%@@   @@#**#@          
+                                @#=-====================-::.+@@@@ @@@@@=@@@@  @@@@+.:-=======-:@@   @@%***#@          
+                             @ @*#.=========================-::.@@@   @@@   @@@+.:-========-::@@   @@-%***@@          
+                             @ @@#+-===========================-:.@@@      @@ :-==========-:@@@   @@+=%**#@           
+                             @  @%%.-=============================-.@@  . @@ -==========-- @@    @@*+=%**@@           
+                             @@ #@+%:-=============================-.@@   @@:+========-:.@@@   @@@**+@#*@@            
+                             @@  @@@%.-=============================:@@:  @%:=======--.@@@    @@+**++%*@@             
+                             @@@   @@#+.-===========================--@@  @%.=====-:.@@@+   @@@***+=%@@@              
+                             @*@@   @@@%#.:-=========================:#@  @*.==--.+@@@@    @@+***+=%@@@               
+                             @#*@@@   @@@*@-.::-=====================:%@  @@#...%@@@     @@@****+=%@@                 
+                             @@***@@@   @@@@#%@.::::-================.#@   @+@@@@@    @@@@******+@@@                  
+                              @@#*##@@@    @@@@@@#%%-:::::::::::::::.+@@ . @@@=     @@@******++*@@                    
+                               @@##%=+@@@       @@@@@@@@@@@=--=#@@@@@@@- .       @@@@+******+=@@@                     
+                                @@*#%=+*@@@@@            .@@@@@@#            @@@@@+*******++@@@                       
+                                 @@@#%+****+@@@@@@@@                   @@@@@@@+*********++@@@                         
+                                   @@@%=++*******+#@@@@@@@@@@@@@@@@@@@@@*+***********+++@@@                           
+                                     @@@@=++**************************************++=@@@@                             
+                                       @@@@*=++*******************************++==@@@@                                
+                                          @@@@@@===++*******************++===#@@@@@                                   
+                                               @@@@@@@@%==============@@@@@@@@@-                                       
+                                                       @@@@@@@@@@@@@@@@                                               `}
+              </pre>
             </div>
-          ))}
+            <div className="text-xs sm:text-sm tracking-[0.3em] mt-3 md:mt-5 uppercase">
+              <div className="mb-1">═══════════════════════════════════</div>
+              <div>Est. 2025</div>
+              <div className="mt-1">═══════════════════════════════════</div>
+            </div>
+          </div>
+
+          <div className="px-2 md:px-4">
+            <div className="text-center mb-6 md:mb-8 border-t-2 border-b-2 border-black py-3">
+              <p className="text-xs sm:text-sm tracking-[0.2em] uppercase font-bold">═ Premium Cuts & Fine Dining ═</p>
+            </div>
+
+            <div className="space-y-3 md:space-y-4">
+              {menuItems.map((item, index) => (
+                <div key={index} className="flex items-baseline text-sm md:text-base">
+                  <span className="flex-shrink-0">{item.name}</span>
+                  <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
+                  <span className="flex-shrink-0 font-bold tracking-wider">{item.price}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 md:mt-10 text-center text-xs md:text-sm border-t-2 border-black pt-4">
+              <p className="tracking-wide">All steaks served with choice of two sides</p>
+              <p className="mt-3 tracking-wider">* Prices subject to market availability *</p>
+            </div>
+          </div>
         </div>
 
-        {/* Footer Info */}
-        <div className="mt-4 pt-2 border-t border-black text-center text-[0.625rem] leading-tight">
-          <p className="mb-1">All steaks served with choice of two sides</p>
-          <p className="text-gray-600">* Prices subject to market availability *</p>
-        </div>
-
-        {/* Hours */}
-        <div className="text-center mt-3 pt-2 border-t border-black text-[0.625rem]">
-          <p className="font-semibold">Open Daily 5-11PM</p>
+        <div className="text-center mt-6 md:mt-8 text-xs tracking-[0.25em] uppercase">
+          <p>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</p>
+          <p className="my-2">Open Daily 5-11PM</p>
+          <p>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━</p>
         </div>
 
         {/* Test Authentication Button (for development) */}
-        <div className="mt-3 text-center">
+        <div className="mt-6 text-center">
           <button
             onClick={handleGetToken}
-            className="px-3 py-1.5 text-[0.625rem] bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Test Quick Auth
           </button>
