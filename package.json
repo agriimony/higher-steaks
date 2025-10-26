@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@farcaster/miniapp-sdk": "^0.2.1",
-    "@neynar/nodejs-sdk": "^3.34.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.454.0",
