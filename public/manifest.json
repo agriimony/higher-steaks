@@ -1,0 +1,12 @@
+{
+  "name": "Higher Steaks",
+  "description": "Staking interface for higher network discovery",
+  "icon": "/icon.png",
+  "splash": "/splash.png",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#000000",
+  "background_color": "#f9f7f1"
+}
+
