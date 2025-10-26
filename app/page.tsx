@@ -64,15 +64,31 @@ export default function HigherSteakMenu() {
   return (
     <main className="min-h-screen bg-[#f9f7f1] text-black font-mono p-2 max-w-[424px] mx-auto">
       <div className="bg-[#fefdfb] border-2 border-black p-3">
+        {/* ASCII Art Header - Scaled to fit 424px */}
+        <div className="text-center mb-3 -ml-2">
+          <pre className="text-[0.25rem] leading-[0.28rem] font-mono whitespace-pre overflow-hidden">
+            {`@@@@@@@@   @@@@@@@@@ @@@@@@@@        @@@@@@   @   @@@@@@@@   @@@@@@@@ @@@@@@@@@@@@@@@  @@@@@@@@@@              
+      @@@        @@@      @@@        @@        @@@     +@@         @@@      @@        @@     @@     @@@@          
+      @@@        @@@      @@@      @@@           @      @@         @@       @@         @     @@      @@@@         
+      @@@        @@@      @@@     @@@                   @@         @@       @@       %       @@      @@@@         
+      @@*        @@@      @@@    @@@                    @@         @@       @@       @       @@      @@@          
+      @@@@@@@@@@@@@@      @@@    @@@           @@@@     @@@@@@@@@@@@@       @@@@@@@@@@       @@@@@@@@             
+      @@*        @@@      @@@    @@@@          @@@      @@         @@       @@       @       @@   @@@             
+      @@@        @@@      @@@     @@@          @@@      @@         @@       @@     @@        @@@    @@@           
+      @@@        @@@      @@@      @@@         @@@      @@         @@       @@@   @#@@@@@@@@-@@@  @  @@@          
+      @@@        @@@      @@@       @@@@       @@@     #@@         @@@     @@@@ =.     @-#:  @@@-  @  @@@         
+   @@@@@@@@   @@@@@@@@@ @@@@@@@@        @@@@@@@      @@@@@@@@   @@@@@@@@@@@@@@@@@@@@@@@@  @@@@@@@@ @@   @@@@@`}
+          </pre>
+        </div>
+
         {/* Compact Header */}
-        <div className="text-center mb-4 pb-3 border-b-2 border-black">
-          <h1 className="text-2xl font-bold mb-1">HIGHER STEAKS</h1>
-          <p className="text-xs text-gray-600">Premium Cuts & Fine Dining</p>
-          <p className="text-xs mt-1">Est. 2025</p>
+        <div className="text-center mb-3 pb-2 border-b-2 border-black">
+          <p className="text-xs text-gray-600 mb-1">Premium Cuts & Fine Dining</p>
+          <p className="text-xs">Est. 2025</p>
         </div>
 
         {/* Menu Items - Compact */}
-        <div className="space-y-2 mt-4">
+        <div className="space-y-2 mt-3">
           {menuItems.map((item, index) => (
             <div key={index} className="flex items-center text-xs leading-tight">
               <span className="flex-1 truncate">{item.name}</span>
@@ -82,21 +98,21 @@ export default function HigherSteakMenu() {
         </div>
 
         {/* Footer Info */}
-        <div className="mt-4 pt-3 border-t border-black text-center text-xs">
+        <div className="mt-4 pt-2 border-t border-black text-center text-[0.625rem] leading-tight">
           <p className="mb-1">All steaks served with choice of two sides</p>
           <p className="text-gray-600">* Prices subject to market availability *</p>
         </div>
 
         {/* Hours */}
-        <div className="text-center mt-3 pt-2 border-t border-black text-xs">
+        <div className="text-center mt-3 pt-2 border-t border-black text-[0.625rem]">
           <p className="font-semibold">Open Daily 5-11PM</p>
         </div>
 
         {/* Test Authentication Button (for development) */}
-        <div className="mt-4 text-center">
+        <div className="mt-3 text-center">
           <button
             onClick={handleGetToken}
-            className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-3 py-1.5 text-[0.625rem] bg-blue-600 text-white rounded hover:bg-blue-700"
           >
             Test Quick Auth
           </button>
