@@ -6,8 +6,8 @@ A Farcaster Mini App for the higher network discovery. This Mini App can be embe
 
 - 🍖 Premium steak menu interface
 - 🔐 Farcaster MiniApp SDK integration
-- ⚡ Real-time data ingestion from /higher channel
 - 🎨 Modern, responsive design
+- 📐 3:2 aspect ratio embed images
 
 ## Setup
 

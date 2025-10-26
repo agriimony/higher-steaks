@@ -24,8 +24,16 @@ export default function HigherSteakMenu() {
   ]);
 
   useEffect(() => {
-    // Try to authenticate with Farcaster Quick Auth
-    const authenticate = async () => {
+    // Call ready() to hide splash screen and show content
+    const initApp = async () => {
+      try {
+        await sdk.actions.ready();
+        console.log('✅ MiniApp ready - splash screen hidden');
+      } catch (error) {
+        console.log('Running in browser mode (not in Farcaster client)');
+      }
+      
+      // Try to authenticate with Farcaster Quick Auth
       try {
         // Get the session token from Quick Auth
         const { token } = await sdk.quickAuth.getToken();
@@ -40,7 +48,7 @@ export default function HigherSteakMenu() {
       }
     };
 
-    authenticate();
+    initApp();
   }, []);
 
   const handleGetToken = async () => {
