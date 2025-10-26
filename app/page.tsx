@@ -24,31 +24,31 @@ export default function HigherSteakMenu() {
   ]);
 
   useEffect(() => {
-    // Call ready() to hide splash screen and show content
-    const initApp = async () => {
+    // IMPORTANT: Call ready() FIRST to hide splash screen immediately
+    const hideSplash = async () => {
       try {
         await sdk.actions.ready();
-        console.log('✅ MiniApp ready - splash screen hidden');
+        console.log('✅ Splash screen hidden');
       } catch (error) {
-        console.log('Running in browser mode (not in Farcaster client)');
-      }
-      
-      // Try to authenticate with Farcaster Quick Auth
-      try {
-        // Get the session token from Quick Auth
-        const { token } = await sdk.quickAuth.getToken();
-        console.log('✅ Authenticated with Farcaster');
-        
-        // You can decode and use the token here
-        // For now, just set a mock user
-        setUser({ fid: 1234 }); // TODO: decode JWT token to get real FID
-      } catch (error) {
-        console.log('Running in browser mode (not in Farcaster client)');
-        // In browser, authentication might not be available
+        console.log('Not in Farcaster client - ready() failed:', error);
       }
     };
 
-    initApp();
+    // Hide splash immediately
+    hideSplash();
+
+    // Then try to authenticate (this can happen after splash is hidden)
+    const authenticate = async () => {
+      try {
+        const { token } = await sdk.quickAuth.getToken();
+        console.log('✅ Authenticated with Farcaster');
+        setUser({ fid: 1234 });
+      } catch (error) {
+        console.log('No authentication available');
+      }
+    };
+
+    authenticate();
   }, []);
 
   const handleGetToken = async () => {
