@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   other: {
     "fc:miniapp": JSON.stringify({
       version: "1",
-      imageUrl: "http://localhost:3000/og-image.svg",
+      imageUrl: "https://higher-steaks.vercel.app/og-image.svg",
       button: {
         title: "Higher Steaks",
         action: {
