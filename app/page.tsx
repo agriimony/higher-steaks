@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
+import { decodeJwt } from 'jose';
 
 interface User {
   fid: number;
-  username?: string;
+  username: string;
+  displayName: string;
+  pfpUrl: string;
+  walletAddress: string | null;
+  bio?: string;
 }
 
 export default function HigherSteakMenu() {
@@ -42,9 +47,38 @@ export default function HigherSteakMenu() {
       try {
         const { token } = await sdk.quickAuth.getToken();
         console.log('✅ Authenticated with Farcaster');
-        setUser({ fid: 1234 });
+        
+        // Decode JWT to get FID immediately
+        const decoded = decodeJwt(token);
+        const fid = decoded.sub as number;
+        console.log('FID from token:', fid);
+
+        // Fetch full profile from backend
+        const response = await fetch('/api/user/profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        });
+
+        if (response.ok) {
+          const profileData = await response.json();
+          console.log('Profile data:', profileData);
+          setUser(profileData);
+        } else {
+          console.error('Failed to fetch profile:', await response.text());
+          // Fallback to just FID if profile fetch fails
+          setUser({
+            fid,
+            username: `user-${fid}`,
+            displayName: `User ${fid}`,
+            pfpUrl: '',
+            walletAddress: null,
+          });
+        }
       } catch (error) {
-        console.log('No authentication available');
+        console.log('No authentication available:', error);
       }
     };
 
@@ -66,8 +100,35 @@ export default function HigherSteakMenu() {
       <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
         {/* Authentication Status */}
         {user && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <p className="text-sm text-blue-800">✓ Authenticated as Farcaster user</p>
+          <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              {user.pfpUrl && (
+                <img 
+                  src={user.pfpUrl} 
+                  alt={user.displayName}
+                  className="w-10 h-10 rounded-full border-2 border-white shadow-sm"
+                />
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-800">
+                  {user.displayName}
+                  <span className="text-purple-600 ml-2">@{user.username}</span>
+                </p>
+                <p className="text-xs text-gray-600">
+                  FID: {user.fid}
+                  {user.walletAddress && (
+                    <span className="ml-2">
+                      • {user.walletAddress.slice(0, 6)}...{user.walletAddress.slice(-4)}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="text-green-600">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+            </div>
           </div>
         )}
         
