@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
-import { decodeJwt } from 'jose';
+import * as jose from 'jose';
 
 interface User {
   fid: number;
@@ -49,7 +49,7 @@ export default function HigherSteakMenu() {
         console.log('✅ Authenticated with Farcaster');
         
         // Decode JWT to get FID immediately
-        const decoded = decodeJwt(token);
+        const decoded = jose.decodeJwt(token);
         const fid = decoded.sub as number;
         console.log('FID from token:', fid);
 
