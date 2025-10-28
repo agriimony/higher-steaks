@@ -6,6 +6,8 @@ export const dynamic = 'force-dynamic'; // Disable caching for fresh data
 
 export async function GET() {
   try {
+    console.log('Fetching leaderboard entries...');
+    
     // Query top 10 users by HIGHER balance
     const result = await sql`
       SELECT 
@@ -25,38 +27,52 @@ export async function GET() {
       LIMIT 10
     `;
 
-    // Format data for frontend
-    const entries = result.rows.map((row) => ({
-      fid: row.fid,
-      username: row.username,
-      displayName: row.display_name,
-      pfpUrl: row.pfp_url,
-      castHash: row.cast_hash,
-      castText: row.cast_text,
-      description: row.description,
-      castTimestamp: row.cast_timestamp,
-      higherBalance: parseFloat(row.higher_balance).toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-      usdValue: row.usd_value
-        ? `$${parseFloat(row.usd_value).toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          })}`
-        : '$0.00',
-      rank: row.rank,
-    }));
+    console.log(`Found ${result.rows.length} entries in database`);
 
+    // Format data for frontend
+    const entries = result.rows.map((row) => {
+      console.log('Processing row:', {
+        fid: row.fid,
+        username: row.username,
+        higher_balance: row.higher_balance,
+        usd_value: row.usd_value,
+      });
+      
+      return {
+        fid: row.fid,
+        username: row.username,
+        displayName: row.display_name,
+        pfpUrl: row.pfp_url,
+        castHash: row.cast_hash,
+        castText: row.cast_text,
+        description: row.description,
+        castTimestamp: row.cast_timestamp,
+        higherBalance: parseFloat(row.higher_balance).toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }),
+        usdValue: row.usd_value
+          ? `$${parseFloat(row.usd_value).toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}`
+          : '$0.00',
+        rank: row.rank,
+      };
+    });
+
+    console.log(`Returning ${entries.length} formatted entries`);
     return NextResponse.json({ entries });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Leaderboard API error:', error);
+    console.error('Error stack:', error.stack);
     
-    // Return empty array if table doesn't exist yet
+    // Return detailed error for debugging
     return NextResponse.json({ 
       entries: [],
-      error: 'Database not initialized or empty',
-    });
+      error: error.message || 'Database error',
+      details: error.stack,
+    }, { status: 500 });
   }
 }
 
