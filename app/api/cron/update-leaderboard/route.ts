@@ -5,6 +5,7 @@ import { createPublicClient, http, formatUnits } from 'viem';
 import { base } from 'viem/chains';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic'; // Required for request.headers
 export const maxDuration = 300; // 5 minutes max for cron job
 
 // HIGHER token contract
