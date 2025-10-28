@@ -147,6 +147,7 @@ export async function GET(request: NextRequest) {
     // Seed list of known HIGHER community members (expand this list over time)
     // You can find active members by visiting warpcast.com/~/channel/higher
     const knownHigherFids = [
+      191780, // YOU - for testing
       3,      // dwr
       2,      // v
       239,    // composta  
