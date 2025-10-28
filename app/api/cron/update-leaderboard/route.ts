@@ -132,10 +132,6 @@ export async function GET(request: NextRequest) {
       transport: http(rpcUrl),
     });
     
-    // Fetch casts from /higher channel (last 24 hours)
-    // Note: Neynar's feed API may have different methods - adjust as needed
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
     console.log('Fetching recent casts (FREE TIER workaround)...');
     
     // FREE TIER WORKAROUND:
@@ -160,8 +156,9 @@ export async function GET(request: NextRequest) {
     
     console.log(`Fetching casts from ${knownHigherFids.length} known HIGHER community members...`);
     
-    const allCasts: any[] = [];
+    // Calculate time range (last 24 hours)
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const allCasts: any[] = [];
     
     // Fetch recent casts for each known FID
     for (const fid of knownHigherFids) {
