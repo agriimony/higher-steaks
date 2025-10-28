@@ -37,30 +37,62 @@ export async function GET(request: NextRequest) {
     const neynarClient = new NeynarAPIClient({ apiKey: neynarApiKey });
     logs.push('- Neynar client created');
     
-    logs.push('Step 4: Testing Neynar API call (fetchFeedByChannelIds - FREE TIER)...');
+    logs.push('Step 4: Testing Neynar API endpoints...');
+    
+    // Test which endpoints work on free tier
+    let apiTestResults: any = {};
+    
+    // Test 1: fetchBulkUsers (should work - basic endpoint)
     try {
-      const castsResponse = await neynarClient.fetchFeedByChannelIds({
-        channelIds: ['higher'],
-        limit: 5, // Just 5 for testing
-        withRecasts: false,
+      logs.push('- Testing fetchBulkUsers (basic endpoint)...');
+      const userTest = await neynarClient.fetchBulkUsers({ fids: [3] }); // Test with dwr
+      apiTestResults.fetchBulkUsers = '✅ Works';
+      logs.push(`  ✅ fetchBulkUsers works: @${userTest.users[0].username}`);
+    } catch (e: any) {
+      apiTestResults.fetchBulkUsers = '❌ ' + e.message;
+      logs.push(`  ❌ fetchBulkUsers failed: ${e.message}`);
+    }
+    
+    // Test 2: fetchFeed (may work on free tier)
+    try {
+      logs.push('- Testing fetchFeed...');
+      const feedTest = await neynarClient.fetchFeed({
+        filterType: 'channel_id' as any,
+        channelId: 'higher',
+        limit: 5,
       });
-      
-      const casts = castsResponse.casts || [];
-      logs.push(`- Found ${casts.length} casts from /higher channel`);
+      const casts = feedTest.casts || [];
+      apiTestResults.fetchFeed = '✅ Works';
+      logs.push(`  ✅ fetchFeed works: ${casts.length} casts`);
+    } catch (e: any) {
+      apiTestResults.fetchFeed = '❌ ' + e.message;
+      logs.push(`  ❌ fetchFeed failed: ${e.message}`);
+    }
+    
+    // Test 3: fetchFeedByChannelIds
+    try {
+      logs.push('- Testing fetchFeedByChannelIds...');
+      const channelFeedTest = await neynarClient.fetchFeedByChannelIds({
+        channelIds: ['higher'],
+        limit: 5,
+      });
+      const casts = channelFeedTest.casts || [];
+      apiTestResults.fetchFeedByChannelIds = '✅ Works';
+      logs.push(`  ✅ fetchFeedByChannelIds works: ${casts.length} casts`);
       
       if (casts.length > 0) {
-        logs.push(`- First cast author: @${casts[0].author.username}`);
-        logs.push(`- First cast FID: ${casts[0].author.fid}`);
-        logs.push(`- First cast text: ${casts[0].text.substring(0, 100)}...`);
+        logs.push(`  First cast: @${casts[0].author.username} - ${casts[0].text.substring(0, 80)}...`);
       }
-    } catch (neynarError: any) {
-      logs.push(`- Neynar API error: ${neynarError.message || String(neynarError)}`);
-      if (neynarError.response) {
-        logs.push(`- Response status: ${neynarError.response.status}`);
-        logs.push(`- Response data: ${JSON.stringify(neynarError.response.data)}`);
-      }
-      throw neynarError;
+    } catch (e: any) {
+      apiTestResults.fetchFeedByChannelIds = '❌ ' + e.message;
+      logs.push(`  ❌ fetchFeedByChannelIds failed: ${e.message}`);
     }
+    
+    logs.push('');
+    logs.push('API Test Summary:');
+    Object.entries(apiTestResults).forEach(([endpoint, result]) => {
+      logs.push(`  ${endpoint}: ${result}`);
+    });
     
     logs.push('Step 5: Testing database connection...');
     const { sql } = await import('@vercel/postgres');

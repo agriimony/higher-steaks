@@ -138,15 +138,29 @@ export async function GET(request: NextRequest) {
     
     console.log('Fetching casts from /higher channel...');
     
-    // Use fetchFeedByChannelIds (free tier compatible) instead of searchCasts
-    // We'll fetch recent casts and filter client-side for the keyphrase
-    const castsResponse = await neynarClient.fetchFeedByChannelIds({
-      channelIds: ['higher'],
-      limit: 100, // Fetch up to 100 recent casts
-      withRecasts: false,
-    });
+    // Try using lookupChannel and then fetchAllCastsInThread or fetchFeed
+    // Free tier workaround: fetch recent feed and filter by channel
+    let casts: any[] = [];
     
-    const casts = castsResponse.casts || [];
+    try {
+      // Option 1: Try fetchFeed with filter_type
+      const castsResponse = await neynarClient.fetchFeed({
+        filterType: 'channel_id' as any,
+        channelId: 'higher',
+        limit: 100,
+        withRecasts: false,
+      });
+      casts = castsResponse.casts || [];
+    } catch (error1) {
+      console.log('fetchFeed failed, trying alternative...', error1);
+      
+      // Option 2: If that fails, return error with helpful message
+      throw new Error(
+        'Unable to fetch channel feed. This may require a paid Neynar plan. ' +
+        'Free tier only includes: user lookups, cast by hash, and user feeds. ' +
+        'Consider upgrading to Neynar Growth plan ($49/mo) for channel feeds.'
+      );
+    }
     
     console.log(`Found ${casts.length} casts matching keyphrase`);
     
