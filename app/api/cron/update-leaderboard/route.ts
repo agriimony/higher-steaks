@@ -259,7 +259,7 @@ export async function GET(request: NextRequest) {
           ${entry.castText},
           ${entry.description},
           ${entry.timestamp},
-          ${entry.higherBalance},
+          ${entry.balanceFormatted},
           ${entry.usdValue},
           ${i + 1}
         )
