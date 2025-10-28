@@ -37,16 +37,16 @@ export async function GET(request: NextRequest) {
     const neynarClient = new NeynarAPIClient({ apiKey: neynarApiKey });
     logs.push('- Neynar client created');
     
-    logs.push('Step 4: Testing Neynar API call (searchCasts)...');
+    logs.push('Step 4: Testing Neynar API call (fetchFeedByChannelIds - FREE TIER)...');
     try {
-      const castsResponse = await neynarClient.searchCasts({
-        q: 'started aiming higher and it worked out',
-        channelId: 'higher',
+      const castsResponse = await neynarClient.fetchFeedByChannelIds({
+        channelIds: ['higher'],
         limit: 5, // Just 5 for testing
+        withRecasts: false,
       });
       
-      const casts = castsResponse.result?.casts || [];
-      logs.push(`- Found ${casts.length} casts`);
+      const casts = castsResponse.casts || [];
+      logs.push(`- Found ${casts.length} casts from /higher channel`);
       
       if (casts.length > 0) {
         logs.push(`- First cast author: @${casts[0].author.username}`);

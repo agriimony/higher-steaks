@@ -138,14 +138,15 @@ export async function GET(request: NextRequest) {
     
     console.log('Fetching casts from /higher channel...');
     
-    // Fetch channel casts - using searchCasts for keyphrase matching
-    const castsResponse = await neynarClient.searchCasts({
-      q: 'started aiming higher and it worked out',
-      channelId: 'higher',
+    // Use fetchFeedByChannelIds (free tier compatible) instead of searchCasts
+    // We'll fetch recent casts and filter client-side for the keyphrase
+    const castsResponse = await neynarClient.fetchFeedByChannelIds({
+      channelIds: ['higher'],
       limit: 100, // Fetch up to 100 recent casts
+      withRecasts: false,
     });
     
-    const casts = castsResponse.result?.casts || [];
+    const casts = castsResponse.casts || [];
     
     console.log(`Found ${casts.length} casts matching keyphrase`);
     
