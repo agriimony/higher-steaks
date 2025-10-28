@@ -123,8 +123,33 @@ export default function HigherSteakMenu() {
   return (
     <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
       <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
-        {/* Header Row with Profile Pill - Outside black frame */}
-        <div className="flex flex-col items-end gap-2 mb-3 sm:mb-4">
+        {/* Header Row - Balance left, Profile right */}
+        <div className="flex justify-between items-center gap-2 mb-3 sm:mb-4">
+          {/* Token Balance Pill - Left */}
+          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1.5 shadow-sm">
+            {loadingBalance ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin h-3 w-3 border-2 border-purple-600 border-t-transparent rounded-full"></div>
+                <span className="text-[0.65rem] sm:text-xs text-gray-600">Loading...</span>
+              </div>
+            ) : balance ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[0.65rem] sm:text-xs font-bold text-purple-700">
+                  {balance.totalBalanceFormatted} HIGHER
+                </span>
+                <span className="text-gray-400">•</span>
+                <span className="text-[0.65rem] sm:text-xs text-gray-600">
+                  {balance.usdValue}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[0.65rem] sm:text-xs text-gray-400">...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Profile Pill - Right */}
           <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow">
             {user ? (
               <>
@@ -148,27 +173,6 @@ export default function HigherSteakMenu() {
               </>
             )}
           </div>
-
-          {/* Token Balance Display */}
-          {user && (
-            <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg px-3 py-2 shadow-sm">
-              {loadingBalance ? (
-                <div className="flex items-center gap-2">
-                  <div className="animate-spin h-3 w-3 border-2 border-purple-600 border-t-transparent rounded-full"></div>
-                  <span className="text-[0.65rem] sm:text-xs text-gray-600">Loading balance...</span>
-                </div>
-              ) : balance ? (
-                <div className="text-right">
-                  <div className="text-xs sm:text-sm font-bold text-purple-700">
-                    {balance.totalBalanceFormatted} HIGHER
-                  </div>
-                  <div className="text-[0.6rem] sm:text-xs text-gray-600">
-                    {balance.usdValue}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
         </div>
 
         <div className="border-2 border-black p-2 sm:p-3 md:p-4">
