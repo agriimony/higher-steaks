@@ -100,12 +100,20 @@ export async function GET(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
     
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    // Only enforce auth if CRON_SECRET is set
+    if (cronSecret && authHeader && authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        { error: 'Unauthorized - invalid secret' },
         { status: 401 }
       );
     }
+    
+    // Log for debugging
+    console.log('Cron job triggered:', {
+      hasSecret: !!cronSecret,
+      hasAuth: !!authHeader,
+      timestamp: new Date().toISOString(),
+    });
     
     const neynarApiKey = process.env.NEYNAR_API_KEY;
     
@@ -229,8 +237,16 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Cron job error:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
     return NextResponse.json(
-      { error: 'Internal server error', details: String(error) },
+      { 
+        error: 'Internal server error', 
+        message: errorMessage,
+        stack: process.env.NODE_ENV === 'development' ? errorStack : undefined,
+        timestamp: new Date().toISOString(),
+      },
       { status: 500 }
     );
   }
