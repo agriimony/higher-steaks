@@ -144,12 +144,23 @@ export default function HigherSteakMenu() {
       setLoadingLeaderboard(true);
       try {
         const response = await fetch('/api/leaderboard/top');
+        console.log('Leaderboard response status:', response.status, response.ok);
+        
         if (response.ok) {
           const data = await response.json();
-          console.log('Leaderboard data:', data);
+          console.log('Leaderboard data received:', data);
+          console.log('Entries array:', data.entries);
+          console.log('Entries length:', data.entries?.length);
+          
+          if (data.entries && data.entries.length > 0) {
+            console.log('First entry:', data.entries[0]);
+          }
+          
           setLeaderboard(data.entries || []);
         } else {
-          console.error('Failed to fetch leaderboard');
+          console.error('Failed to fetch leaderboard, status:', response.status);
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
         }
       } catch (error) {
         console.error('Error fetching leaderboard:', error);
