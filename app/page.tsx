@@ -94,34 +94,34 @@ export default function HigherSteakMenu() {
   return (
     <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
       <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
-        <div className="border-2 border-black p-2 sm:p-3 md:p-4">
-          {/* Header Row with Profile Pill */}
-          <div className="flex justify-end mb-4 md:mb-6">
-            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow">
-              {user ? (
-                <>
-                  <img 
-                    src={user.pfpUrl} 
-                    alt={user.username}
-                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10"
-                  />
-                  <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800 pr-1.5">
-                    @{user.username}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10 bg-gray-100 flex items-center justify-center">
-                    <span className="text-gray-400 text-xs font-bold">?</span>
-                  </div>
-                  <span className="text-[0.65rem] sm:text-xs font-medium text-gray-400 pr-1.5">
-                    Not Connected
-                  </span>
-                </>
-              )}
-            </div>
+        {/* Header Row with Profile Pill - Outside black frame */}
+        <div className="flex justify-end mb-3 sm:mb-4">
+          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow">
+            {user ? (
+              <>
+                <img 
+                  src={user.pfpUrl} 
+                  alt={user.username}
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10"
+                />
+                <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800 pr-1.5">
+                  @{user.username}
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10 bg-gray-100 flex items-center justify-center">
+                  <span className="text-gray-400 text-xs font-bold">?</span>
+                </div>
+                <span className="text-[0.65rem] sm:text-xs font-medium text-gray-400 pr-1.5">
+                  Not Connected
+                </span>
+              </>
+            )}
           </div>
+        </div>
 
+        <div className="border-2 border-black p-2 sm:p-3 md:p-4">
           <div className="text-center mb-6 md:mb-10">
             <div className="flex justify-center overflow-x-auto">
               <pre className="text-[0.25rem] leading-[0.28rem] xs:text-[0.3rem] xs:leading-[0.33rem] sm:text-[0.4rem] sm:leading-[0.45rem] md:text-[0.5rem] md:leading-[0.55rem] lg:text-[0.6rem] lg:leading-[0.65rem] xl:text-[0.7rem] xl:leading-[0.75rem] whitespace-pre">
