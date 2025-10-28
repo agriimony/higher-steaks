@@ -14,7 +14,26 @@ export async function GET() {
     
     const count = parseInt(tableCheck.rows[0]?.count || '0');
     
-    // Get all entries (not just top 10)
+    // Test the EXACT same query as /api/leaderboard/top
+    const topQuery = await sql`
+      SELECT 
+        fid,
+        username,
+        display_name,
+        pfp_url,
+        cast_hash,
+        cast_text,
+        description,
+        cast_timestamp,
+        higher_balance,
+        usd_value,
+        rank
+      FROM leaderboard_entries
+      ORDER BY higher_balance DESC
+      LIMIT 10
+    `;
+    
+    // Get all entries
     const allEntries = await sql`
       SELECT 
         fid,
@@ -33,7 +52,9 @@ export async function GET() {
     return NextResponse.json({
       tableExists: true,
       totalEntries: count,
-      entries: allEntries.rows,
+      topQueryResults: topQuery.rows.length,
+      topQueryData: topQuery.rows,
+      allEntries: allEntries.rows,
       rawData: allEntries.rows.map(row => ({
         ...row,
         higher_balance: row.higher_balance?.toString(),
@@ -43,6 +64,7 @@ export async function GET() {
   } catch (error: any) {
     return NextResponse.json({
       error: error.message,
+      stack: error.stack,
       tableExists: false,
     }, { status: 500 });
   }
