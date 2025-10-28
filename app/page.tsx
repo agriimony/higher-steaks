@@ -18,10 +18,25 @@ interface TokenBalance {
   pricePerToken: number;
 }
 
+interface LeaderboardEntry {
+  fid: number;
+  username: string;
+  displayName: string;
+  pfpUrl: string;
+  castHash: string;
+  castText: string;
+  description: string;
+  higherBalance: string;
+  usdValue: string;
+  rank: number;
+}
+
 export default function HigherSteakMenu() {
   const [user, setUser] = useState<User | null>(null);
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   
   // Format large numbers with K/M/B suffixes
   const formatTokenAmount = (amount: string): string => {
@@ -39,18 +54,19 @@ export default function HigherSteakMenu() {
     }
   };
   
-  const [menuItems] = useState([
-    { name: "The Ribeye Supreme", price: "$48.00" },
-    { name: "Filet Mignon Deluxe", price: "$52.00" },
-    { name: "New York Strip Classic", price: "$44.00" },
-    { name: "Porterhouse for Two", price: "$89.00" },
-    { name: "Wagyu Sirloin Experience", price: "$76.00" },
-    { name: "Grilled Salmon Steak", price: "$38.00" },
-    { name: "Bone-In Tomahawk", price: "$95.00" },
-    { name: "Surf & Turf Combo", price: "$68.00" },
-    { name: "Prime Skirt Steak", price: "$36.00" },
-    { name: "Vegetarian Portobello Stack", price: "$28.00" },
-  ]);
+  // Fallback menu items (shown if leaderboard is empty)
+  const fallbackMenuItems = [
+    { name: "The Ribeye Supreme", price: "$48.00", description: "Perfectly aged and grilled to perfection" },
+    { name: "Filet Mignon Deluxe", price: "$52.00", description: "Tender cut with signature seasoning" },
+    { name: "New York Strip Classic", price: "$44.00", description: "Bold flavor, classic preparation" },
+    { name: "Porterhouse for Two", price: "$89.00", description: "A sharing experience for true steak lovers" },
+    { name: "Wagyu Sirloin Experience", price: "$76.00", description: "Premium marbling, unmatched richness" },
+    { name: "Grilled Salmon Steak", price: "$38.00", description: "Fresh catch with lemon butter" },
+    { name: "Bone-In Tomahawk", price: "$95.00", description: "Showstopper presentation, unforgettable taste" },
+    { name: "Surf & Turf Combo", price: "$68.00", description: "Best of land and sea" },
+    { name: "Prime Skirt Steak", price: "$36.00", description: "Flavorful and perfectly charred" },
+    { name: "Vegetarian Portobello Stack", price: "$28.00", description: "Hearty mushrooms with seasonal vegetables" },
+  ];
 
   useEffect(() => {
     // IMPORTANT: Call ready() FIRST to hide splash screen immediately
@@ -124,7 +140,26 @@ export default function HigherSteakMenu() {
       }
     };
 
+    const fetchLeaderboard = async () => {
+      setLoadingLeaderboard(true);
+      try {
+        const response = await fetch('/api/leaderboard/top');
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Leaderboard data:', data);
+          setLeaderboard(data.entries || []);
+        } else {
+          console.error('Failed to fetch leaderboard');
+        }
+      } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+      } finally {
+        setLoadingLeaderboard(false);
+      }
+    };
+
     fetchUserProfile();
+    fetchLeaderboard();
   }, []);
 
   const handleGetToken = async () => {
@@ -244,14 +279,54 @@ export default function HigherSteakMenu() {
 
           <div className="px-1 sm:px-2 md:px-4 mt-4 sm:mt-6 md:mt-8">
 
-            <div className="space-y-3 md:space-y-4">
-              {menuItems.map((item, index) => (
-                <div key={index} className="flex items-baseline text-xs sm:text-sm md:text-base">
-                  <span className="flex-shrink-0">{item.name}</span>
-                  <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
-                  <span className="flex-shrink-0 font-bold tracking-wider">{item.price}</span>
+            <div className="space-y-4 md:space-y-5">
+              {loadingLeaderboard ? (
+                // Loading state
+                <div className="text-center py-8">
+                  <div className="animate-spin h-8 w-8 border-3 border-black border-t-transparent rounded-full mx-auto mb-3"></div>
+                  <p className="text-xs sm:text-sm text-gray-600">Loading menu...</p>
                 </div>
-              ))}
+              ) : leaderboard.length > 0 ? (
+                // Leaderboard entries
+                leaderboard.map((entry, index) => (
+                  <div key={entry.fid} className="group">
+                    <div className="flex items-baseline text-xs sm:text-sm md:text-base">
+                      <a 
+                        href={`https://warpcast.com/${entry.username}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 font-bold hover:text-purple-700 transition-colors"
+                      >
+                        @{entry.username}
+                      </a>
+                      <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
+                      <span className="flex-shrink-0 font-bold tracking-wider">{entry.usdValue}</span>
+                    </div>
+                    <a
+                      href={`https://warpcast.com/${entry.username}/${entry.castHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block mt-1 text-[0.65rem] sm:text-xs text-gray-600 hover:text-gray-900 transition-colors italic"
+                    >
+                      {entry.description}
+                    </a>
+                  </div>
+                ))
+              ) : (
+                // Fallback menu if leaderboard is empty
+                fallbackMenuItems.map((item, index) => (
+                  <div key={index}>
+                    <div className="flex items-baseline text-xs sm:text-sm md:text-base">
+                      <span className="flex-shrink-0 font-bold">{item.name}</span>
+                      <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
+                      <span className="flex-shrink-0 font-bold tracking-wider">{item.price}</span>
+                    </div>
+                    <p className="mt-1 text-[0.65rem] sm:text-xs text-gray-600 italic">
+                      {item.description}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="mt-8 md:mt-10 text-center text-[0.65rem] xs:text-[0.7rem] sm:text-xs md:text-sm border-t border-black/20 pt-4">

@@ -4,6 +4,7 @@ import { base } from 'viem/chains';
 
 // Force Node.js runtime
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 // HIGHER token contract address on Base
 const HIGHER_TOKEN_ADDRESS = '0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe';

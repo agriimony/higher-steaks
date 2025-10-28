@@ -4,9 +4,14 @@ A Farcaster Mini App for the higher network discovery. This Mini App can be embe
 
 ## Features
 
-- 🍖 Premium steak menu interface
+- 🍖 Premium steak menu interface with dynamic leaderboard
 - 🔐 Farcaster MiniApp SDK integration with Quick Auth
 - 👤 User profile display (FID, username, pfp, wallet address)
+- 💰 HIGHER token balance tracking across verified addresses
+- 🏆 Live leaderboard from /higher channel casts
+- 📊 Real-time USD value conversion via CoinGecko
+- 🔄 Daily automated updates via Vercel Cron
+- 🗄️ Vercel Postgres database integration
 - 🎨 Modern, responsive design optimized for 424px modal
 - 📐 3:2 aspect ratio embed images
 
@@ -27,7 +32,19 @@ npm install
 Create a `.env.local` file in the root directory:
 
 ```env
+# Required: Neynar API Key
 NEYNAR_API_KEY=your_neynar_api_key_here
+
+# Optional: Base RPC URL (defaults to public RPC)
+BASE_RPC_URL=https://mainnet.base.org
+
+# Required for Production: Vercel Postgres (auto-added by Vercel)
+POSTGRES_URL=postgres://...
+POSTGRES_PRISMA_URL=postgres://...
+POSTGRES_URL_NON_POOLING=postgres://...
+
+# Required for Production: Cron job authentication
+CRON_SECRET=your_random_secret_here
 ```
 
 **Get your Neynar API key:**
@@ -35,7 +52,8 @@ NEYNAR_API_KEY=your_neynar_api_key_here
 2. Sign up or log in
 3. Generate an API key from your dashboard
 
-**Note:** The app will work without the Neynar API key, but will display mock user data. Add the key to fetch real Farcaster profile information.
+**Vercel Postgres Setup:**
+See [DATABASE_SETUP.md](./DATABASE_SETUP.md) for detailed database configuration instructions.
 
 ### Development
 
@@ -71,15 +89,25 @@ npm run build
 
 ## API Routes
 
-### User Authentication
-- `POST /api/user/profile` - Fetch authenticated user's Farcaster profile
-  - Requires Quick Auth JWT token in request body
-  - Returns: FID, username, display name, pfp URL, wallet address
+### User Profile & Balance
+- `GET /api/user/profile?fid={fid}` - Fetch Farcaster user profile via Neynar
+  - Returns: FID, username, display name, pfp URL, verified addresses
+  
+- `GET /api/user/balance?fid={fid}` - Get total HIGHER token balance
+  - Queries all verified addresses on Base network
+  - Returns: Total balance, formatted balance, USD value, price per token
 
-### Data Ingestion
-- `POST /api/ingest/higher` - Fetch matching casts from /higher channel
-- `GET /api/ingest/higher` - Get recent matching casts
-- `GET /api/ingest/higher/stream` - Stream matching casts in real-time
+### Leaderboard
+- `GET /api/leaderboard/top` - Get top 10 HIGHER holders from leaderboard
+  - Returns: FID, username, cast text, description, HIGHER balance, USD value
+
+### Cron Jobs
+- `GET /api/cron/update-leaderboard` - Daily leaderboard update (Vercel Cron)
+  - Runs at midnight UTC
+  - Fetches /higher channel casts with keyphrase "started aiming higher and it worked out!"
+  - Calculates HIGHER balances and USD values
+  - Stores top 100 entries in database
+  - Protected by `CRON_SECRET` header
 
 ## Development
 
