@@ -7,6 +7,13 @@ export const dynamic = 'force-dynamic'; // Disable caching for fresh data
 export async function GET() {
   try {
     console.log('=== Fetching leaderboard entries ===');
+    console.log('POSTGRES_URL exists:', !!process.env.POSTGRES_URL);
+    console.log('POSTGRES_PRISMA_URL exists:', !!process.env.POSTGRES_PRISMA_URL);
+    console.log('POSTGRES_URL_NON_POOLING exists:', !!process.env.POSTGRES_URL_NON_POOLING);
+    
+    // First, let's verify the connection works
+    const testQuery = await sql`SELECT 1 as test`;
+    console.log('Database connection test:', testQuery.rows[0]);
     
     // Query top 10 users by HIGHER balance
     const result = await sql`
