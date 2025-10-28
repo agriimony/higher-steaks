@@ -53,27 +53,24 @@ export async function GET(request: NextRequest) {
       logs.push(`  ❌ fetchBulkUsers failed: ${e.message}`);
     }
     
-    // Test 2: searchCasts with channel_id (RECOMMENDED FOR FREE TIER)
+    // Test 2: fetchCastsForUser (FREE TIER - gets user's recent casts)
     try {
-      logs.push('- Testing searchCasts with channel_id and keyphrase...');
-      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const afterDate = yesterday.toISOString().split('T')[0];
-      
-      const searchTest = await neynarClient.searchCasts({
-        q: `started aiming higher and it worked out after:${afterDate}`,
-        channelId: 'higher',
+      logs.push('- Testing fetchCastsForUser (free tier)...');
+      const userCastsTest = await neynarClient.fetchCastsForUser({
+        fid: 3, // Test with dwr
         limit: 5,
       });
-      const casts = searchTest.result?.casts || [];
-      apiTestResults.searchCasts = '✅ Works';
-      logs.push(`  ✅ searchCasts works: ${casts.length} casts with keyphrase`);
+      const casts = userCastsTest.casts || [];
+      apiTestResults.fetchCastsForUser = '✅ Works';
+      logs.push(`  ✅ fetchCastsForUser works: ${casts.length} casts from @dwr`);
       
       if (casts.length > 0) {
-        logs.push(`  First match: @${casts[0].author.username} - ${casts[0].text.substring(0, 80)}...`);
+        logs.push(`  First cast: ${casts[0].text.substring(0, 80)}...`);
+        logs.push(`  Channel: ${casts[0].channel?.id || 'none'}`);
       }
     } catch (e: any) {
-      apiTestResults.searchCasts = '❌ ' + e.message;
-      logs.push(`  ❌ searchCasts failed: ${e.message}`);
+      apiTestResults.fetchCastsForUser = '❌ ' + e.message;
+      logs.push(`  ❌ fetchCastsForUser failed: ${e.message}`);
     }
     
     logs.push('');

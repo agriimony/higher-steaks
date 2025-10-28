@@ -136,21 +136,57 @@ export async function GET(request: NextRequest) {
     // Note: Neynar's feed API may have different methods - adjust as needed
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     
-    console.log('Fetching casts from /higher channel...');
+    console.log('Fetching recent casts (FREE TIER workaround)...');
     
-    // Calculate time range (last 24 hours)
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const afterDate = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD format
+    // FREE TIER WORKAROUND:
+    // Since channel feeds and searchCasts require paid plans, we'll use a hybrid approach:
+    // 1. Manually maintain a list of active HIGHER community FIDs
+    // 2. Fetch their recent casts using fetchBulkCastsByUser (free tier)
+    // 3. Filter for /higher channel and keyphrase client-side
     
-    // Use searchCasts with channel_id parameter (FREE TIER COMPATIBLE)
-    // Search for our keyphrase in the /higher channel
-    const castsResponse = await neynarClient.searchCasts({
-      q: `started aiming higher and it worked out after:${afterDate}`,
-      channelId: 'higher',
-      limit: 100,
-    });
+    // Seed list of known HIGHER community members (expand this list over time)
+    // You can find active members by visiting warpcast.com/~/channel/higher
+    const knownHigherFids = [
+      3,      // dwr
+      2,      // v
+      239,    // composta  
+      602,    // wake
+      1231,   // jayme
+      15971,  // ted
+      // Add more active /higher community member FIDs here
+      // This list can be expanded based on who posts frequently
+    ];
     
-    const casts = castsResponse.result?.casts || [];
+    console.log(`Fetching casts from ${knownHigherFids.length} known HIGHER community members...`);
+    
+    const allCasts: any[] = [];
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    // Fetch recent casts for each known FID
+    for (const fid of knownHigherFids) {
+      try {
+        const userCasts = await neynarClient.fetchCastsForUser({
+          fid,
+          limit: 25, // Check last 25 casts per user
+        });
+        
+        // Filter for /higher channel and within last 24h
+        const higherCasts = (userCasts.casts || []).filter((cast: any) => {
+          const castTime = new Date(cast.timestamp);
+          const isRecent = castTime > oneDayAgo;
+          const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
+          return isRecent && isHigherChannel;
+        });
+        
+        allCasts.push(...higherCasts);
+      } catch (error) {
+        console.error(`Error fetching casts for FID ${fid}:`, error);
+        // Continue with other FIDs
+      }
+    }
+    
+    const casts = allCasts;
+    console.log(`Found ${casts.length} total casts from /higher channel in last 24h`);
     
     console.log(`Found ${casts.length} casts matching keyphrase`);
     
