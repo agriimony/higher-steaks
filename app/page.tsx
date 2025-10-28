@@ -5,7 +5,11 @@ import { sdk } from '@farcaster/miniapp-sdk';
 
 interface User {
   fid: number;
-  username?: string;
+  username: string;
+  displayName: string;
+  pfpUrl: string;
+  walletAddress: string | null;
+  bio?: string;
 }
 
 export default function HigherSteakMenu() {
@@ -37,18 +41,44 @@ export default function HigherSteakMenu() {
     // Hide splash immediately
     hideSplash();
 
-    // Then try to authenticate (this can happen after splash is hidden)
-    const authenticate = async () => {
+    // Then try to get user context (this can happen after splash is hidden)
+    const fetchUserProfile = async () => {
       try {
-        const { token } = await sdk.quickAuth.getToken();
-        console.log('✅ Authenticated with Farcaster');
-        setUser({ fid: 1234 });
+        // Get context from Farcaster SDK
+        const context = await sdk.context;
+        
+        if (!context?.user?.fid) {
+          console.log('Not in Farcaster client or no user context');
+          return;
+        }
+
+        const fid = context.user.fid;
+        console.log('✅ User FID from context:', fid);
+
+        // Fetch full profile from backend
+        const response = await fetch(`/api/user/profile?fid=${fid}`);
+
+        if (response.ok) {
+          const profileData = await response.json();
+          console.log('Profile data:', profileData);
+          setUser(profileData);
+        } else {
+          console.error('Failed to fetch profile');
+          // Fallback to just FID if profile fetch fails
+          setUser({
+            fid,
+            username: `user-${fid}`,
+            displayName: `User ${fid}`,
+            pfpUrl: '',
+            walletAddress: null,
+          });
+        }
       } catch (error) {
-        console.log('No authentication available');
+        console.log('Not in Farcaster client:', error);
       }
     };
 
-    authenticate();
+    fetchUserProfile();
   }, []);
 
   const handleGetToken = async () => {
@@ -64,14 +94,23 @@ export default function HigherSteakMenu() {
   return (
     <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
       <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
-        {/* Authentication Status */}
-        {user && (
-          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <p className="text-sm text-blue-800">✓ Authenticated as Farcaster user</p>
-          </div>
-        )}
-        
-        <div className="border-2 border-black p-2 sm:p-3 md:p-4">
+        <div className="border-2 border-black p-2 sm:p-3 md:p-4 relative">
+          {/* User Profile Pill - Top Right */}
+          {user && (
+            <div className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 z-10">
+              <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow">
+                <img 
+                  src={user.pfpUrl} 
+                  alt={user.username}
+                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10"
+                />
+                <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800 pr-1.5">
+                  @{user.username}
+                </span>
+              </div>
+            </div>
+          )}
+
           <div className="text-center mb-6 md:mb-10">
             <div className="flex justify-center overflow-x-auto">
               <pre className="text-[0.25rem] leading-[0.28rem] xs:text-[0.3rem] xs:leading-[0.33rem] sm:text-[0.4rem] sm:leading-[0.45rem] md:text-[0.5rem] md:leading-[0.55rem] lg:text-[0.6rem] lg:leading-[0.65rem] xl:text-[0.7rem] xl:leading-[0.75rem] whitespace-pre">
