@@ -138,29 +138,19 @@ export async function GET(request: NextRequest) {
     
     console.log('Fetching casts from /higher channel...');
     
-    // Try using lookupChannel and then fetchAllCastsInThread or fetchFeed
-    // Free tier workaround: fetch recent feed and filter by channel
-    let casts: any[] = [];
+    // Calculate time range (last 24 hours)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const afterDate = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD format
     
-    try {
-      // Option 1: Try fetchFeed with filter_type
-      const castsResponse = await neynarClient.fetchFeed({
-        filterType: 'channel_id' as any,
-        channelId: 'higher',
-        limit: 100,
-        withRecasts: false,
-      });
-      casts = castsResponse.casts || [];
-    } catch (error1) {
-      console.log('fetchFeed failed, trying alternative...', error1);
-      
-      // Option 2: If that fails, return error with helpful message
-      throw new Error(
-        'Unable to fetch channel feed. This may require a paid Neynar plan. ' +
-        'Free tier only includes: user lookups, cast by hash, and user feeds. ' +
-        'Consider upgrading to Neynar Growth plan ($49/mo) for channel feeds.'
-      );
-    }
+    // Use searchCasts with channel_id parameter (FREE TIER COMPATIBLE)
+    // Search for our keyphrase in the /higher channel
+    const castsResponse = await neynarClient.searchCasts({
+      q: `started aiming higher and it worked out after:${afterDate}`,
+      channelId: 'higher',
+      limit: 100,
+    });
+    
+    const casts = castsResponse.result?.casts || [];
     
     console.log(`Found ${casts.length} casts matching keyphrase`);
     

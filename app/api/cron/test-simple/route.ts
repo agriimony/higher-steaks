@@ -53,39 +53,27 @@ export async function GET(request: NextRequest) {
       logs.push(`  ❌ fetchBulkUsers failed: ${e.message}`);
     }
     
-    // Test 2: fetchFeed (may work on free tier)
+    // Test 2: searchCasts with channel_id (RECOMMENDED FOR FREE TIER)
     try {
-      logs.push('- Testing fetchFeed...');
-      const feedTest = await neynarClient.fetchFeed({
-        filterType: 'channel_id' as any,
+      logs.push('- Testing searchCasts with channel_id and keyphrase...');
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const afterDate = yesterday.toISOString().split('T')[0];
+      
+      const searchTest = await neynarClient.searchCasts({
+        q: `started aiming higher and it worked out after:${afterDate}`,
         channelId: 'higher',
         limit: 5,
       });
-      const casts = feedTest.casts || [];
-      apiTestResults.fetchFeed = '✅ Works';
-      logs.push(`  ✅ fetchFeed works: ${casts.length} casts`);
-    } catch (e: any) {
-      apiTestResults.fetchFeed = '❌ ' + e.message;
-      logs.push(`  ❌ fetchFeed failed: ${e.message}`);
-    }
-    
-    // Test 3: fetchFeedByChannelIds
-    try {
-      logs.push('- Testing fetchFeedByChannelIds...');
-      const channelFeedTest = await neynarClient.fetchFeedByChannelIds({
-        channelIds: ['higher'],
-        limit: 5,
-      });
-      const casts = channelFeedTest.casts || [];
-      apiTestResults.fetchFeedByChannelIds = '✅ Works';
-      logs.push(`  ✅ fetchFeedByChannelIds works: ${casts.length} casts`);
+      const casts = searchTest.result?.casts || [];
+      apiTestResults.searchCasts = '✅ Works';
+      logs.push(`  ✅ searchCasts works: ${casts.length} casts with keyphrase`);
       
       if (casts.length > 0) {
-        logs.push(`  First cast: @${casts[0].author.username} - ${casts[0].text.substring(0, 80)}...`);
+        logs.push(`  First match: @${casts[0].author.username} - ${casts[0].text.substring(0, 80)}...`);
       }
     } catch (e: any) {
-      apiTestResults.fetchFeedByChannelIds = '❌ ' + e.message;
-      logs.push(`  ❌ fetchFeedByChannelIds failed: ${e.message}`);
+      apiTestResults.searchCasts = '❌ ' + e.message;
+      logs.push(`  ❌ searchCasts failed: ${e.message}`);
     }
     
     logs.push('');
