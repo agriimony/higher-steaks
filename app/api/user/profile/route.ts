@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     // Lazy import Neynar SDK to avoid client-side bundling
     const { NeynarAPIClient } = await import('@neynar/nodejs-sdk');
-    const neynarClient = new NeynarAPIClient(neynarApiKey);
+    const neynarClient = new NeynarAPIClient({ apiKey: neynarApiKey });
     
     // Fetch user profile from Neynar
     try {
