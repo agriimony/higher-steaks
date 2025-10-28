@@ -173,16 +173,6 @@ export default function HigherSteakMenu() {
     fetchLeaderboard();
   }, []);
 
-  const handleGetToken = async () => {
-    try {
-      const { token } = await sdk.quickAuth.getToken();
-      console.log('Token:', token);
-      alert(`Authenticated! Token: ${token.substring(0, 20)}...`);
-    } catch (error) {
-      console.error('Auth error:', error);
-    }
-  };
-
   return (
     <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
       <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
@@ -349,16 +339,6 @@ export default function HigherSteakMenu() {
 
         <div className="text-center mt-3 md:mt-4">
           <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60">Open Daily · 5PM – 11PM</p>
-        </div>
-
-        {/* Test Authentication Button (for development) */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={handleGetToken}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Test Quick Auth
-          </button>
         </div>
       </div>
     </main>
