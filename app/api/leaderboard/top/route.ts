@@ -16,20 +16,9 @@ export async function GET() {
     console.log('Database connection test:', testQuery.rows[0]);
     
     // Query top 10 users by HIGHER balance
+    // Using the same query structure that works in /compare
     const result = await sql`
-      SELECT 
-        fid,
-        username,
-        display_name,
-        pfp_url,
-        cast_hash,
-        cast_text,
-        description,
-        cast_timestamp,
-        higher_balance,
-        usd_value,
-        rank
-      FROM leaderboard_entries
+      SELECT * FROM leaderboard_entries 
       ORDER BY higher_balance DESC
       LIMIT 10
     `;
