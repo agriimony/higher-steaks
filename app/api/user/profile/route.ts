@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     
     // Fetch user profile from Neynar
     try {
-      const userResponse = await neynarClient.fetchBulkUsers([fid]);
+      const userResponse = await neynarClient.fetchBulkUsers({ fids: [fid] });
       const user = userResponse.users[0];
 
       if (!user) {
