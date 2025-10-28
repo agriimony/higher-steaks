@@ -186,15 +186,18 @@ export async function GET(request: NextRequest) {
     const casts = allCasts;
     console.log(`Found ${casts.length} total casts from /higher channel in last 24h`);
     
-    console.log(`Found ${casts.length} casts matching keyphrase`);
-    
     // Filter and process casts
     const validCasts = new Map(); // FID -> cast data (keep only most recent per FID)
+    let skippedCount = 0;
     
     for (const cast of casts) {
       const description = extractDescription(cast.text);
       
-      if (!description) continue; // Skip if keyphrase not found or no description
+      if (!description) {
+        skippedCount++;
+        console.log(`Skipped cast from @${cast.author.username}: "${cast.text.substring(0, 100)}..."`);
+        continue; // Skip if keyphrase not found or no description
+      }
       
       const fid = cast.author.fid;
       const castTimestamp = new Date(cast.timestamp);
@@ -215,7 +218,8 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    console.log(`Processing ${validCasts.size} unique users...`);
+    console.log(`Skipped ${skippedCount} casts without keyphrase`);
+    console.log(`Processing ${validCasts.size} unique users with matching casts...`);
     
     // Get balances for all users
     const tokenPrice = await getTokenPrice();
