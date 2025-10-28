@@ -22,6 +22,23 @@ export default function HigherSteakMenu() {
   const [user, setUser] = useState<User | null>(null);
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
+  
+  // Format large numbers with K/M/B suffixes
+  const formatTokenAmount = (amount: string): string => {
+    const num = parseFloat(amount.replace(/,/g, ''));
+    if (isNaN(num)) return amount;
+    
+    if (num >= 1_000_000_000) {
+      return (num / 1_000_000_000).toFixed(2) + 'B';
+    } else if (num >= 1_000_000) {
+      return (num / 1_000_000).toFixed(2) + 'M';
+    } else if (num >= 1_000) {
+      return (num / 1_000).toFixed(2) + 'K';
+    } else {
+      return num.toFixed(2);
+    }
+  };
+  
   const [menuItems] = useState([
     { name: "The Ribeye Supreme", price: "$48.00" },
     { name: "Filet Mignon Deluxe", price: "$52.00" },
@@ -135,7 +152,7 @@ export default function HigherSteakMenu() {
             ) : balance ? (
               <div className="flex items-center gap-1.5">
                 <span className="text-[0.65rem] sm:text-xs font-bold text-purple-700">
-                  {balance.totalBalanceFormatted} HIGHER
+                  {formatTokenAmount(balance.totalBalanceFormatted)} HIGHER
                 </span>
                 <span className="text-gray-400">•</span>
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
