@@ -147,7 +147,7 @@ export async function GET(request: NextRequest) {
           abi: LOCKUP_ABI,
           functionName: 'lockUps',
           args: [lockupId],
-        }) as readonly [string, boolean, number, boolean, bigint, string, string];
+        }) as readonly [`0x${string}`, boolean, bigint, boolean, bigint, `0x${string}`, string];
         
         const [token, isERC20, unlockTime, unlocked, amount, receiver, title] = lockup;
         
