@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
         
         // Only include active (not unlocked) lockups
         if (!unlocked) {
-          
+          const receiverLower = receiver.toLowerCase();
           const current = receiverBalances.get(receiverLower) || 0n;
           receiverBalances.set(receiverLower, current + amount);
         }
