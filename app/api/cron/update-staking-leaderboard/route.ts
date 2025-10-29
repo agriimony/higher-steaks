@@ -288,9 +288,26 @@ export async function GET(request: NextRequest) {
       };
     });
     
-    // Sort by staked balance and keep top 100
+    // Sort by staked balance
     entriesWithUsd.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
-    const top100 = entriesWithUsd.slice(0, 100);
+    
+    // Deduplicate by FID - keep only the entry with highest balance per FID
+    const deduplicatedEntries = new Map<number, typeof entriesWithUsd[0]>();
+    for (const entry of entriesWithUsd) {
+      const existing = deduplicatedEntries.get(entry.fid);
+      if (!existing || entry.balanceFormatted > existing.balanceFormatted) {
+        deduplicatedEntries.set(entry.fid, entry);
+      }
+    }
+    
+    // Convert back to array and sort again
+    const uniqueEntries = Array.from(deduplicatedEntries.values());
+    uniqueEntries.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
+    
+    // Keep top 100
+    const top100 = uniqueEntries.slice(0, 100);
+    
+    console.log(`After deduplication: ${uniqueEntries.length} unique FIDs, storing top ${top100.length}`);
     
     console.log(`Storing top ${top100.length} entries in database...`);
     
