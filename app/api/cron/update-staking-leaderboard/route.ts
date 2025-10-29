@@ -215,10 +215,13 @@ export async function GET(request: NextRequest) {
     
     console.log(`Mapped ${addressToFid.size} addresses to Farcaster accounts`);
     
-    // Step 5: Find casts with keyphrase
-    console.log('Step 5: Finding casts with keyphrase...');
-    const validEntries = [];
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Step 4b: Aggregate balances by FID
+    console.log('Step 4b: Aggregating balances by FID...');
+    const fidBalances = new Map<number, {
+      totalBalance: bigint;
+      user: any;
+      addresses: string[];
+    }>();
     
     for (const [address, balance] of receiverBalances.entries()) {
       const user = addressToFid.get(address);
@@ -228,7 +231,32 @@ export async function GET(request: NextRequest) {
         continue;
       }
       
+      const existing = fidBalances.get(user.fid);
+      if (existing) {
+        // Add to existing balance for this FID
+        existing.totalBalance += balance;
+        existing.addresses.push(address);
+      } else {
+        // Create new entry for this FID
+        fidBalances.set(user.fid, {
+          totalBalance: balance,
+          user,
+          addresses: [address],
+        });
+      }
+    }
+    
+    console.log(`Aggregated to ${fidBalances.size} unique FIDs`);
+    
+    // Step 5: Find casts with keyphrase
+    console.log('Step 5: Finding casts with keyphrase...');
+    const validEntries = [];
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    
+    for (const [fid, { totalBalance, user, addresses }] of fidBalances.entries()) {
       try {
+        console.log(`Checking FID ${fid} (${user.username}) with total balance ${formatUnits(totalBalance, 18)} HIGHER from ${addresses.length} address(es)`);
+        
         // Fetch recent casts from user
         const userCasts = await neynarClient.fetchCastsForUser({
           fid: user.fid,
@@ -251,22 +279,24 @@ export async function GET(request: NextRequest) {
           const description = extractDescription(latestCast.text);
           
           if (description) {
+            console.log(`  ✓ Found matching cast for ${user.username}`);
             validEntries.push({
               fid: user.fid,
               username: user.username,
               displayName: user.display_name || user.username,
               pfpUrl: user.pfp_url || '',
-              walletAddress: address,
               castHash: latestCast.hash,
               castText: latestCast.text,
               description,
               timestamp: latestCast.timestamp,
-              stakedBalance: balance,
+              stakedBalance: totalBalance, // Total across all addresses
             });
           }
+        } else {
+          console.log(`  ✗ No matching cast for ${user.username}`);
         }
       } catch (error) {
-        console.error(`Error fetching casts for FID ${user.fid}:`, error);
+        console.error(`Error fetching casts for FID ${fid}:`, error);
         // Continue with other users
       }
     }
@@ -288,26 +318,11 @@ export async function GET(request: NextRequest) {
       };
     });
     
-    // Sort by staked balance
+    // Sort by staked balance and keep top 100
     entriesWithUsd.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
+    const top100 = entriesWithUsd.slice(0, 100);
     
-    // Deduplicate by FID - keep only the entry with highest balance per FID
-    const deduplicatedEntries = new Map<number, typeof entriesWithUsd[0]>();
-    for (const entry of entriesWithUsd) {
-      const existing = deduplicatedEntries.get(entry.fid);
-      if (!existing || entry.balanceFormatted > existing.balanceFormatted) {
-        deduplicatedEntries.set(entry.fid, entry);
-      }
-    }
-    
-    // Convert back to array and sort again
-    const uniqueEntries = Array.from(deduplicatedEntries.values());
-    uniqueEntries.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
-    
-    // Keep top 100
-    const top100 = uniqueEntries.slice(0, 100);
-    
-    console.log(`After deduplication: ${uniqueEntries.length} unique FIDs, storing top ${top100.length}`);
+    console.log(`Sorted by balance, storing top ${top100.length} entries`);
     
     console.log(`Storing top ${top100.length} entries in database...`);
     
