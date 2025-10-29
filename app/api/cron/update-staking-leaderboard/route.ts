@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
       abi: LOCKUP_ABI,
       functionName: 'getLockUpIdsByToken',
       args: [HIGHER_TOKEN, 1n, totalLockups],
-    });
+    }) as bigint[];
     
     console.log(`Found ${higherLockupIds.length} HIGHER lockups`);
     
@@ -165,15 +165,16 @@ export async function GET(request: NextRequest) {
           abi: LOCKUP_ABI,
           functionName: 'lockUps',
           args: [lockupId],
-        });
+        }) as readonly [string, boolean, number, boolean, bigint, string, string];
+        
+        // Destructure for clarity: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
+        const [token, isERC20, unlockTime, unlocked, amount, receiver, title] = lockup;
         
         // Only include active (not unlocked) lockups
-        if (!lockup[3]) { // unlocked is at index 3
-          const receiver = lockup[5].toLowerCase(); // receiver is at index 5
-          const amount = lockup[4]; // amount is at index 4
+        if (!unlocked) {
           
-          const current = receiverBalances.get(receiver) || 0n;
-          receiverBalances.set(receiver, current + amount);
+          const current = receiverBalances.get(receiverLower) || 0n;
+          receiverBalances.set(receiverLower, current + amount);
         }
       } catch (error) {
         console.error(`Error fetching lockup ${lockupId}:`, error);
