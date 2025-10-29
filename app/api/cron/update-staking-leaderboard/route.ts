@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
       const batch = addresses.slice(i, i + batchSize);
       
       try {
-        const users = await neynarClient.fetchBulkUsersByEthereumAddress({
+        const users = await neynarClient.fetchBulkUsersByEthOrSolAddress({
           addresses: batch as `0x${string}`[],
         });
         
