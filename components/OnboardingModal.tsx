@@ -29,25 +29,31 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
 
   const handleQuickCast = async () => {
     try {
-      await sdk.actions.composeCast({
+      console.log('Opening cast composer...');
+      const result = await sdk.actions.composeCast({
         text: "started aiming higher and it worked out! ",
         channelKey: "higher"
       });
+      console.log('Compose cast result:', result);
+      // Only close if user successfully posted or cancelled intentionally
       onClose();
     } catch (error) {
       console.error("Failed to open cast composer:", error);
+      // Keep modal open on error
     }
   };
 
   const handleStakeOnMintClub = async () => {
     try {
+      console.log('Opening mint.club miniapp...');
       await sdk.actions.openMiniApp({
         url: "https://farcaster.xyz/miniapps/ebIiKqVQ26EG/mint-club"
       });
       // Note: Current app will close after successful navigation
-      onClose();
+      // No need to call onClose() as the app will close
     } catch (error) {
       console.error("Failed to open mint.club:", error);
+      // Keep modal open on error
     }
   };
 
@@ -56,14 +62,24 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
       // CAIP-19 format for HIGHER token on Base (chain ID 8453)
       const buyToken = "eip155:8453/erc20:0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe";
       
+      console.log('Opening swap for buyToken:', buyToken);
       const result = await sdk.actions.swapToken({
         buyToken,
       });
       
       console.log('Swap result:', result);
-      onClose();
+      
+      // Only close modal if swap was successful
+      if (result.success) {
+        console.log('Swap successful, transactions:', result.swap.transactions);
+        onClose();
+      } else {
+        console.error('Swap failed:', result.reason, result.error);
+        // Keep modal open so user can try again
+      }
     } catch (error) {
       console.error("Failed to open swap:", error);
+      // Keep modal open on error
     }
   };
 
