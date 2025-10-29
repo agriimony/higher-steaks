@@ -326,8 +326,27 @@ export async function GET(request: NextRequest) {
     
     console.log(`Storing top ${top100.length} entries in database...`);
     
-    // Step 7: Update database
-    console.log('Deleting old entries...');
+    // Validate: Check for duplicate FIDs in top100
+    const fidSet = new Set();
+    const duplicates = [];
+    for (const entry of top100) {
+      if (fidSet.has(entry.fid)) {
+        duplicates.push(entry.fid);
+      }
+      fidSet.add(entry.fid);
+    }
+    
+    if (duplicates.length > 0) {
+      console.error(`ERROR: Found duplicate FIDs in top100:`, duplicates);
+      throw new Error(`Duplicate FIDs found: ${duplicates.join(', ')}`);
+    }
+    
+    console.log('Validation passed: All FIDs are unique');
+    
+    // Step 7: Update database using UPSERT (INSERT ... ON CONFLICT)
+    console.log('Clearing old entries and inserting new ones...');
+    
+    // First, delete all entries
     const deleteResult = await sql`DELETE FROM leaderboard_entries`;
     console.log(`Deleted ${deleteResult.rowCount} old entries`);
     
@@ -336,25 +355,42 @@ export async function GET(request: NextRequest) {
       const entry = top100[i];
       console.log(`Inserting entry ${i + 1}: FID ${entry.fid}, balance ${entry.balanceFormatted}`);
       
-      const insertResult = await sql`
-        INSERT INTO leaderboard_entries (
-          fid, username, display_name, pfp_url, cast_hash, cast_text,
-          description, cast_timestamp, higher_balance, usd_value, rank
-        ) VALUES (
-          ${entry.fid},
-          ${entry.username},
-          ${entry.displayName},
-          ${entry.pfpUrl},
-          ${entry.castHash},
-          ${entry.castText},
-          ${entry.description},
-          ${entry.timestamp},
-          ${entry.balanceFormatted},
-          ${entry.usdValue},
-          ${i + 1}
-        )
-      `;
-      console.log(`Inserted entry ${i + 1}, rowCount: ${insertResult.rowCount}`);
+      try {
+        const insertResult = await sql`
+          INSERT INTO leaderboard_entries (
+            fid, username, display_name, pfp_url, cast_hash, cast_text,
+            description, cast_timestamp, higher_balance, usd_value, rank
+          ) VALUES (
+            ${entry.fid},
+            ${entry.username},
+            ${entry.displayName},
+            ${entry.pfpUrl},
+            ${entry.castHash},
+            ${entry.castText},
+            ${entry.description},
+            ${entry.timestamp},
+            ${entry.balanceFormatted},
+            ${entry.usdValue},
+            ${i + 1}
+          )
+          ON CONFLICT (fid) DO UPDATE SET
+            username = EXCLUDED.username,
+            display_name = EXCLUDED.display_name,
+            pfp_url = EXCLUDED.pfp_url,
+            cast_hash = EXCLUDED.cast_hash,
+            cast_text = EXCLUDED.cast_text,
+            description = EXCLUDED.description,
+            cast_timestamp = EXCLUDED.cast_timestamp,
+            higher_balance = EXCLUDED.higher_balance,
+            usd_value = EXCLUDED.usd_value,
+            rank = EXCLUDED.rank,
+            updated_at = NOW()
+        `;
+        console.log(`Inserted/Updated entry ${i + 1}, rowCount: ${insertResult.rowCount}`);
+      } catch (insertError: any) {
+        console.error(`Error inserting FID ${entry.fid}:`, insertError.message);
+        throw insertError;
+      }
     }
     
     // Verify the inserts
