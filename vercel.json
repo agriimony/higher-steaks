@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/update-leaderboard",
+      "path": "/api/cron/update-staking-leaderboard",
       "schedule": "0 0 * * *"
     }
   ]
