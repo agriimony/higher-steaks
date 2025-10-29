@@ -475,7 +475,7 @@ export default function HigherSteakMenu() {
                   <div key={entry.fid} className="group">
                     <div className="flex items-baseline text-xs sm:text-sm md:text-base">
                       <a 
-                        href={`https://warpcast.com/${entry.username}`}
+                        href={`https://farcaster.xyz/${entry.username}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex-shrink-0 font-bold hover:text-purple-700 transition-colors"
@@ -486,7 +486,7 @@ export default function HigherSteakMenu() {
                       <span className="flex-shrink-0 font-bold tracking-wider">{entry.usdValue}</span>
                     </div>
                     <a
-                      href={`https://warpcast.com/${entry.username}/${entry.castHash}`}
+                      href={`https://farcaster.xyz/${entry.username}/${entry.castHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block mt-1 text-[0.65rem] sm:text-xs text-gray-600 hover:text-gray-900 transition-colors italic"
