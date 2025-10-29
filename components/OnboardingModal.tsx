@@ -52,13 +52,12 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
     try {
       // CAIP-19 format for HIGHER token on Base (chain ID 8453)
       const buyToken = "eip155:8453/erc20:0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe";
-      // Default sell token: USDC on Base
-      const sellToken = "eip155:8453/erc20:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
       
-      await sdk.actions.swapToken({
+      const result = await sdk.actions.swapToken({
         buyToken,
-        sellToken,
       });
+      
+      console.log('Swap result:', result);
       onClose();
     } catch (error) {
       console.error("Failed to open swap:", error);
