@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
+import { OnboardingModal } from '@/components/OnboardingModal';
 
 interface User {
   fid: number;
@@ -16,6 +17,10 @@ interface TokenBalance {
   totalBalanceFormatted: string;
   usdValue: string;
   pricePerToken: number;
+}
+
+interface StakingBalance {
+  totalStakedFormatted: string;
 }
 
 interface LeaderboardEntry {
@@ -35,8 +40,17 @@ export default function HigherSteakMenu() {
   const [user, setUser] = useState<User | null>(null);
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
+  const [stakingBalance, setStakingBalance] = useState<StakingBalance | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [onboardingState, setOnboardingState] = useState<'staked-no-cast' | 'has-enough' | 'needs-more' | null>(null);
+  const [onboardingData, setOnboardingData] = useState<{
+    stakedAmount?: string;
+    walletAmount?: string;
+    totalAmount?: string;
+    minimumRequired?: string;
+  }>({});
   
   // Format large numbers with K/M/B suffixes
   const formatTokenAmount = (amount: string): string => {
@@ -104,8 +118,9 @@ export default function HigherSteakMenu() {
           console.log('Profile data:', profileData);
           setUser(profileData);
           
-          // Fetch token balance after getting user profile
+          // Fetch token balance and staking balance after getting user profile
           fetchTokenBalance(fid);
+          fetchStakingBalance(fid);
         } else {
           console.error('Failed to fetch profile');
           // Fallback to just FID if profile fetch fails
@@ -137,6 +152,21 @@ export default function HigherSteakMenu() {
         console.error('Error fetching balance:', error);
       } finally {
         setLoadingBalance(false);
+      }
+    };
+
+    const fetchStakingBalance = async (fid: number) => {
+      try {
+        const response = await fetch(`/api/user/staking-balance?fid=${fid}`);
+        if (response.ok) {
+          const stakingData = await response.json();
+          console.log('Staking data:', stakingData);
+          setStakingBalance(stakingData);
+        } else {
+          console.error('Failed to fetch staking balance');
+        }
+      } catch (error) {
+        console.error('Error fetching staking balance:', error);
       }
     };
 
@@ -173,9 +203,109 @@ export default function HigherSteakMenu() {
     fetchLeaderboard();
   }, []);
 
+  // Check onboarding status after all data is loaded
+  useEffect(() => {
+    const checkOnboardingStatus = () => {
+      if (!user?.fid || loadingLeaderboard || loadingBalance) {
+        return; // Wait for all data to load
+      }
+
+      // Check if user dismissed modal this session
+      const dismissedKey = `higher-steaks-onboarding-dismissed-${user.fid}`;
+      if (typeof window !== 'undefined' && sessionStorage.getItem(dismissedKey)) {
+        return;
+      }
+
+      // 1. Check if user is already on leaderboard
+      const isOnLeaderboard = leaderboard.some(entry => entry.fid === user.fid);
+      if (isOnLeaderboard) {
+        console.log('User is on leaderboard, skip onboarding modal');
+        return; // Skip modal entirely
+      }
+
+      // Get balances
+      const stakedAmount = parseFloat(stakingBalance?.totalStakedFormatted?.replace(/,/g, '') || '0');
+      const walletAmount = parseFloat(balance?.totalBalanceFormatted?.replace(/,/g, '') || '0');
+      const totalAmount = stakedAmount + walletAmount;
+      
+      // Get minimum leaderboard amount (10th place or 0 if leaderboard is empty)
+      const minimumRequired = leaderboard.length > 0 
+        ? parseFloat(leaderboard[leaderboard.length - 1]?.higherBalance?.replace(/,/g, '') || '0')
+        : 0;
+
+      console.log('Onboarding check:', {
+        stakedAmount,
+        walletAmount,
+        totalAmount,
+        minimumRequired,
+        leaderboardLength: leaderboard.length,
+      });
+
+      // STATE 1: User has staked HIGHER but hasn't made a qualifying cast
+      if (stakedAmount > 0) {
+        setOnboardingState('staked-no-cast');
+        setOnboardingData({
+          stakedAmount: stakingBalance?.totalStakedFormatted || '0',
+        });
+        setShowOnboardingModal(true);
+        console.log('Onboarding: State 1 - Staked but no cast');
+        return;
+      }
+
+      // STATE 2: User is not staked enough
+      // STATE 2a: User has enough HIGHER total but hasn't staked enough
+      if (totalAmount >= minimumRequired && minimumRequired > 0) {
+        setOnboardingState('has-enough');
+        setOnboardingData({
+          stakedAmount: stakingBalance?.totalStakedFormatted || '0',
+          walletAmount: balance?.totalBalanceFormatted || '0',
+          totalAmount: totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          minimumRequired: minimumRequired.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+        });
+        setShowOnboardingModal(true);
+        console.log('Onboarding: State 2a - Has enough but not staked');
+        return;
+      }
+
+      // STATE 2b: User does not have enough HIGHER total
+      if (totalAmount < minimumRequired || minimumRequired === 0) {
+        setOnboardingState('needs-more');
+        setOnboardingData({
+          totalAmount: totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+          minimumRequired: minimumRequired > 0 
+            ? minimumRequired.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : '1,000.00', // Default minimum if leaderboard is empty
+        });
+        setShowOnboardingModal(true);
+        console.log('Onboarding: State 2b - Needs more HIGHER');
+        return;
+      }
+    };
+
+    checkOnboardingStatus();
+  }, [user, balance, stakingBalance, leaderboard, loadingLeaderboard, loadingBalance]);
+
+  const handleCloseOnboardingModal = () => {
+    setShowOnboardingModal(false);
+    // Remember dismissal for this session
+    if (user?.fid && typeof window !== 'undefined') {
+      sessionStorage.setItem(`higher-steaks-onboarding-dismissed-${user.fid}`, 'true');
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
-      <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
+    <>
+      {/* Onboarding Modal */}
+      {showOnboardingModal && onboardingState && (
+        <OnboardingModal
+          state={onboardingState}
+          onClose={handleCloseOnboardingModal}
+          data={onboardingData}
+        />
+      )}
+
+      <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
+        <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
         {/* Header Row - Balance left, Profile right */}
         <div className="flex justify-between items-center gap-2 mb-3 sm:mb-4">
           {/* Token Balance Pill - Left */}
@@ -319,9 +449,9 @@ export default function HigherSteakMenu() {
                   <div key={index}>
                     <div className="flex items-baseline text-xs sm:text-sm md:text-base">
                       <span className="flex-shrink-0 font-bold">{item.name}</span>
-                      <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
-                      <span className="flex-shrink-0 font-bold tracking-wider">{item.price}</span>
-                    </div>
+                  <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
+                  <span className="flex-shrink-0 font-bold tracking-wider">{item.price}</span>
+                </div>
                     <p className="mt-1 text-[0.65rem] sm:text-xs text-gray-600 italic">
                       {item.description}
                     </p>
@@ -342,5 +472,6 @@ export default function HigherSteakMenu() {
         </div>
       </div>
     </main>
+    </>
   );
 }
