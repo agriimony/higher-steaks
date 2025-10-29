@@ -57,28 +57,30 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
       case 'staked-no-cast':
         return (
           <>
-            <h2 className="text-2xl font-bold mb-4">You're Staking HIGHER! 🥩</h2>
-            <p className="mb-4">
+            <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
+              You're Staking HIGHER! 🥩
+            </h2>
+            <p className="mb-3 text-black text-sm">
               You have <span className="font-bold">{data.stakedAmount}</span> HIGHER staked.
             </p>
-            <p className="mb-4">
+            <p className="mb-3 text-black text-sm">
               To appear on the leaderboard, post in /higher:
             </p>
-            <div className="bg-zinc-800 p-4 rounded mb-6 border border-zinc-700">
-              <code className="text-sm text-green-400">
-                started aiming higher and it worked out! <span className="text-zinc-500">[your message here]</span>
+            <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-6">
+              <code className="text-xs text-black">
+                started aiming higher and it worked out! <span className="text-black/40">[your message here]</span>
               </code>
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 border-t border-black/20 pt-4">
               <button
                 onClick={handleQuickCast}
-                className="flex-1 px-6 py-3 bg-white text-black font-bold rounded hover:bg-zinc-200 transition"
+                className="flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
               >
                 Quick Cast
               </button>
               <button
                 onClick={onClose}
-                className="px-6 py-3 bg-zinc-800 text-white border border-zinc-700 rounded hover:bg-zinc-700 transition"
+                className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
               >
                 Maybe Later
               </button>
@@ -89,28 +91,30 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
       case 'has-enough':
         return (
           <>
-            <h2 className="text-2xl font-bold mb-4">Stake More HIGHER! 🥩</h2>
-            <p className="mb-4">
+            <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
+              Stake More HIGHER! 🥩
+            </h2>
+            <p className="mb-3 text-black text-sm">
               You have <span className="font-bold">{data.totalAmount}</span> HIGHER total
               {data.stakedAmount && data.walletAmount && (
-                <span className="text-zinc-400">
+                <span className="text-black/50">
                   {' '}({data.stakedAmount} staked + {data.walletAmount} in wallet)
                 </span>
               )}.
             </p>
-            <p className="mb-6">
-              The minimum to rank is <span className="font-bold text-green-400">{data.minimumRequired}</span> HIGHER. Stake more to compete!
+            <p className="mb-6 text-black text-sm">
+              The minimum to rank is <span className="font-bold underline">{data.minimumRequired}</span> HIGHER. Stake more to compete!
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-3 border-t border-black/20 pt-4">
               <button
                 onClick={handleStakeOnMintClub}
-                className="flex-1 px-6 py-3 bg-white text-black font-bold rounded hover:bg-zinc-200 transition"
+                className="flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
               >
                 Stake on mint.club
               </button>
               <button
                 onClick={onClose}
-                className="px-6 py-3 bg-zinc-800 text-white border border-zinc-700 rounded hover:bg-zinc-700 transition"
+                className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
               >
                 Maybe Later
               </button>
@@ -121,23 +125,25 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
       case 'needs-more':
         return (
           <>
-            <h2 className="text-2xl font-bold mb-4">Get More HIGHER! 🥩</h2>
-            <p className="mb-4">
+            <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
+              Get More HIGHER! 🥩
+            </h2>
+            <p className="mb-3 text-black text-sm">
               You have <span className="font-bold">{data.totalAmount}</span> HIGHER total.
             </p>
-            <p className="mb-6">
-              The minimum to rank is <span className="font-bold text-green-400">{data.minimumRequired}</span> HIGHER. Swap to get more!
+            <p className="mb-6 text-black text-sm">
+              The minimum to rank is <span className="font-bold underline">{data.minimumRequired}</span> HIGHER. Swap to get more!
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-3 border-t border-black/20 pt-4">
               <button
                 onClick={handleSwapToHigher}
-                className="flex-1 px-6 py-3 bg-white text-black font-bold rounded hover:bg-zinc-200 transition"
+                className="flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
               >
                 Swap to HIGHER
               </button>
               <button
                 onClick={onClose}
-                className="px-6 py-3 bg-zinc-800 text-white border border-zinc-700 rounded hover:bg-zinc-700 transition"
+                className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
               >
                 Maybe Later
               </button>
@@ -149,22 +155,25 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
 
   return (
     <div 
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <div 
-        className="bg-zinc-900 border border-zinc-700 rounded-lg p-6 max-w-md w-full relative"
+        className="bg-[#fefdfb] border-2 border-black rounded-none p-6 max-w-md w-full relative font-mono shadow-2xl"
         onClick={(e) => e.stopPropagation()}
+        style={{
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)'
+        }}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-zinc-500 hover:text-white transition"
+          className="absolute top-3 right-3 text-black/40 hover:text-black transition"
           aria-label="Close"
         >
           <svg 
             xmlns="http://www.w3.org/2000/svg" 
-            width="24" 
-            height="24" 
+            width="20" 
+            height="20" 
             viewBox="0 0 24 24" 
             fill="none" 
             stroke="currentColor" 
