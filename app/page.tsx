@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
+import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 
 interface User {
   fid: number;
@@ -37,6 +38,10 @@ interface LeaderboardEntry {
 }
 
 export default function HigherSteakMenu() {
+  // Development mode: Enable to test with simulated profiles
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(true);
+  const [simulatedProfile, setSimulatedProfile] = useState<SimulatedProfile | null>(null);
+  
   const [user, setUser] = useState<User | null>(null);
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
@@ -203,6 +208,35 @@ export default function HigherSteakMenu() {
     fetchLeaderboard();
   }, []);
 
+  // Handle simulated profile changes in development mode
+  useEffect(() => {
+    if (isDevelopmentMode && simulatedProfile) {
+      // Set simulated user data
+      setUser({
+        fid: simulatedProfile.fid,
+        username: simulatedProfile.username,
+        displayName: simulatedProfile.displayName,
+        pfpUrl: simulatedProfile.pfpUrl,
+        walletAddress: null,
+      });
+      
+      // Set simulated balance
+      setBalance({
+        totalBalanceFormatted: simulatedProfile.walletBalance,
+        usdValue: '$0.00',
+        pricePerToken: 0,
+      });
+      
+      // Set simulated staking balance
+      setStakingBalance({
+        totalStakedFormatted: simulatedProfile.stakedBalance,
+      });
+      
+      setLoadingBalance(false);
+      setLoadingLeaderboard(false);
+    }
+  }, [isDevelopmentMode, simulatedProfile]);
+
   // Check onboarding status after all data is loaded
   useEffect(() => {
     const checkOnboardingStatus = () => {
@@ -216,8 +250,11 @@ export default function HigherSteakMenu() {
         return;
       }
 
-      // 1. Check if user is already on leaderboard
-      const isOnLeaderboard = leaderboard.some(entry => entry.fid === user.fid);
+      // 1. Check if user is already on leaderboard (or simulated profile says so)
+      const isOnLeaderboard = isDevelopmentMode && simulatedProfile 
+        ? simulatedProfile.isOnLeaderboard
+        : leaderboard.some(entry => entry.fid === user.fid);
+        
       if (isOnLeaderboard) {
         console.log('User is on leaderboard, skip onboarding modal');
         return; // Skip modal entirely
@@ -332,30 +369,45 @@ export default function HigherSteakMenu() {
             )}
           </div>
 
-          {/* Profile Pill - Right */}
-          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow">
-            {user ? (
-              <>
-                <img 
-                  src={user.pfpUrl} 
-                  alt={user.username}
-                  className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10"
-                />
-                <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800 pr-1.5">
-                  @{user.username}
-                </span>
-              </>
-            ) : (
-              <>
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10 bg-gray-100 flex items-center justify-center">
-                  <span className="text-gray-400 text-xs font-bold">?</span>
-                </div>
-                <span className="text-[0.65rem] sm:text-xs font-medium text-gray-400 pr-1.5">
-                  Not Connected
-                </span>
-              </>
-            )}
-          </div>
+          {/* Profile Pill - Right (with dev mode switcher) */}
+          {isDevelopmentMode ? (
+            <ProfileSwitcher
+              currentProfile={simulatedProfile}
+              onProfileChange={(profile) => {
+                setSimulatedProfile(profile);
+                // Clear session dismissal to force modal to show
+                if (typeof window !== 'undefined') {
+                  sessionStorage.removeItem(`higher-steaks-onboarding-dismissed-${profile.fid}`);
+                }
+                setShowOnboardingModal(false); // Reset modal state
+              }}
+              isDevelopmentMode={isDevelopmentMode}
+            />
+          ) : (
+            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow">
+              {user ? (
+                <>
+                  <img 
+                    src={user.pfpUrl} 
+                    alt={user.username}
+                    className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10"
+                  />
+                  <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800 pr-1.5">
+                    @{user.username}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10 bg-gray-100 flex items-center justify-center">
+                    <span className="text-gray-400 text-xs font-bold">?</span>
+                  </div>
+                  <span className="text-[0.65rem] sm:text-xs font-medium text-gray-400 pr-1.5">
+                    Not Connected
+                  </span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="border-2 border-black p-2 sm:p-3 md:p-4">
