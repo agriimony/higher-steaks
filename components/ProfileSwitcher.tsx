@@ -39,8 +39,8 @@ export const SIMULATED_PROFILES: SimulatedProfile[] = [
     username: "test-newbie",
     displayName: "Test Newbie",
     pfpUrl: "https://i.imgur.com/placeholder3.png",
-    walletBalance: "100.00",
-    stakedBalance: "0.00", // Needs more HIGHER
+    walletBalance: "0.00",
+    stakedBalance: "0.00", // Needs HIGHER
     isOnLeaderboard: false,
     description: "State 2b: Needs more HIGHER to compete"
   }

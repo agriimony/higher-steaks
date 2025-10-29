@@ -39,17 +39,24 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
     }
   };
 
-  const handleStakeOnMintClub = () => {
-    const mintClubUrl = "https://farcaster.xyz/miniapps/ebIiKqVQ26EG/mint-club";
-    sdk.actions.openUrl(mintClubUrl);
-    onClose();
+  const handleStakeOnMintClub = async () => {
+    try {
+      await sdk.actions.openUrl("https://farcaster.xyz/miniapps/ebIiKqVQ26EG/mint-club");
+      onClose();
+    } catch (error) {
+      console.error("Failed to open mint.club:", error);
+    }
   };
 
-  const handleSwapToHigher = () => {
-    const higherTokenAddress = "0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe";
-    const swapUrl = `https://warpcast.com/~/wallets?swap=${higherTokenAddress}`;
-    sdk.actions.openUrl(swapUrl);
-    onClose();
+  const handleSwapToHigher = async () => {
+    try {
+      const higherTokenAddress = "0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe";
+      const swapUrl = `https://warpcast.com/~/wallets?swap=${higherTokenAddress}`;
+      await sdk.actions.openUrl(swapUrl);
+      onClose();
+    } catch (error) {
+      console.error("Failed to open swap:", error);
+    }
   };
 
   const renderContent = () => {
