@@ -3,6 +3,7 @@ import { sql } from '@vercel/postgres';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic'; // Disable caching for fresh data
+export const revalidate = 0; // Never cache
 
 export async function GET() {
   try {

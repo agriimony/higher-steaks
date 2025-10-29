@@ -295,11 +295,16 @@ export async function GET(request: NextRequest) {
     console.log(`Storing top ${top100.length} entries in database...`);
     
     // Step 7: Update database
-    await sql`DELETE FROM leaderboard_entries`;
+    console.log('Deleting old entries...');
+    const deleteResult = await sql`DELETE FROM leaderboard_entries`;
+    console.log(`Deleted ${deleteResult.rowCount} old entries`);
     
+    console.log('Inserting new entries...');
     for (let i = 0; i < top100.length; i++) {
       const entry = top100[i];
-      await sql`
+      console.log(`Inserting entry ${i + 1}: FID ${entry.fid}, balance ${entry.balanceFormatted}`);
+      
+      const insertResult = await sql`
         INSERT INTO leaderboard_entries (
           fid, username, display_name, pfp_url, cast_hash, cast_text,
           description, cast_timestamp, higher_balance, usd_value, rank
@@ -317,6 +322,17 @@ export async function GET(request: NextRequest) {
           ${i + 1}
         )
       `;
+      console.log(`Inserted entry ${i + 1}, rowCount: ${insertResult.rowCount}`);
+    }
+    
+    // Verify the inserts
+    console.log('Verifying database writes...');
+    const verifyResult = await sql`SELECT COUNT(*) as count FROM leaderboard_entries`;
+    const finalCount = parseInt(verifyResult.rows[0]?.count || '0');
+    console.log(`Database now contains ${finalCount} entries`);
+    
+    if (finalCount !== top100.length) {
+      console.error(`WARNING: Expected ${top100.length} entries but found ${finalCount}`);
     }
     
     console.log('=== Staking leaderboard updated successfully ===');
