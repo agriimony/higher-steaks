@@ -63,6 +63,10 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
       const buyToken = "eip155:8453/erc20:0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe";
       
       console.log('Opening swap for buyToken:', buyToken);
+      
+      // Add a small delay to ensure any previous state is cleared
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       const result = await sdk.actions.swapToken({
         buyToken,
       });
@@ -74,7 +78,10 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
         console.log('Swap successful, transactions:', result.swap.transactions);
         onClose();
       } else {
-        console.error('Swap failed:', result.reason, result.error);
+        console.log('Swap not completed:', result.reason);
+        if (result.reason === 'rejected_by_user') {
+          console.log('User cancelled swap - modal stays open for retry');
+        }
         // Keep modal open so user can try again
       }
     } catch (error) {
