@@ -41,7 +41,10 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
 
   const handleStakeOnMintClub = async () => {
     try {
-      await sdk.actions.openUrl("https://farcaster.xyz/miniapps/ebIiKqVQ26EG/mint-club");
+      await sdk.actions.openMiniApp({
+        url: "https://farcaster.xyz/miniapps/ebIiKqVQ26EG/mint-club"
+      });
+      // Note: Current app will close after successful navigation
       onClose();
     } catch (error) {
       console.error("Failed to open mint.club:", error);
