@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 
 interface OnboardingModalProps {
@@ -15,6 +15,8 @@ interface OnboardingModalProps {
 }
 
 export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) {
+  const [customMessage, setCustomMessage] = useState('');
+
   // Handle click outside to close
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -30,8 +32,9 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
   const handleQuickCast = async () => {
     try {
       console.log('Opening cast composer...');
+      const fullMessage = "started aiming higher and it worked out! " + customMessage;
       const result = await sdk.actions.composeCast({
-        text: "started aiming higher and it worked out! ",
+        text: fullMessage,
         channelKey: "higher"
       });
       console.log('Compose cast result:', result);
@@ -105,9 +108,16 @@ export function OnboardingModal({ state, onClose, data }: OnboardingModalProps) 
               To appear on the leaderboard, post in /higher:
             </p>
             <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-6">
-              <code className="text-xs text-black">
-                started aiming higher and it worked out! <span className="text-black/40">[your message here]</span>
-              </code>
+              <div className="text-xs text-black font-mono mb-2">
+                started aiming higher and it worked out!
+              </div>
+              <textarea
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                placeholder="[your message here]"
+                className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black resize-none"
+                rows={3}
+              />
             </div>
             <div className="flex gap-3 border-t border-black/20 pt-4">
               <button
