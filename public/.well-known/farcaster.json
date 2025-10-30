@@ -1,0 +1,21 @@
+{
+  "accountAssociation": {
+    "header": "REPLACE_WITH_YOUR_HEADER",
+    "payload": "REPLACE_WITH_YOUR_PAYLOAD",
+    "signature": "REPLACE_WITH_YOUR_SIGNATURE"
+  },
+  "miniapp": {
+    "version": "1",
+    "name": "Higher Steaks",
+    "iconUrl": "https://higher-steaks.vercel.app/icon.png",
+    "splashImageUrl": "https://higher-steaks.vercel.app/splash.png",
+    "splashBackgroundColor": "#f9f7f1",
+    "homeUrl": "https://higher-steaks.vercel.app",
+    "webhookUrl": "",
+    "subtitle": "The Higher Steakhaus",
+    "description": "Discover what the higher network is cooking",
+    "primaryCategory": "social",
+    "tags": ["higher", "network", "discovery", "staking", "interface"]
+  }
+}
+
