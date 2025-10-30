@@ -412,8 +412,8 @@ export default function HigherSteakMenu() {
 
         <div className="border-2 border-black p-2 sm:p-3 md:p-4">
           <div className="text-center mb-6 md:mb-10">
-            <div className="flex justify-center overflow-x-hidden">
-              <pre className="text-[0.18rem] leading-[0.2rem] xs:text-[0.22rem] xs:leading-[0.25rem] sm:text-[0.35rem] sm:leading-[0.4rem] md:text-[0.5rem] md:leading-[0.55rem] lg:text-[0.6rem] lg:leading-[0.65rem] xl:text-[0.7rem] xl:leading-[0.75rem] whitespace-pre scale-90 sm:scale-95 md:scale-100">
+            <div className="flex justify-center overflow-x-hidden -mx-2">
+              <pre className="text-[0.28rem] leading-[0.32rem] sm:text-[0.4rem] sm:leading-[0.45rem] md:text-[0.5rem] md:leading-[0.55rem] lg:text-[0.6rem] lg:leading-[0.65rem] xl:text-[0.7rem] xl:leading-[0.75rem] whitespace-pre origin-center transform scale-x-[0.70] scale-y-95 sm:scale-x-90 sm:scale-y-95 md:scale-x-100 md:scale-y-100">
                 {` @@@@@@@@   @@@@@@@@@ @@@@@@@@        @@@@@@   @   @@@@@@@@   @@@@@@@@ @@@@@@@@@@@@@@@  @@@@@@@@@@              
           @@@        @@@      @@@        @@        @@@     +@@         @@@      @@        @@     @@     @@@@          
           @@@        @@@      @@@      @@@           @      @@         @@       @@         @     @@      @@@@         
