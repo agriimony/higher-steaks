@@ -20,8 +20,8 @@ export const metadata: Metadata = {
       button: {
         title: "See what's cooking 👀",
         action: {
-          type: "launch",
-          url: "/",
+          type: "launch_frame",
+          url: "https://higher-steaks.vercel.app/",
         },
       },
     }),
