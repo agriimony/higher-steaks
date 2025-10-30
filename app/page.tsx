@@ -109,7 +109,7 @@ export default function HigherSteakMenu() {
   // Seems to work fine with just a 1x1 scale
   const getAsciiScale = () => {
 
-    return { scaleX: 1, scaleY: 1 };
+    return { scaleX: 1/pixelDensity, scaleY: 1 };
 
   };
 
