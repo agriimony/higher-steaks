@@ -57,6 +57,10 @@ export default function HigherSteakMenu() {
     minimumRequired?: string;
   }>({});
   
+  // Detect pixel density for ASCII art scaling
+  const [pixelDensity, setPixelDensity] = useState(1);
+  const [viewportWidth, setViewportWidth] = useState(0);
+  
   // Format large numbers with K/M/B suffixes
   const formatTokenAmount = (amount: string): string => {
     const num = parseFloat(amount.replace(/,/g, ''));
@@ -86,6 +90,44 @@ export default function HigherSteakMenu() {
     { name: "Prime Skirt Steak", price: "$36.00", description: "Flavorful and perfectly charred" },
     { name: "Vegetarian Portobello Stack", price: "$28.00", description: "Hearty mushrooms with seasonal vegetables" },
   ];
+
+  // Detect pixel density and viewport width for responsive ASCII art
+  useEffect(() => {
+    const updateDisplayMetrics = () => {
+      if (typeof window !== 'undefined') {
+        setPixelDensity(window.devicePixelRatio || 1);
+        setViewportWidth(window.innerWidth);
+      }
+    };
+
+    updateDisplayMetrics();
+    window.addEventListener('resize', updateDisplayMetrics);
+    return () => window.removeEventListener('resize', updateDisplayMetrics);
+  }, []);
+
+  // Calculate dynamic scale based on pixel density and viewport width
+  const getAsciiScale = () => {
+    // ASCII art is ~120 chars wide
+    // On high DPI mobile (pixelDensity >= 2), we need more compression
+    // On desktop (pixelDensity = 1), less or no compression
+    
+    if (viewportWidth === 0) return { scaleX: 1, scaleY: 1 }; // Default before measuring
+    
+    if (viewportWidth < 640) { // Mobile/small screens
+      // High DPI mobile (iPhone, modern Android)
+      if (pixelDensity >= 2) {
+        return { scaleX: 0.65, scaleY: 0.92 };
+      }
+      // Low DPI mobile (rare)
+      return { scaleX: 0.85, scaleY: 0.95 };
+    } else if (viewportWidth < 768) { // Tablet/small laptop
+      return { scaleX: 0.90, scaleY: 0.95 };
+    } else { // Desktop
+      return { scaleX: 1, scaleY: 1 };
+    }
+  };
+
+  const asciiScale = getAsciiScale();
 
   useEffect(() => {
     // IMPORTANT: Call ready() FIRST to hide splash screen immediately
@@ -412,8 +454,13 @@ export default function HigherSteakMenu() {
 
         <div className="border-2 border-black p-2 sm:p-3 md:p-4">
           <div className="text-center mb-6 md:mb-10">
-            <div className="flex justify-center overflow-x-hidden -mx-2">
-              <pre className="text-[0.28rem] leading-[0.32rem] sm:text-[0.4rem] sm:leading-[0.45rem] md:text-[0.5rem] md:leading-[0.55rem] lg:text-[0.6rem] lg:leading-[0.65rem] xl:text-[0.7rem] xl:leading-[0.75rem] whitespace-pre origin-center transform scale-x-[0.70] scale-y-95 sm:scale-x-90 sm:scale-y-95 md:scale-x-100 md:scale-y-100">
+            <div className="flex justify-center overflow-x-hidden">
+              <pre 
+                className="text-[0.28rem] leading-[0.32rem] sm:text-[0.4rem] sm:leading-[0.45rem] md:text-[0.5rem] md:leading-[0.55rem] lg:text-[0.6rem] lg:leading-[0.65rem] xl:text-[0.7rem] xl:leading-[0.75rem] whitespace-pre origin-center transform"
+                style={{
+                  transform: `scaleX(${asciiScale.scaleX}) scaleY(${asciiScale.scaleY})`
+                }}
+              >
                 {` @@@@@@@@   @@@@@@@@@ @@@@@@@@        @@@@@@   @   @@@@@@@@   @@@@@@@@ @@@@@@@@@@@@@@@  @@@@@@@@@@              
           @@@        @@@      @@@        @@        @@@     +@@         @@@      @@        @@     @@     @@@@          
           @@@        @@@      @@@      @@@           @      @@         @@       @@         @     @@      @@@@         
