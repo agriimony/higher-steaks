@@ -39,7 +39,7 @@ interface LeaderboardEntry {
 
 export default function HigherSteakMenu() {
   // Development mode: Enable to test with simulated profiles
-  const [isDevelopmentMode, setIsDevelopmentMode] = useState(true);
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
   const [simulatedProfile, setSimulatedProfile] = useState<SimulatedProfile | null>(null);
   
   const [user, setUser] = useState<User | null>(null);

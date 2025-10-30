@@ -5,8 +5,14 @@ import { useState } from 'react';
 export default function TestCronPage() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [secret, setSecret] = useState('');
 
   const runCronJob = async () => {
+    if (!secret.trim()) {
+      setResult({ error: 'Please enter a CRON_SECRET' });
+      return;
+    }
+
     setLoading(true);
     setResult(null);
 
@@ -14,6 +20,10 @@ export default function TestCronPage() {
       console.log('Running cron test...');
       const response = await fetch('/api/test-cron', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ secret }),
       });
       const data = await response.json();
       setResult(data);
@@ -34,8 +44,21 @@ export default function TestCronPage() {
         {/* Control Section */}
         <div className="mb-8 p-6 bg-zinc-900 border border-zinc-700 rounded">
           <p className="mb-4 text-sm text-zinc-400">
-            This will securely use the CRON_SECRET from your environment variables to run the cron job and check all endpoints.
+            Enter your CRON_SECRET to run the cron job and check all endpoints.
           </p>
+          <div className="mb-4">
+            <label htmlFor="secret" className="block text-sm font-medium mb-2">
+              CRON_SECRET
+            </label>
+            <input
+              id="secret"
+              type="password"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              placeholder="Enter CRON_SECRET"
+              className="w-full px-4 py-2 bg-black border border-zinc-700 rounded text-white placeholder-zinc-500 focus:outline-none focus:border-white"
+            />
+          </div>
           <button
             onClick={runCronJob}
             disabled={loading}

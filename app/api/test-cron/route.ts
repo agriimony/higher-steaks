@@ -6,12 +6,13 @@ export const revalidate = 0;
 
 export async function POST(request: Request) {
   try {
-    const cronSecret = process.env.CRON_SECRET;
+    const body = await request.json();
+    const cronSecret = body.secret;
     
     if (!cronSecret) {
       return NextResponse.json({
-        error: 'CRON_SECRET not configured in environment variables',
-      }, { status: 500 });
+        error: 'CRON_SECRET not provided in request',
+      }, { status: 400 });
     }
 
     // Get the base URL from the request headers
