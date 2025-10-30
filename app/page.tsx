@@ -106,25 +106,11 @@ export default function HigherSteakMenu() {
   }, []);
 
   // Calculate dynamic scale based on pixel density and viewport width
+  // Seems to work fine with just a 1x1 scale
   const getAsciiScale = () => {
-    // ASCII art is ~120 chars wide
-    // On high DPI mobile (pixelDensity >= 2), we need more compression
-    // On desktop (pixelDensity = 1), less or no compression
-    
-    if (viewportWidth === 0) return { scaleX: 1, scaleY: 1 }; // Default before measuring
-    
-    if (viewportWidth < 640) { // Mobile/small screens
-      // High DPI mobile (iPhone, modern Android)
-      if (pixelDensity >= 2) {
-        return { scaleX: 0.65, scaleY: 0.92 };
-      }
-      // Low DPI mobile (rare)
-      return { scaleX: 0.85, scaleY: 0.95 };
-    } else if (viewportWidth < 768) { // Tablet/small laptop
-      return { scaleX: 0.90, scaleY: 0.95 };
-    } else { // Desktop
-      return { scaleX: 1, scaleY: 1 };
-    }
+
+    return { scaleX: 1, scaleY: 1 };
+
   };
 
   const asciiScale = getAsciiScale();
