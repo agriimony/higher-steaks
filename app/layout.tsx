@@ -22,6 +22,7 @@ export const metadata: Metadata = {
         action: {
           type: "launch_frame",
           url: "https://higher-steaks.vercel.app/",
+          name: "Higher Steaks",
         },
       },
     }),
