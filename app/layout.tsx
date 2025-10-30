@@ -11,14 +11,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Higher Steaks",
     description: "Staking interface for higher network discovery",
-    images: ["/og-image.svg"],
+    images: ["/embed.png"],
   },
   other: {
     "fc:miniapp": JSON.stringify({
       version: "1",
-      imageUrl: "https://higher-steaks.vercel.app/og-image.svg",
+      imageUrl: "https://higher-steaks.vercel.app/embed.png",
       button: {
-        title: "Higher Steaks",
+        title: "See what's cooking 👀",
         action: {
           type: "launch",
           url: "/",
