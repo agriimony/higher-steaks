@@ -181,13 +181,17 @@ export async function GET(request: NextRequest) {
     const allDetailedLockups = await Promise.all(
       verifiedAddresses.map(async (address) => {
         try {
+          console.log(`[Balance API] Fetching lockups for address: ${address}`);
           const lockUpCount = await client.readContract({
             address: LOCKUP_CONTRACT,
             abi: LOCKUP_ABI,
             functionName: 'lockUpCount',
           });
 
+          console.log(`[Balance API] Total lockup count: ${lockUpCount.toString()}`);
+
           if (lockUpCount === BigInt(0)) {
+            console.log(`[Balance API] No lockups in contract for ${address}`);
             return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
           }
 
@@ -197,6 +201,8 @@ export async function GET(request: NextRequest) {
             functionName: 'getLockUpIdsByReceiver',
             args: [address as `0x${string}`, BigInt(0), lockUpCount],
           });
+
+          console.log(`[Balance API] Found ${lockUpIds.length} lockup IDs for ${address}:`, lockUpIds.map(id => id.toString()));
 
           const lockUpPromises = lockUpIds.map(async (id: bigint) => {
             try {
@@ -237,11 +243,15 @@ export async function GET(request: NextRequest) {
               const unlockedBool = unlocked as boolean;
               const amountBigInt = amount as bigint;
 
+              console.log(`[Balance API] Lockup ${id.toString()}: token=${tokenAddress}, unlocked=${unlockedBool}, unlockTime=${unlockTimeNum}, amount=${amountBigInt.toString()}, receiver=${receiver as string}`);
+
               // Calculate totals (for balance pill)
               if (currentTime >= unlockTimeNum && !unlockedBool) {
                 unlockedBalance += amountBigInt;
+                console.log(`[Balance API] Added to unlocked balance: ${amountBigInt.toString()}`);
               } else if (currentTime < unlockTimeNum) {
                 lockedBalance += amountBigInt;
+                console.log(`[Balance API] Added to locked balance: ${amountBigInt.toString()}`);
               }
 
               // Store details for modal (only if not yet unlocked/claimed)
@@ -258,18 +268,26 @@ export async function GET(request: NextRequest) {
                   timeRemaining,
                   receiver: receiver as string,
                 });
+                console.log(`[Balance API] Added lockup ${id.toString()} to details array`);
+              } else {
+                console.log(`[Balance API] Skipped lockup ${id.toString()} - already unlocked/claimed`);
               }
+            } else {
+              console.log(`[Balance API] Skipped lockup ${id.toString()} - not HIGHER token or not ERC20`);
             }
           }
 
           lockups.sort((a, b) => a.unlockTime - b.unlockTime);
+          console.log(`[Balance API] Final summary for ${address}: ${lockups.length} lockups, locked=${lockedBalance.toString()}, unlocked=${unlockedBalance.toString()}`);
           return { address, lockups, unlockedBalance, lockedBalance };
         } catch (error) {
-          console.error(`Error fetching detailed lockups for ${address}:`, error);
+          console.error(`[Balance API] Error fetching detailed lockups for ${address}:`, error);
           return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
         }
       })
     );
+
+    console.log(`[Balance API] Total lockups found across all addresses: ${allDetailedLockups.reduce((sum, item) => sum + item.lockups.length, 0)}`);
 
     // Extract lockup totals and details
     const lockupData = allDetailedLockups.map(item => ({
