@@ -63,7 +63,8 @@ const LOCKUP_ABI = [
 // Fetch lockup data for a given address
 async function fetchLockupData(
   client: PublicClient,
-  address: `0x${string}`
+  address: `0x${string}`,
+  currentTime: number
 ): Promise<{ unlockedBalance: bigint; lockedBalance: bigint }> {
   let unlockedBalance = BigInt(0);
   let lockedBalance = BigInt(0);
@@ -87,14 +88,6 @@ async function fetchLockupData(
       functionName: 'getLockUpIdsByReceiver',
       args: [address, BigInt(0), lockUpCount],
     });
-
-    // Get current timestamp
-    const currentBlock = await client.getBlockNumber();
-    const block = await client.getBlock({ 
-      blockNumber: currentBlock,
-      includeTransactions: false 
-    }) as { timestamp: bigint };
-    const currentTime = Number(block.timestamp);
 
     // Fetch details for each lockup
     const lockUpPromises = lockUpIds.map(async (id: bigint) => {
@@ -248,6 +241,14 @@ export async function GET(request: NextRequest) {
       transport: http(rpcUrl),
     });
 
+    // Get current timestamp once (outside of fetchLockupData to avoid type issues)
+    const currentBlock = await client.getBlockNumber();
+    const block = await client.getBlock({ 
+      blockNumber: currentBlock,
+      includeTransactions: false 
+    });
+    const currentTime = Number(block.timestamp);
+
     // Fetch wallet balances and lockup data for all verified addresses in parallel
     const [addressBalances, lockupData, higherLogo] = await Promise.all([
       // Wallet balances
@@ -285,7 +286,7 @@ export async function GET(request: NextRequest) {
       Promise.all(
         verifiedAddresses.map(async (address) => {
           try {
-            return await fetchLockupData(client, address as `0x${string}`);
+            return await fetchLockupData(client, address as `0x${string}`, currentTime);
           } catch (error) {
             console.error(`Error fetching lockups for ${address}:`, error);
             return { unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
