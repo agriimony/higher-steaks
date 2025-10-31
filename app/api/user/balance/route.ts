@@ -286,7 +286,7 @@ export async function GET(request: NextRequest) {
       Promise.all(
         verifiedAddresses.map(async (address) => {
           try {
-            return await fetchLockupData(client, address as `0x${string}`, currentTime);
+            return await fetchLockupData(client as PublicClient, address as `0x${string}`, currentTime);
           } catch (error) {
             console.error(`Error fetching lockups for ${address}:`, error);
             return { unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
