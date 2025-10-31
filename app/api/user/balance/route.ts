@@ -116,6 +116,8 @@ export async function GET(request: NextRequest) {
     // Get all verified Ethereum addresses
     const verifiedAddresses = user.verified_addresses?.eth_addresses || [];
     
+    console.log(`[Balance API] User ${fid} has ${verifiedAddresses.length} verified addresses:`, verifiedAddresses);
+    
     if (verifiedAddresses.length === 0) {
       return NextResponse.json({
         totalBalance: '0',
@@ -195,14 +197,24 @@ export async function GET(request: NextRequest) {
             return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
           }
 
+          // Normalize address to checksum format for consistent matching
+          const normalizedAddress = address as `0x${string}`;
+          console.log(`[Balance API] Querying getLockUpIdsByReceiver with: address=${normalizedAddress}, start=0, stop=${lockUpCount.toString()}`);
+
           const lockUpIds = await client.readContract({
             address: LOCKUP_CONTRACT,
             abi: LOCKUP_ABI,
             functionName: 'getLockUpIdsByReceiver',
-            args: [address as `0x${string}`, BigInt(0), lockUpCount],
-          });
+            args: [normalizedAddress, BigInt(0), lockUpCount],
+          }) as bigint[];
 
-          console.log(`[Balance API] Found ${lockUpIds.length} lockup IDs for ${address}:`, lockUpIds.map(id => id.toString()));
+          console.log(`[Balance API] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for ${normalizedAddress}`);
+          if (lockUpIds.length > 0) {
+            console.log(`[Balance API] Lockup IDs found:`, lockUpIds.map(id => id.toString()));
+          } else {
+            console.log(`[Balance API] ⚠️  No lockup IDs returned for address ${normalizedAddress} - this might indicate address mismatch or no lockups for this receiver`);
+            return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
+          }
 
           const lockUpPromises = lockUpIds.map(async (id: bigint) => {
             try {
@@ -294,8 +306,9 @@ export async function GET(request: NextRequest) {
           lockups.sort((a, b) => a.unlockTime - b.unlockTime);
           console.log(`[Balance API] Final summary for ${address}: ${lockups.length} lockups, locked=${lockedBalance.toString()}, unlocked=${unlockedBalance.toString()}`);
           return { address, lockups, unlockedBalance, lockedBalance };
-        } catch (error) {
+        } catch (error: any) {
           console.error(`[Balance API] Error fetching detailed lockups for ${address}:`, error);
+          console.error(`[Balance API] Error details:`, error.message, error.stack);
           return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
         }
       })
