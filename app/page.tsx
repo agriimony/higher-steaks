@@ -179,6 +179,7 @@ export default function HigherSteakMenu() {
         if (response.ok) {
           const balanceData = await response.json();
           console.log('Balance data:', balanceData);
+          console.log('Higher logo URL:', balanceData.higherLogoUrl);
           setBalance(balanceData);
         } else {
           console.error('Failed to fetch balance');
@@ -385,13 +386,15 @@ export default function HigherSteakMenu() {
               </div>
             ) : balance ? (
               <div className="flex items-center gap-1.5">
-                {balance.higherLogoUrl && (
-                  <img 
-                    src={balance.higherLogoUrl} 
-                    alt="HIGHER" 
-                    className="w-4 h-4 sm:w-5 sm:h-5 rounded-full"
-                  />
-                )}
+                <img 
+                  src={balance.higherLogoUrl || '/higher-logo.png'} 
+                  alt="HIGHER" 
+                  className="w-4 h-4 sm:w-5 sm:h-5 rounded-full"
+                  onError={(e) => {
+                    console.error('Failed to load HIGHER logo:', e);
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
                 <span className="text-[0.65rem] sm:text-xs font-bold text-purple-700">
                   {formatTokenAmount(balance.lockedBalanceFormatted)}/{formatTokenAmount(balance.totalBalanceFormatted)}
                 </span>
