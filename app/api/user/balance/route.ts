@@ -137,31 +137,6 @@ async function fetchLockupData(
   return { unlockedBalance, lockedBalance };
 }
 
-// Fetch HIGHER logo from DexScreener API
-async function fetchHigherLogo(): Promise<string | undefined> {
-  try {
-    const response = await fetch('https://api.dexscreener.com/token-profiles/latest/v1', {
-      next: { revalidate: 3600 }, // Cache for 1 hour
-    });
-
-    if (!response.ok) {
-      return undefined;
-    }
-
-    const data = await response.json();
-    
-    // Find HIGHER token on Base chain
-    const higherToken = data.find((token: any) => 
-      token.chainId?.toLowerCase() === 'base' &&
-      token.tokenAddress?.toLowerCase() === HIGHER_TOKEN_ADDRESS.toLowerCase()
-    );
-
-    return higherToken?.icon;
-  } catch (error) {
-    console.error('Error fetching HIGHER logo:', error);
-    return undefined;
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -196,7 +171,7 @@ export async function GET(request: NextRequest) {
         lockedBalanceFormatted: '0.00',
         usdValue: '$0.00',
         pricePerToken: 0,
-        higherLogoUrl: undefined,
+        higherLogoUrl: '/higher-logo.png',
         addresses: [],
         error: 'Neynar API key not configured',
       });
@@ -220,7 +195,6 @@ export async function GET(request: NextRequest) {
     const verifiedAddresses = user.verified_addresses?.eth_addresses || [];
     
     if (verifiedAddresses.length === 0) {
-      const higherLogo = await fetchHigherLogo();
       return NextResponse.json({
         totalBalance: '0',
         totalBalanceFormatted: '0.00',
@@ -228,7 +202,7 @@ export async function GET(request: NextRequest) {
         lockedBalanceFormatted: '0.00',
         usdValue: '$0.00',
         pricePerToken: 0,
-        higherLogoUrl: higherLogo,
+        higherLogoUrl: '/higher-logo.png',
         addresses: [],
         message: 'No verified addresses found',
       });
@@ -250,7 +224,7 @@ export async function GET(request: NextRequest) {
     const currentTime = Number(block.timestamp);
 
     // Fetch wallet balances and lockup data for all verified addresses in parallel
-    const [addressBalances, lockupData, higherLogo] = await Promise.all([
+    const [addressBalances, lockupData] = await Promise.all([
       // Wallet balances
       Promise.all(
         verifiedAddresses.map(async (address) => {
@@ -293,8 +267,6 @@ export async function GET(request: NextRequest) {
           }
         })
       ),
-      // HIGHER logo
-      fetchHigherLogo(),
     ]);
 
     // Sum wallet balances
@@ -361,7 +333,7 @@ export async function GET(request: NextRequest) {
       lockedBalanceFormatted,
       usdValue,
       pricePerToken,
-      higherLogoUrl: higherLogo,
+      higherLogoUrl: '/higher-logo.png',
       addresses: addressBalances,
     });
   } catch (error) {
