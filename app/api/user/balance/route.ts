@@ -153,13 +153,13 @@ export async function GET(request: NextRequest) {
     const addressBalances = await Promise.all(
       verifiedAddresses.map(async (address) => {
         try {
-            const balance = await client.readContract({
-              address: HIGHER_TOKEN_ADDRESS,
-              abi: ERC20_ABI,
-              functionName: 'balanceOf',
-              args: [address as `0x${string}`],
+          const balance = await client.readContract({
+            address: HIGHER_TOKEN_ADDRESS,
+            abi: ERC20_ABI,
+            functionName: 'balanceOf',
+            args: [address as `0x${string}`],
               blockNumber: currentBlock, // Use consistent block number
-            });
+          });
 
           const balanceFormatted = formatUnits(balance, 18);
 
@@ -182,10 +182,31 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    // Fetch detailed lockups once for all addresses (reused for totals and details)
-    const allDetailedLockups = await Promise.all(
-      verifiedAddresses.map(async (address) => {
-        try {
+    // Fetch detailed lockups for all addresses
+    // Process sequentially to avoid overwhelming RPC with parallel requests
+    type DetailedLockupResult = {
+      address: string;
+      lockups: Array<{
+        lockupId: string;
+        amount: string;
+        amountFormatted: string;
+        unlockTime: number;
+        timeRemaining: number;
+        receiver: string;
+      }>;
+      unlockedBalance: bigint;
+      lockedBalance: bigint;
+      debug: {
+        lockUpIdsFound: number;
+        lockupsIncluded?: number;
+        message?: string;
+        normalizedAddress: string;
+        originalAddress: string;
+      };
+    };
+    const allDetailedLockups: DetailedLockupResult[] = [];
+    for (const address of verifiedAddresses) {
+      try {
           // Match debug endpoint behavior: use address as-is (no normalization)
           // The debug endpoint uses receiver directly, so we'll try the same approach
           console.log(`[Balance API] Fetching lockups for address: ${address}`);
@@ -269,23 +290,56 @@ export async function GET(request: NextRequest) {
 
           console.log(`[Balance API] ✓ Found ${lockUpIds.length} lockup IDs using address format: ${workingAddressFormat}`);
 
-          const lockUpPromises = lockUpIds.map(async (id: bigint) => {
-            try {
-              const lockUp = await client.readContract({
-                address: LOCKUP_CONTRACT,
-                abi: LOCKUP_ABI,
-                functionName: 'lockUps',
-                args: [id],
-                blockNumber: currentBlock, // Use consistent block number
-              }) as unknown as readonly [`0x${string}`, boolean, number, boolean, bigint, `0x${string}`, string];
-              return { id, lockUp };
-            } catch (error) {
-              console.error(`Error fetching lockup ${id}:`, error);
-              return null;
+          // Fetch lockup details in batches to avoid rate limits
+          // Process 3 at a time with 100ms delay between batches
+          const batchSize = 3;
+          const batchDelay = 100; // milliseconds
+          const lockUpResults = [];
+          
+          for (let i = 0; i < lockUpIds.length; i += batchSize) {
+            const batch = lockUpIds.slice(i, i + batchSize);
+            const batchPromises = batch.map(async (id: bigint) => {
+              try {
+                const lockUp = await client.readContract({
+                  address: LOCKUP_CONTRACT,
+                  abi: LOCKUP_ABI,
+                  functionName: 'lockUps',
+                  args: [id],
+                  blockNumber: currentBlock, // Use consistent block number
+                }) as unknown as readonly [`0x${string}`, boolean, number, boolean, bigint, `0x${string}`, string];
+                return { id, lockUp };
+              } catch (error) {
+                console.error(`Error fetching lockup ${id}:`, error);
+                // If rate limited, wait a bit and retry once
+                if (error && typeof error === 'object' && 'status' in error && (error as any).status === 429) {
+                  console.log(`[Balance API] Rate limited, waiting 500ms before retry for lockup ${id}`);
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  try {
+                    const lockUp = await client.readContract({
+                      address: LOCKUP_CONTRACT,
+                      abi: LOCKUP_ABI,
+                      functionName: 'lockUps',
+                      args: [id],
+                      blockNumber: currentBlock,
+                    }) as unknown as readonly [`0x${string}`, boolean, number, boolean, bigint, `0x${string}`, string];
+                    return { id, lockUp };
+                  } catch (retryError) {
+                    console.error(`Error fetching lockup ${id} after retry:`, retryError);
+                    return null;
+                  }
+                }
+                return null;
+              }
+            });
+            
+            const batchResults = await Promise.all(batchPromises);
+            lockUpResults.push(...batchResults);
+            
+            // Delay between batches (except for the last batch)
+            if (i + batchSize < lockUpIds.length) {
+              await new Promise(resolve => setTimeout(resolve, batchDelay));
             }
-          });
-
-          const lockUpResults = await Promise.all(lockUpPromises);
+          }
           const lockups: Array<{
             lockupId: string;
             amount: string;
@@ -361,7 +415,7 @@ export async function GET(request: NextRequest) {
 
           lockups.sort((a, b) => a.unlockTime - b.unlockTime);
           console.log(`[Balance API] Final summary for ${address}: ${lockups.length} lockups (from ${lockUpIds.length} IDs), locked=${lockedBalance.toString()}, unlocked=${unlockedBalance.toString()}`);
-          return { 
+          allDetailedLockups.push({ 
             address, 
             lockups, 
             unlockedBalance, 
@@ -372,14 +426,30 @@ export async function GET(request: NextRequest) {
               normalizedAddress,
               originalAddress: address,
             }
-          };
+          });
         } catch (error: any) {
           console.error(`[Balance API] Error fetching detailed lockups for ${address}:`, error);
           console.error(`[Balance API] Error details:`, error.message, error.stack);
-          return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
+          const normalizedAddress = getAddress(address);
+          allDetailedLockups.push({ 
+            address, 
+            lockups: [], 
+            unlockedBalance: BigInt(0), 
+            lockedBalance: BigInt(0),
+            debug: {
+              lockUpIdsFound: 0,
+              message: error.message,
+              normalizedAddress,
+              originalAddress: address,
+            }
+          });
         }
-      })
-    );
+        
+        // Small delay between addresses to avoid rate limiting (except for the last address)
+        if (verifiedAddresses.indexOf(address) < verifiedAddresses.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+    }
 
     const totalLockupsFound = allDetailedLockups.reduce((sum, item) => sum + item.lockups.length, 0);
     const totalIdsFound = allDetailedLockups.reduce((sum, item) => sum + (item.debug?.lockUpIdsFound || 0), 0);
