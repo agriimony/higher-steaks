@@ -113,23 +113,24 @@ async function fetchLockupData(
     const lockUps = await Promise.all(lockUpPromises);
 
     // Filter and sum HIGHER token lockups
+    // lockUps returns a tuple: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
     for (const lockUp of lockUps) {
       if (!lockUp) continue;
 
-      const tokenAddress = lockUp.token.toLowerCase();
-      const isERC20 = lockUp.isERC20;
-      const unlockTime = Number(lockUp.unlockTime);
-      const unlocked = lockUp.unlocked;
-      const amount = lockUp.amount;
+      // Destructure tuple: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
+      const [token, isERC20, unlockTime, unlocked, amount] = lockUp;
+      const tokenAddress = (token as string).toLowerCase();
+      const unlockTimeNum = Number(unlockTime);
+      const unlockedBool = unlocked as boolean;
 
       // Filter for HIGHER token ERC20 lockups
       if (tokenAddress === HIGHER_TOKEN_ADDRESS.toLowerCase() && isERC20) {
-        if (currentTime >= unlockTime && !unlocked) {
+        if (currentTime >= unlockTimeNum && !unlockedBool) {
           // Unlocked but not yet claimed
-          unlockedBalance += amount;
-        } else if (currentTime < unlockTime) {
+          unlockedBalance += amount as bigint;
+        } else if (currentTime < unlockTimeNum) {
           // Still locked
-          lockedBalance += amount;
+          lockedBalance += amount as bigint;
         }
       }
     }
