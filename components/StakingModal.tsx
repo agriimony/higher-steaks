@@ -168,7 +168,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
             {/* Left Column: Staked Lockups */}
             <div>
               <h3 className="text-lg font-bold mb-4 text-black border-b-2 border-black pb-2">
-                Staked Lockups
+                Staked Positions
               </h3>
               {lockups.length === 0 ? (
                 <p className="text-sm text-gray-600 italic">No active lockups</p>
@@ -176,29 +176,44 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                 <ul className="space-y-3">
                   {lockups.map((lockup) => (
                     <li key={lockup.lockupId} className="text-sm">
-                      <div className="flex items-start gap-2">
-                        <span className="text-black">•</span>
-                        <div className="flex-1">
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="font-bold text-black">
-                              {formatTokenAmount(lockup.amountFormatted)} HIGHER
-                            </span>
-                            <span className="text-gray-600">
-                              {formatTimeRemaining(lockup.timeRemaining)}
-                            </span>
-                          </div>
-                          {lockup.timeRemaining <= 0 && (
-                            <button
-                              className="mt-2 px-3 py-1.5 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
-                              onClick={() => {
-                                // Placeholder for unstake functionality
-                                console.log('Unstake lockup:', lockup.lockupId);
-                              }}
-                            >
-                              Unstake
-                            </button>
-                          )}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <img 
+                            src={balance.higherLogoUrl || '/higher-logo.png'} 
+                            alt="HIGHER" 
+                            className="w-4 h-4 rounded-full"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                          <span className="font-bold text-black">
+                            {formatTokenAmount(lockup.amountFormatted)}
+                          </span>
                         </div>
+                        <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
+                        <a
+                          href={`https://basescan.org/address/${lockup.receiver}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gray-600 hover:text-black transition underline text-right flex-shrink-0"
+                        >
+                          {truncateAddress(lockup.receiver)}
+                        </a>
+                        {lockup.timeRemaining <= 0 ? (
+                          <button
+                            className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
+                            onClick={() => {
+                              // Placeholder for unstake functionality
+                              console.log('Unstake lockup:', lockup.lockupId);
+                            }}
+                          >
+                            Unstake
+                          </button>
+                        ) : (
+                          <span className="text-gray-600 text-xs flex-shrink-0">
+                            {formatTimeRemaining(lockup.timeRemaining)}
+                          </span>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -235,7 +250,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                               </span>
                               {isConnected && (
                                 <button
-                                  className="px-2 py-1 bg-[#fefdfb] text-xs font-bold border-2 border-purple-500 text-purple-700 hover:bg-black hover:text-white hover:border-black transition-all"
+                                  className="px-1 py-1 bg-[#fefdfb] text-xs font-bold border-2 border-purple-500 text-purple-700 hover:bg-black hover:text-white hover:border-black transition-all"
                                   onClick={() => {
                                     // Placeholder for stake functionality
                                     console.log('Stake HIGHER from wallet:', wallet.address);
