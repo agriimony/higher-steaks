@@ -219,8 +219,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                     const isConnected = connectedWalletAddress?.toLowerCase() === wallet.address.toLowerCase();
                     return (
                       <li key={wallet.address} className="text-sm">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-shrink-0">
                             <span className="text-black">•</span>
                             <img 
                               src={balance.higherLogoUrl || '/higher-logo.png'} 
@@ -232,7 +232,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                             />
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-black">
-                                {formatTokenAmount(wallet.balanceFormatted)} HIGHER
+                                {formatTokenAmount(wallet.balanceFormatted)}
                               </span>
                               {isConnected && (
                                 <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold border border-purple-300">
@@ -252,6 +252,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                               )}
                             </div>
                           </div>
+                          <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                           <a
                             href={`https://basescan.org/address/${wallet.address}`}
                             target="_blank"
