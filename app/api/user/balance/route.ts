@@ -6,6 +6,28 @@ import { base } from 'viem/chains';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Type definition for detailed lockup results
+type DetailedLockupResult = {
+  address: string;
+  lockups: Array<{
+    lockupId: string;
+    amount: string;
+    amountFormatted: string;
+    unlockTime: number;
+    timeRemaining: number;
+    receiver: string;
+  }>;
+  unlockedBalance: bigint;
+  lockedBalance: bigint;
+  debug: {
+    lockUpIdsFound: number;
+    lockupsIncluded?: number;
+    message?: string;
+    normalizedAddress: string;
+    originalAddress: string;
+  };
+};
+
 // HIGHER token contract address on Base
 const HIGHER_TOKEN_ADDRESS = '0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe';
 
@@ -184,26 +206,6 @@ export async function GET(request: NextRequest) {
 
     // Fetch detailed lockups for all addresses
     // Process sequentially to avoid overwhelming RPC with parallel requests
-    type DetailedLockupResult = {
-      address: string;
-      lockups: Array<{
-        lockupId: string;
-        amount: string;
-        amountFormatted: string;
-        unlockTime: number;
-        timeRemaining: number;
-        receiver: string;
-      }>;
-      unlockedBalance: bigint;
-      lockedBalance: bigint;
-      debug: {
-        lockUpIdsFound: number;
-        lockupsIncluded?: number;
-        message?: string;
-        normalizedAddress: string;
-        originalAddress: string;
-      };
-    };
     const allDetailedLockups: DetailedLockupResult[] = [];
     for (const address of verifiedAddresses) {
       try {
@@ -224,7 +226,8 @@ export async function GET(request: NextRequest) {
 
           if (lockUpCount === BigInt(0)) {
             console.log(`[Balance API] No lockups in contract`);
-            return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0), debug: { lockUpIdsFound: 0, message: 'No lockups in contract' } };
+            allDetailedLockups.push({ address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0), debug: { lockUpIdsFound: 0, message: 'No lockups in contract', normalizedAddress, originalAddress: address } });
+            continue;
           }
 
           // Use address exactly as received from Neynar (like debug endpoint)
@@ -285,7 +288,8 @@ export async function GET(request: NextRequest) {
           if (lockUpIds.length === 0) {
             const debugMsg = `⚠️  No lockup IDs returned for any address format (original: ${address}, normalized: ${normalizedAddress}, lowercase: ${address.toLowerCase()})`;
             console.log(`[Balance API] ${debugMsg}`);
-            return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0), debug: { lockUpIdsFound: 0, message: debugMsg, normalizedAddress, originalAddress: address } };
+            allDetailedLockups.push({ address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0), debug: { lockUpIdsFound: 0, message: debugMsg, normalizedAddress, originalAddress: address } });
+            continue;
           }
 
           console.log(`[Balance API] ✓ Found ${lockUpIds.length} lockup IDs using address format: ${workingAddressFormat}`);
