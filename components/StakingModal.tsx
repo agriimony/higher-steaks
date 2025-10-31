@@ -143,7 +143,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
               className="w-5 h-5 rounded-full"
             />
             <span className="text-sm font-bold text-purple-700">
-              {formatTokenAmount(balance.lockedBalanceFormatted)}/{formatTokenAmount(balance.totalBalanceFormatted)}
+              {formatTokenAmount(balance.lockedBalanceFormatted)} / {formatTokenAmount(balance.totalBalanceFormatted)}
             </span>
             <span className="text-sm">🥩</span>
           </div>
@@ -219,10 +219,18 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                     const isConnected = connectedWalletAddress?.toLowerCase() === wallet.address.toLowerCase();
                     return (
                       <li key={wallet.address} className="text-sm">
-                        <div className="flex items-start gap-2">
-                          <span className="text-black">•</span>
-                          <div className="flex-1">
-                            <div className="flex items-baseline gap-2 flex-wrap">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 flex-1">
+                            <span className="text-black">•</span>
+                            <img 
+                              src={balance.higherLogoUrl || '/higher-logo.png'} 
+                              alt="HIGHER" 
+                              className="w-4 h-4 rounded-full"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-black">
                                 {formatTokenAmount(wallet.balanceFormatted)} HIGHER
                               </span>
@@ -231,27 +239,27 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                   Connected
                                 </span>
                               )}
+                              {isConnected && (
+                                <button
+                                  className="px-3 py-1.5 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+                                  onClick={() => {
+                                    // Placeholder for stake functionality
+                                    console.log('Stake HIGHER from wallet:', wallet.address);
+                                  }}
+                                >
+                                  Stake HIGHER
+                                </button>
+                              )}
                             </div>
-                            <a
-                              href={`https://basescan.org/address/${wallet.address}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-xs text-gray-600 hover:text-black transition underline mt-1 block"
-                            >
-                              {truncateAddress(wallet.address)}
-                            </a>
-                            {isConnected && (
-                              <button
-                                className="mt-2 px-3 py-1.5 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
-                                onClick={() => {
-                                  // Placeholder for stake functionality
-                                  console.log('Stake HIGHER from wallet:', wallet.address);
-                                }}
-                              >
-                                Stake HIGHER
-                              </button>
-                            )}
                           </div>
+                          <a
+                            href={`https://basescan.org/address/${wallet.address}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-gray-600 hover:text-black transition underline text-right flex-shrink-0"
+                          >
+                            {truncateAddress(wallet.address)}
+                          </a>
                         </div>
                       </li>
                     );
