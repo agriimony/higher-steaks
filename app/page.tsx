@@ -399,7 +399,7 @@ export default function HigherSteakMenu() {
                   {formatTokenAmount(balance.lockedBalanceFormatted)}/{formatTokenAmount(balance.totalBalanceFormatted)}
                 </span>
                 <span className="text-[0.65rem] sm:text-xs">🔒</span>
-                <span className="text-gray-400">☻</span>
+                <span className="text-gray-400">•</span>
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue}
                 </span>
