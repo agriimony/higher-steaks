@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http, formatUnits, type PublicClient } from 'viem';
+import { createPublicClient, http, formatUnits, getAddress, type PublicClient } from 'viem';
 import { base } from 'viem/chains';
 
 // Force Node.js runtime
@@ -183,7 +183,10 @@ export async function GET(request: NextRequest) {
     const allDetailedLockups = await Promise.all(
       verifiedAddresses.map(async (address) => {
         try {
-          console.log(`[Balance API] Fetching lockups for address: ${address}`);
+          // Normalize address to checksum format for consistent matching with contract
+          const normalizedAddress = getAddress(address);
+          console.log(`[Balance API] Fetching lockups for address: ${address} -> normalized: ${normalizedAddress}`);
+          
           const lockUpCount = await client.readContract({
             address: LOCKUP_CONTRACT,
             abi: LOCKUP_ABI,
@@ -193,12 +196,10 @@ export async function GET(request: NextRequest) {
           console.log(`[Balance API] Total lockup count: ${lockUpCount.toString()}`);
 
           if (lockUpCount === BigInt(0)) {
-            console.log(`[Balance API] No lockups in contract for ${address}`);
-            return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
+            console.log(`[Balance API] No lockups in contract`);
+            return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0), debug: { lockUpIdsFound: 0, message: 'No lockups in contract' } };
           }
 
-          // Normalize address to checksum format for consistent matching
-          const normalizedAddress = address as `0x${string}`;
           console.log(`[Balance API] Querying getLockUpIdsByReceiver with: address=${normalizedAddress}, start=0, stop=${lockUpCount.toString()}`);
 
           const lockUpIds = await client.readContract({
@@ -209,12 +210,13 @@ export async function GET(request: NextRequest) {
           }) as bigint[];
 
           console.log(`[Balance API] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for ${normalizedAddress}`);
-          if (lockUpIds.length > 0) {
-            console.log(`[Balance API] Lockup IDs found:`, lockUpIds.map(id => id.toString()));
-          } else {
-            console.log(`[Balance API] ⚠️  No lockup IDs returned for address ${normalizedAddress} - this might indicate address mismatch or no lockups for this receiver`);
-            return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
+          if (lockUpIds.length === 0) {
+            const debugMsg = `⚠️  No lockup IDs returned for address ${normalizedAddress} (original: ${address}) - this might indicate address mismatch or no lockups for this receiver`;
+            console.log(`[Balance API] ${debugMsg}`);
+            return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0), debug: { lockUpIdsFound: 0, message: debugMsg, normalizedAddress, originalAddress: address } };
           }
+
+          console.log(`[Balance API] ✓ Found ${lockUpIds.length} lockup IDs:`, lockUpIds.map(id => id.toString()));
 
           const lockUpPromises = lockUpIds.map(async (id: bigint) => {
             try {
@@ -304,8 +306,19 @@ export async function GET(request: NextRequest) {
           }
 
           lockups.sort((a, b) => a.unlockTime - b.unlockTime);
-          console.log(`[Balance API] Final summary for ${address}: ${lockups.length} lockups, locked=${lockedBalance.toString()}, unlocked=${unlockedBalance.toString()}`);
-          return { address, lockups, unlockedBalance, lockedBalance };
+          console.log(`[Balance API] Final summary for ${address}: ${lockups.length} lockups (from ${lockUpIds.length} IDs), locked=${lockedBalance.toString()}, unlocked=${unlockedBalance.toString()}`);
+          return { 
+            address, 
+            lockups, 
+            unlockedBalance, 
+            lockedBalance,
+            debug: {
+              lockUpIdsFound: lockUpIds.length,
+              lockupsIncluded: lockups.length,
+              normalizedAddress,
+              originalAddress: address,
+            }
+          };
         } catch (error: any) {
           console.error(`[Balance API] Error fetching detailed lockups for ${address}:`, error);
           console.error(`[Balance API] Error details:`, error.message, error.stack);
@@ -314,7 +327,9 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    console.log(`[Balance API] Total lockups found across all addresses: ${allDetailedLockups.reduce((sum, item) => sum + item.lockups.length, 0)}`);
+    const totalLockupsFound = allDetailedLockups.reduce((sum, item) => sum + item.lockups.length, 0);
+    const totalIdsFound = allDetailedLockups.reduce((sum, item) => sum + (item.debug?.lockUpIdsFound || 0), 0);
+    console.log(`[Balance API] Total: ${totalIdsFound} lockup IDs found, ${totalLockupsFound} lockups included in response`);
 
     // Extract lockup totals and details
     const lockupData = allDetailedLockups.map(item => ({
@@ -323,6 +338,7 @@ export async function GET(request: NextRequest) {
     }));
     
     const allLockupsFlat = allDetailedLockups.flatMap(item => item.lockups);
+    const debugInfo = allDetailedLockups.map(item => item.debug).filter(Boolean);
 
     // Sum wallet balances
     const walletBalance = addressBalances.reduce(
@@ -397,6 +413,12 @@ export async function GET(request: NextRequest) {
         balance: w.balance,
         balanceFormatted: w.balanceFormatted,
       })),
+      debug: {
+        verifiedAddresses,
+        totalLockupIdsFound: totalIdsFound,
+        totalLockupsIncluded: totalLockupsFound,
+        perAddress: debugInfo,
+      },
     });
   } catch (error) {
     console.error('Balance API error:', error);
