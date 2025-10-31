@@ -16,8 +16,10 @@ interface User {
 
 interface TokenBalance {
   totalBalanceFormatted: string;
+  lockedBalanceFormatted: string;
   usdValue: string;
   pricePerToken: number;
+  higherLogoUrl?: string;
 }
 
 interface StakingBalance {
@@ -251,6 +253,7 @@ export default function HigherSteakMenu() {
       // Set simulated balance
       setBalance({
         totalBalanceFormatted: simulatedProfile.walletBalance,
+        lockedBalanceFormatted: '0.00',
         usdValue: '$0.00',
         pricePerToken: 0,
       });
@@ -382,10 +385,18 @@ export default function HigherSteakMenu() {
               </div>
             ) : balance ? (
               <div className="flex items-center gap-1.5">
+                {balance.higherLogoUrl && (
+                  <img 
+                    src={balance.higherLogoUrl} 
+                    alt="HIGHER" 
+                    className="w-4 h-4 sm:w-5 sm:h-5 rounded-full"
+                  />
+                )}
                 <span className="text-[0.65rem] sm:text-xs font-bold text-purple-700">
-                  {formatTokenAmount(balance.totalBalanceFormatted)} HIGHER
+                  {formatTokenAmount(balance.lockedBalanceFormatted)}/{formatTokenAmount(balance.totalBalanceFormatted)}
                 </span>
-                <span className="text-gray-400">•</span>
+                <span className="text-[0.65rem] sm:text-xs">🔒</span>
+                <span className="text-gray-400">☻</span>
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue}
                 </span>
@@ -530,19 +541,10 @@ export default function HigherSteakMenu() {
                   </div>
                 ))
               ) : (
-                // Fallback menu if leaderboard is empty
-                fallbackMenuItems.map((item, index) => (
-                  <div key={index}>
-                    <div className="flex items-baseline text-xs sm:text-sm md:text-base">
-                      <span className="flex-shrink-0 font-bold">{item.name}</span>
-                  <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
-                  <span className="flex-shrink-0 font-bold tracking-wider">{item.price}</span>
+                // Sold Out if leaderboard is empty
+                <div className="text-center py-8">
+                  <p className="text-base sm:text-lg md:text-xl font-bold">Sold Out</p>
                 </div>
-                    <p className="mt-1 text-[0.65rem] sm:text-xs text-gray-600 italic">
-                      {item.description}
-                    </p>
-                  </div>
-                ))
               )}
             </div>
 
@@ -554,7 +556,7 @@ export default function HigherSteakMenu() {
         </div>
 
         <div className="text-center mt-3 md:mt-4">
-          <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60">Menu changes daily · 12PM UTC</p>
+          <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60">Menu Changes Daily · 12PM UTC</p>
         </div>
       </div>
     </main>
