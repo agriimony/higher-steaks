@@ -60,84 +60,6 @@ const LOCKUP_ABI = [
   },
 ] as const;
 
-// Fetch lockup data for a given address
-async function fetchLockupData(
-  client: PublicClient,
-  address: `0x${string}`,
-  currentTime: number
-): Promise<{ unlockedBalance: bigint; lockedBalance: bigint }> {
-  let unlockedBalance = BigInt(0);
-  let lockedBalance = BigInt(0);
-
-  try {
-    // Get total lockup count
-    const lockUpCount = await client.readContract({
-      address: LOCKUP_CONTRACT,
-      abi: LOCKUP_ABI,
-      functionName: 'lockUpCount',
-    });
-
-    if (lockUpCount === BigInt(0)) {
-      return { unlockedBalance, lockedBalance };
-    }
-
-    // Get all lockup IDs for this receiver
-    const lockUpIds = await client.readContract({
-      address: LOCKUP_CONTRACT,
-      abi: LOCKUP_ABI,
-      functionName: 'getLockUpIdsByReceiver',
-      args: [address, BigInt(0), lockUpCount],
-    });
-
-    // Fetch details for each lockup
-    const lockUpPromises = lockUpIds.map(async (id: bigint) => {
-      try {
-        const lockUp = await client.readContract({
-          address: LOCKUP_CONTRACT,
-          abi: LOCKUP_ABI,
-          functionName: 'lockUps',
-          args: [id],
-        });
-
-        return lockUp;
-      } catch (error) {
-        console.error(`Error fetching lockup ${id}:`, error);
-        return null;
-      }
-    });
-
-    const lockUps = await Promise.all(lockUpPromises);
-
-    // Filter and sum HIGHER token lockups
-    // lockUps returns a tuple: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
-    for (const lockUp of lockUps) {
-      if (!lockUp) continue;
-
-      // Destructure tuple: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
-      const [token, isERC20, unlockTime, unlocked, amount] = lockUp;
-      const tokenAddress = (token as string).toLowerCase();
-      const unlockTimeNum = Number(unlockTime);
-      const unlockedBool = unlocked as boolean;
-
-      // Filter for HIGHER token ERC20 lockups
-      if (tokenAddress === HIGHER_TOKEN_ADDRESS.toLowerCase() && isERC20) {
-        if (currentTime >= unlockTimeNum && !unlockedBool) {
-          // Unlocked but not yet claimed
-          unlockedBalance += amount as bigint;
-        } else if (currentTime < unlockTimeNum) {
-          // Still locked
-          lockedBalance += amount as bigint;
-        }
-      }
-    }
-  } catch (error) {
-    console.error(`Error fetching lockup data for ${address}:`, error);
-  }
-
-  return { unlockedBalance, lockedBalance };
-}
-
-
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -223,51 +145,139 @@ export async function GET(request: NextRequest) {
     });
     const currentTime = Number(block.timestamp);
 
-    // Fetch wallet balances and lockup data for all verified addresses in parallel
-    const [addressBalances, lockupData] = await Promise.all([
-      // Wallet balances
-      Promise.all(
-        verifiedAddresses.map(async (address) => {
-          try {
-            const balance = await client.readContract({
-              address: HIGHER_TOKEN_ADDRESS,
-              abi: ERC20_ABI,
-              functionName: 'balanceOf',
-              args: [address as `0x${string}`],
-            });
+    // Fetch wallet balances for all verified addresses
+    const addressBalances = await Promise.all(
+      verifiedAddresses.map(async (address) => {
+        try {
+          const balance = await client.readContract({
+            address: HIGHER_TOKEN_ADDRESS,
+            abi: ERC20_ABI,
+            functionName: 'balanceOf',
+            args: [address as `0x${string}`],
+          });
 
-            const balanceFormatted = formatUnits(balance, 18);
+          const balanceFormatted = formatUnits(balance, 18);
 
-            return {
-              address,
-              balance: balance.toString(),
-              balanceFormatted: parseFloat(balanceFormatted).toLocaleString('en-US', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              }),
-            };
-          } catch (error) {
-            console.error(`Error fetching balance for ${address}:`, error);
-            return {
-              address,
-              balance: '0',
-              balanceFormatted: '0.00',
-            };
+          return {
+            address,
+            balance: balance.toString(),
+            balanceFormatted: parseFloat(balanceFormatted).toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }),
+          };
+        } catch (error) {
+          console.error(`Error fetching balance for ${address}:`, error);
+          return {
+            address,
+            balance: '0',
+            balanceFormatted: '0.00',
+          };
+        }
+      })
+    );
+
+    // Fetch detailed lockups once for all addresses (reused for totals and details)
+    const allDetailedLockups = await Promise.all(
+      verifiedAddresses.map(async (address) => {
+        try {
+          const lockUpCount = await client.readContract({
+            address: LOCKUP_CONTRACT,
+            abi: LOCKUP_ABI,
+            functionName: 'lockUpCount',
+          });
+
+          if (lockUpCount === BigInt(0)) {
+            return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
           }
-        })
-      ),
-      // Lockup data for all addresses
-      Promise.all(
-        verifiedAddresses.map(async (address) => {
-          try {
-            return await fetchLockupData(client as PublicClient, address as `0x${string}`, currentTime);
-          } catch (error) {
-            console.error(`Error fetching lockups for ${address}:`, error);
-            return { unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
+
+          const lockUpIds = await client.readContract({
+            address: LOCKUP_CONTRACT,
+            abi: LOCKUP_ABI,
+            functionName: 'getLockUpIdsByReceiver',
+            args: [address as `0x${string}`, BigInt(0), lockUpCount],
+          });
+
+          const lockUpPromises = lockUpIds.map(async (id: bigint) => {
+            try {
+              const lockUp = await client.readContract({
+                address: LOCKUP_CONTRACT,
+                abi: LOCKUP_ABI,
+                functionName: 'lockUps',
+                args: [id],
+              });
+              return { id, lockUp };
+            } catch (error) {
+              console.error(`Error fetching lockup ${id}:`, error);
+              return null;
+            }
+          });
+
+          const lockUpResults = await Promise.all(lockUpPromises);
+          const lockups: Array<{
+            lockupId: string;
+            amount: string;
+            amountFormatted: string;
+            unlockTime: number;
+            timeRemaining: number;
+            receiver: string;
+          }> = [];
+          
+          let unlockedBalance = BigInt(0);
+          let lockedBalance = BigInt(0);
+
+          for (const result of lockUpResults) {
+            if (!result) continue;
+            const { id, lockUp } = result;
+            const [token, isERC20, unlockTime, unlocked, amount, receiver] = lockUp;
+            const tokenAddress = (token as string).toLowerCase();
+
+            if (tokenAddress === HIGHER_TOKEN_ADDRESS.toLowerCase() && isERC20) {
+              const unlockTimeNum = Number(unlockTime);
+              const unlockedBool = unlocked as boolean;
+              const amountBigInt = amount as bigint;
+
+              // Calculate totals (for balance pill)
+              if (currentTime >= unlockTimeNum && !unlockedBool) {
+                unlockedBalance += amountBigInt;
+              } else if (currentTime < unlockTimeNum) {
+                lockedBalance += amountBigInt;
+              }
+
+              // Store details for modal (only if not yet unlocked/claimed)
+              if (!unlockedBool) {
+                const timeRemaining = unlockTimeNum - currentTime;
+                lockups.push({
+                  lockupId: id.toString(),
+                  amount: amountBigInt.toString(),
+                  amountFormatted: parseFloat(formatUnits(amountBigInt, 18)).toLocaleString('en-US', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  }),
+                  unlockTime: unlockTimeNum,
+                  timeRemaining,
+                  receiver: receiver as string,
+                });
+              }
+            }
           }
-        })
-      ),
-    ]);
+
+          lockups.sort((a, b) => a.unlockTime - b.unlockTime);
+          return { address, lockups, unlockedBalance, lockedBalance };
+        } catch (error) {
+          console.error(`Error fetching detailed lockups for ${address}:`, error);
+          return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0) };
+        }
+      })
+    );
+
+    // Extract lockup totals and details
+    const lockupData = allDetailedLockups.map(item => ({
+      unlockedBalance: item.unlockedBalance,
+      lockedBalance: item.lockedBalance,
+    }));
+    
+    const allLockupsFlat = allDetailedLockups.flatMap(item => item.lockups);
 
     // Sum wallet balances
     const walletBalance = addressBalances.reduce(
@@ -326,6 +336,7 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching token price:', priceError);
     }
 
+
     return NextResponse.json({
       totalBalance: totalBalance.toString(),
       totalBalanceFormatted,
@@ -335,6 +346,12 @@ export async function GET(request: NextRequest) {
       pricePerToken,
       higherLogoUrl: '/higher-logo.png',
       addresses: addressBalances,
+      lockups: allLockupsFlat,
+      wallets: addressBalances.filter(w => BigInt(w.balance) > BigInt(0)).map(w => ({
+        address: w.address,
+        balance: w.balance,
+        balanceFormatted: w.balanceFormatted,
+      })),
     });
   } catch (error) {
     console.error('Balance API error:', error);

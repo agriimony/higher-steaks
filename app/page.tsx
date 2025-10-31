@@ -21,6 +21,8 @@ interface TokenBalance {
   usdValue: string;
   pricePerToken: number;
   higherLogoUrl?: string;
+  lockups?: LockupDetail[];
+  wallets?: WalletDetail[];
 }
 
 interface StakingBalance {
@@ -85,22 +87,13 @@ export default function HigherSteakMenu() {
   const [pixelDensity, setPixelDensity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(0);
   
-  // Fetch staking details function (defined early so it can be called from useEffect)
-  const fetchStakingDetails = async (fid: number) => {
-    setLoadingStakingDetails(true);
-    try {
-      const response = await fetch(`/api/user/staking-details?fid=${fid}`);
-      if (response.ok) {
-        const data = await response.json();
-        setStakingDetails(data);
-      } else {
-        console.error('Failed to fetch staking details');
-        setStakingDetails({ lockups: [], wallets: [] });
-      }
-    } catch (error) {
-      console.error('Error fetching staking details:', error);
-      setStakingDetails({ lockups: [], wallets: [] });
-    } finally {
+  // Extract staking details from balance data (single source of truth)
+  const updateStakingDetailsFromBalance = (balanceData: TokenBalance) => {
+    if (balanceData.lockups && balanceData.wallets) {
+      setStakingDetails({
+        lockups: balanceData.lockups,
+        wallets: balanceData.wallets,
+      });
       setLoadingStakingDetails(false);
     }
   };
@@ -195,10 +188,10 @@ export default function HigherSteakMenu() {
           console.log('Profile data:', profileData);
           setUser(profileData);
           
-          // Fetch token balance, staking balance, and staking details after getting user profile
+          // Fetch token balance and staking balance after getting user profile
+          // Balance API now includes lockups and wallets (single source of truth)
           fetchTokenBalance(fid);
           fetchStakingBalance(fid);
-          fetchStakingDetails(fid);
         } else {
           console.error('Failed to fetch profile');
           // Fallback to just FID if profile fetch fails
@@ -217,6 +210,7 @@ export default function HigherSteakMenu() {
 
     const fetchTokenBalance = async (fid: number) => {
       setLoadingBalance(true);
+      setLoadingStakingDetails(true);
       try {
         const response = await fetch(`/api/user/balance?fid=${fid}`);
         if (response.ok) {
@@ -224,11 +218,17 @@ export default function HigherSteakMenu() {
           console.log('Balance data:', balanceData);
           console.log('Higher logo URL:', balanceData.higherLogoUrl);
           setBalance(balanceData);
+          // Extract staking details from the same response (single source of truth)
+          updateStakingDetailsFromBalance(balanceData);
         } else {
           console.error('Failed to fetch balance');
+          setStakingDetails({ lockups: [], wallets: [] });
+          setLoadingStakingDetails(false);
         }
       } catch (error) {
         console.error('Error fetching balance:', error);
+        setStakingDetails({ lockups: [], wallets: [] });
+        setLoadingStakingDetails(false);
       } finally {
         setLoadingBalance(false);
       }
