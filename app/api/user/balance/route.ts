@@ -90,7 +90,10 @@ async function fetchLockupData(
 
     // Get current timestamp
     const currentBlock = await client.getBlockNumber();
-    const block = await client.getBlock({ blockNumber: currentBlock });
+    const block = await client.getBlock({ 
+      blockNumber: currentBlock,
+      includeTransactions: false 
+    });
     const currentTime = Number(block.timestamp);
 
     // Fetch details for each lockup
