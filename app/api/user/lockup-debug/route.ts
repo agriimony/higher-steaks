@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
       transport: http(rpcUrl),
     });
 
-    // Get current block timestamp
+    // Get current block number and timestamp once - use this same block for all contract calls to ensure consistency
     const currentBlock = await client.getBlockNumber();
     const block = await client.getBlock({ 
       blockNumber: currentBlock,
@@ -71,11 +71,14 @@ export async function GET(request: NextRequest) {
     });
     const currentTime = Number(block.timestamp);
 
-    // Get total lockup count
+    console.log(`[Lockup Debug] Using block ${currentBlock.toString()} at timestamp ${currentTime} (${new Date(currentTime * 1000).toISOString()}) for all contract calls`);
+
+    // Get total lockup count at this specific block
     const lockUpCount = await client.readContract({
       address: LOCKUP_CONTRACT,
       abi: LOCKUP_ABI,
       functionName: 'lockUpCount',
+      blockNumber: currentBlock, // Use consistent block number
     }) as bigint;
 
     if (action === 'count') {
@@ -95,6 +98,7 @@ export async function GET(request: NextRequest) {
           abi: LOCKUP_ABI,
           functionName: 'lockUps',
           args: [id],
+          blockNumber: currentBlock, // Use consistent block number
         }) as unknown as readonly [`0x${string}`, boolean, number, boolean, bigint, `0x${string}`, string];
 
         const [token, isERC20, unlockTime, unlocked, amount, receiverAddr, title] = lockUp;
@@ -137,6 +141,7 @@ export async function GET(request: NextRequest) {
           abi: LOCKUP_ABI,
           functionName: 'getLockUpIdsByReceiver',
           args: [receiver as `0x${string}`, BigInt(0), lockUpCount],
+          blockNumber: currentBlock, // Use consistent block number
         }) as bigint[];
 
         const lockupPromises = lockUpIds.map(async (id: bigint) => {
@@ -212,6 +217,7 @@ export async function GET(request: NextRequest) {
                 abi: LOCKUP_ABI,
                 functionName: 'lockUps',
                 args: [id],
+                blockNumber: currentBlock, // Use consistent block number
               }) as unknown as readonly [`0x${string}`, boolean, number, boolean, bigint, `0x${string}`, string];
 
               const [token, isERC20, unlockTime, unlocked, amount, receiver, title] = lockUp;

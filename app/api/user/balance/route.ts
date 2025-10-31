@@ -139,24 +139,27 @@ export async function GET(request: NextRequest) {
       transport: http(rpcUrl),
     });
 
-    // Get current timestamp once (outside of fetchLockupData to avoid type issues)
+    // Get current block number and timestamp once - use this same block for all contract calls to ensure consistency
     const currentBlock = await client.getBlockNumber();
     const block = await client.getBlock({ 
       blockNumber: currentBlock,
       includeTransactions: false 
     });
     const currentTime = Number(block.timestamp);
+    
+    console.log(`[Balance API] Using block ${currentBlock.toString()} at timestamp ${currentTime} (${new Date(currentTime * 1000).toISOString()}) for all contract calls`);
 
     // Fetch wallet balances for all verified addresses
     const addressBalances = await Promise.all(
       verifiedAddresses.map(async (address) => {
         try {
-          const balance = await client.readContract({
-            address: HIGHER_TOKEN_ADDRESS,
-            abi: ERC20_ABI,
-            functionName: 'balanceOf',
-            args: [address as `0x${string}`],
-          });
+            const balance = await client.readContract({
+              address: HIGHER_TOKEN_ADDRESS,
+              abi: ERC20_ABI,
+              functionName: 'balanceOf',
+              args: [address as `0x${string}`],
+              blockNumber: currentBlock, // Use consistent block number
+            });
 
           const balanceFormatted = formatUnits(balance, 18);
 
@@ -191,6 +194,7 @@ export async function GET(request: NextRequest) {
             address: LOCKUP_CONTRACT,
             abi: LOCKUP_ABI,
             functionName: 'lockUpCount',
+            blockNumber: currentBlock, // Use consistent block number
           });
 
           console.log(`[Balance API] Total lockup count: ${lockUpCount.toString()}`);
@@ -207,6 +211,7 @@ export async function GET(request: NextRequest) {
             abi: LOCKUP_ABI,
             functionName: 'getLockUpIdsByReceiver',
             args: [normalizedAddress, BigInt(0), lockUpCount],
+            blockNumber: currentBlock, // Use consistent block number
           }) as bigint[];
 
           console.log(`[Balance API] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for ${normalizedAddress}`);
@@ -225,6 +230,7 @@ export async function GET(request: NextRequest) {
                 abi: LOCKUP_ABI,
                 functionName: 'lockUps',
                 args: [id],
+                blockNumber: currentBlock, // Use consistent block number
               }) as unknown as readonly [`0x${string}`, boolean, number, boolean, bigint, `0x${string}`, string];
               return { id, lockUp };
             } catch (error) {
