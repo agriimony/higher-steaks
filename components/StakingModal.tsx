@@ -242,7 +242,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                     console.log('Stake HIGHER from wallet:', wallet.address);
                                   }}
                                 >
-                                  Connected | 🥩
+                                  Connected→🥩
                                 </button>
                               )}
                             </div>
