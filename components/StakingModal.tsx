@@ -221,7 +221,6 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                       <li key={wallet.address} className="text-sm">
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-black">•</span>
                             <img 
                               src={balance.higherLogoUrl || '/higher-logo.png'} 
                               alt="HIGHER" 
@@ -242,7 +241,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                     console.log('Stake HIGHER from wallet:', wallet.address);
                                   }}
                                 >
-                                  Connected→🥩
+                                  🥩
                                 </button>
                               )}
                             </div>
