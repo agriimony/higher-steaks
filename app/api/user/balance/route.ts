@@ -186,9 +186,11 @@ export async function GET(request: NextRequest) {
     const allDetailedLockups = await Promise.all(
       verifiedAddresses.map(async (address) => {
         try {
-          // Normalize address to checksum format for consistent matching with contract
-          const normalizedAddress = getAddress(address);
-          console.log(`[Balance API] Fetching lockups for address: ${address} -> normalized: ${normalizedAddress}`);
+          // Match debug endpoint behavior: use address as-is (no normalization)
+          // The debug endpoint uses receiver directly, so we'll try the same approach
+          console.log(`[Balance API] Fetching lockups for address: ${address}`);
+          
+          const normalizedAddress = getAddress(address); // For debug output
           
           const lockUpCount = await client.readContract({
             address: LOCKUP_CONTRACT,
@@ -204,24 +206,68 @@ export async function GET(request: NextRequest) {
             return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0), debug: { lockUpIdsFound: 0, message: 'No lockups in contract' } };
           }
 
-          console.log(`[Balance API] Querying getLockUpIdsByReceiver with: address=${normalizedAddress}, start=0, stop=${lockUpCount.toString()}`);
+          // Use address exactly as received from Neynar (like debug endpoint)
+          // Try different address formats until one works
+          console.log(`[Balance API] Querying getLockUpIdsByReceiver with: address=${address}, start=0, stop=${lockUpCount.toString()}`);
 
-          const lockUpIds = await client.readContract({
+          let lockUpIds: bigint[] = [];
+          let workingAddressFormat: string = address; // Track which format worked
+
+          // Try original address first
+          lockUpIds = await client.readContract({
             address: LOCKUP_CONTRACT,
             abi: LOCKUP_ABI,
             functionName: 'getLockUpIdsByReceiver',
-            args: [normalizedAddress, BigInt(0), lockUpCount],
+            args: [address as `0x${string}`, BigInt(0), lockUpCount],
             blockNumber: currentBlock, // Use consistent block number
           }) as bigint[];
 
-          console.log(`[Balance API] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for ${normalizedAddress}`);
+          console.log(`[Balance API] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for ${address}`);
+
+          // If no IDs found, try normalized address (checksum format)
           if (lockUpIds.length === 0) {
-            const debugMsg = `⚠️  No lockup IDs returned for address ${normalizedAddress} (original: ${address}) - this might indicate address mismatch or no lockups for this receiver`;
+            console.log(`[Balance API] Trying with normalized (checksum) address: ${normalizedAddress}`);
+            lockUpIds = await client.readContract({
+              address: LOCKUP_CONTRACT,
+              abi: LOCKUP_ABI,
+              functionName: 'getLockUpIdsByReceiver',
+              args: [normalizedAddress, BigInt(0), lockUpCount],
+              blockNumber: currentBlock,
+            }) as bigint[];
+            if (lockUpIds.length > 0) {
+              workingAddressFormat = normalizedAddress;
+              console.log(`[Balance API] ✓ Found ${lockUpIds.length} IDs with normalized address`);
+            } else {
+              console.log(`[Balance API] No IDs found with normalized address`);
+            }
+          }
+
+          // If still no IDs, try lowercase
+          if (lockUpIds.length === 0) {
+            const lowercaseAddress = address.toLowerCase() as `0x${string}`;
+            console.log(`[Balance API] Trying with lowercase address: ${lowercaseAddress}`);
+            lockUpIds = await client.readContract({
+              address: LOCKUP_CONTRACT,
+              abi: LOCKUP_ABI,
+              functionName: 'getLockUpIdsByReceiver',
+              args: [lowercaseAddress, BigInt(0), lockUpCount],
+              blockNumber: currentBlock,
+            }) as bigint[];
+            if (lockUpIds.length > 0) {
+              workingAddressFormat = lowercaseAddress;
+              console.log(`[Balance API] ✓ Found ${lockUpIds.length} IDs with lowercase address`);
+            } else {
+              console.log(`[Balance API] No IDs found with lowercase address`);
+            }
+          }
+
+          if (lockUpIds.length === 0) {
+            const debugMsg = `⚠️  No lockup IDs returned for any address format (original: ${address}, normalized: ${normalizedAddress}, lowercase: ${address.toLowerCase()})`;
             console.log(`[Balance API] ${debugMsg}`);
             return { address, lockups: [], unlockedBalance: BigInt(0), lockedBalance: BigInt(0), debug: { lockUpIdsFound: 0, message: debugMsg, normalizedAddress, originalAddress: address } };
           }
 
-          console.log(`[Balance API] ✓ Found ${lockUpIds.length} lockup IDs:`, lockUpIds.map(id => id.toString()));
+          console.log(`[Balance API] ✓ Found ${lockUpIds.length} lockup IDs using address format: ${workingAddressFormat}`);
 
           const lockUpPromises = lockUpIds.map(async (id: bigint) => {
             try {
@@ -259,12 +305,14 @@ export async function GET(request: NextRequest) {
             const tokenAddress = (token as string).toLowerCase();
             const receiverAddr = receiver as string;
 
-            // Verify receiver matches the address we're searching for
-            const receiverMatches = receiverAddr.toLowerCase() === address.toLowerCase();
-            console.log(`[Balance API] Lockup ${id.toString()}: receiver=${receiverAddr}, searchingFor=${address}, matches=${receiverMatches}, token=${tokenAddress}, isERC20=${isERC20}, unlocked=${unlocked as boolean}, unlockTime=${Number(unlockTime)}, amount=${(amount as bigint).toString()}`);
+            // Verify receiver matches the address we're searching for (case-insensitive comparison)
+            // Use the working address format that successfully found lockups
+            const receiverMatches = receiverAddr.toLowerCase() === workingAddressFormat.toLowerCase() || 
+                                   receiverAddr.toLowerCase() === address.toLowerCase();
+            console.log(`[Balance API] Lockup ${id.toString()}: receiver=${receiverAddr}, searchingFor=${address} (workingFormat=${workingAddressFormat}), matches=${receiverMatches}, token=${tokenAddress}, isERC20=${isERC20}, unlocked=${unlocked as boolean}, unlockTime=${Number(unlockTime)}, amount=${(amount as bigint).toString()}`);
 
             if (!receiverMatches) {
-              console.log(`[Balance API] WARNING: Lockup ${id.toString()} receiver ${receiverAddr} does not match verified address ${address}`);
+              console.log(`[Balance API] WARNING: Lockup ${id.toString()} receiver ${receiverAddr} does not match verified address ${address} or working format ${workingAddressFormat}`);
               continue;
             }
 
