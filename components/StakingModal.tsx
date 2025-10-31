@@ -235,19 +235,17 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                 {formatTokenAmount(wallet.balanceFormatted)}
                               </span>
                               {isConnected && (
-                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-bold border border-purple-300">
-                                  Connected
-                                </span>
-                              )}
-                              {isConnected && (
                                 <button
-                                  className="px-3 py-1.5 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+                                  className="px-3 py-1.5 bg-black text-white text-xs font-bold border-2 border-purple-500 hover:bg-purple-50 hover:text-black hover:border-purple-600 transition relative"
                                   onClick={() => {
                                     // Placeholder for stake functionality
                                     console.log('Stake HIGHER from wallet:', wallet.address);
                                   }}
                                 >
-                                  Stake HIGHER
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
+                                    Stake HIGHER
+                                  </span>
                                 </button>
                               )}
                             </div>
