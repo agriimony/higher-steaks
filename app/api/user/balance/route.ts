@@ -237,13 +237,21 @@ export async function GET(request: NextRequest) {
             const { id, lockUp } = result;
             const [token, isERC20, unlockTime, unlocked, amount, receiver] = lockUp;
             const tokenAddress = (token as string).toLowerCase();
+            const receiverAddr = receiver as string;
+
+            // Verify receiver matches the address we're searching for
+            const receiverMatches = receiverAddr.toLowerCase() === address.toLowerCase();
+            console.log(`[Balance API] Lockup ${id.toString()}: receiver=${receiverAddr}, searchingFor=${address}, matches=${receiverMatches}, token=${tokenAddress}, isERC20=${isERC20}, unlocked=${unlocked as boolean}, unlockTime=${Number(unlockTime)}, amount=${(amount as bigint).toString()}`);
+
+            if (!receiverMatches) {
+              console.log(`[Balance API] WARNING: Lockup ${id.toString()} receiver ${receiverAddr} does not match verified address ${address}`);
+              continue;
+            }
 
             if (tokenAddress === HIGHER_TOKEN_ADDRESS.toLowerCase() && isERC20) {
               const unlockTimeNum = Number(unlockTime);
               const unlockedBool = unlocked as boolean;
               const amountBigInt = amount as bigint;
-
-              console.log(`[Balance API] Lockup ${id.toString()}: token=${tokenAddress}, unlocked=${unlockedBool}, unlockTime=${unlockTimeNum}, amount=${amountBigInt.toString()}, receiver=${receiver as string}`);
 
               // Calculate totals (for balance pill)
               if (currentTime >= unlockTimeNum && !unlockedBool) {
@@ -252,6 +260,8 @@ export async function GET(request: NextRequest) {
               } else if (currentTime < unlockTimeNum) {
                 lockedBalance += amountBigInt;
                 console.log(`[Balance API] Added to locked balance: ${amountBigInt.toString()}`);
+              } else if (unlockedBool) {
+                console.log(`[Balance API] Lockup ${id.toString()} is unlocked - not counting in balance`);
               }
 
               // Store details for modal (only if not yet unlocked/claimed)
@@ -266,14 +276,18 @@ export async function GET(request: NextRequest) {
                   }),
                   unlockTime: unlockTimeNum,
                   timeRemaining,
-                  receiver: receiver as string,
+                  receiver: receiverAddr,
                 });
-                console.log(`[Balance API] Added lockup ${id.toString()} to details array`);
+                console.log(`[Balance API] ✓ Added lockup ${id.toString()} to details array`);
               } else {
-                console.log(`[Balance API] Skipped lockup ${id.toString()} - already unlocked/claimed`);
+                console.log(`[Balance API] ✗ Skipped lockup ${id.toString()} - already unlocked/claimed (unlocked=${unlockedBool})`);
               }
             } else {
-              console.log(`[Balance API] Skipped lockup ${id.toString()} - not HIGHER token or not ERC20`);
+              if (tokenAddress !== HIGHER_TOKEN_ADDRESS.toLowerCase()) {
+                console.log(`[Balance API] ✗ Skipped lockup ${id.toString()} - not HIGHER token (got ${tokenAddress})`);
+              } else if (!isERC20) {
+                console.log(`[Balance API] ✗ Skipped lockup ${id.toString()} - not ERC20`);
+              }
             }
           }
 
