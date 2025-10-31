@@ -57,7 +57,7 @@ interface WalletDetail {
 
 export default function HigherSteakMenu() {
   // Development mode: Enable to test with simulated profiles
-  const [isDevelopmentMode, setIsDevelopmentMode] = useState(true);
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
   const [simulatedProfile, setSimulatedProfile] = useState<SimulatedProfile | null>(null);
   
   const [user, setUser] = useState<User | null>(null);
@@ -84,6 +84,26 @@ export default function HigherSteakMenu() {
   // Detect pixel density for ASCII art scaling
   const [pixelDensity, setPixelDensity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(0);
+  
+  // Fetch staking details function (defined early so it can be called from useEffect)
+  const fetchStakingDetails = async (fid: number) => {
+    setLoadingStakingDetails(true);
+    try {
+      const response = await fetch(`/api/user/staking-details?fid=${fid}`);
+      if (response.ok) {
+        const data = await response.json();
+        setStakingDetails(data);
+      } else {
+        console.error('Failed to fetch staking details');
+        setStakingDetails({ lockups: [], wallets: [] });
+      }
+    } catch (error) {
+      console.error('Error fetching staking details:', error);
+      setStakingDetails({ lockups: [], wallets: [] });
+    } finally {
+      setLoadingStakingDetails(false);
+    }
+  };
   
   // Format large numbers with K/M/B suffixes
   const formatTokenAmount = (amount: string): string => {
@@ -175,9 +195,10 @@ export default function HigherSteakMenu() {
           console.log('Profile data:', profileData);
           setUser(profileData);
           
-          // Fetch token balance and staking balance after getting user profile
+          // Fetch token balance, staking balance, and staking details after getting user profile
           fetchTokenBalance(fid);
           fetchStakingBalance(fid);
+          fetchStakingDetails(fid);
         } else {
           console.error('Failed to fetch profile');
           // Fallback to just FID if profile fetch fails
@@ -291,31 +312,11 @@ export default function HigherSteakMenu() {
     }
   }, [isDevelopmentMode, simulatedProfile]);
 
-  // Fetch staking details when modal opens
-  const fetchStakingDetails = async (fid: number) => {
-    setLoadingStakingDetails(true);
-    try {
-      const response = await fetch(`/api/user/staking-details?fid=${fid}`);
-      if (response.ok) {
-        const data = await response.json();
-        setStakingDetails(data);
-      } else {
-        console.error('Failed to fetch staking details');
-        setStakingDetails({ lockups: [], wallets: [] });
-      }
-    } catch (error) {
-      console.error('Error fetching staking details:', error);
-      setStakingDetails({ lockups: [], wallets: [] });
-    } finally {
-      setLoadingStakingDetails(false);
-    }
-  };
-
   // Handle balance pill click
   const handleBalancePillClick = () => {
     if (user?.fid && balance) {
       setShowStakingModal(true);
-      fetchStakingDetails(user.fid);
+      // Staking details are already loaded on initial connection, no need to fetch again
     }
   };
 
