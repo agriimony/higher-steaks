@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http, formatUnits } from 'viem';
+import { createPublicClient, http, formatUnits, type PublicClient } from 'viem';
 import { base } from 'viem/chains';
 
 // Force Node.js runtime
@@ -62,7 +62,7 @@ const LOCKUP_ABI = [
 
 // Fetch lockup data for a given address
 async function fetchLockupData(
-  client: ReturnType<typeof createPublicClient>,
+  client: PublicClient,
   address: `0x${string}`
 ): Promise<{ unlockedBalance: bigint; lockedBalance: bigint }> {
   let unlockedBalance = BigInt(0);
@@ -93,7 +93,7 @@ async function fetchLockupData(
     const block = await client.getBlock({ 
       blockNumber: currentBlock,
       includeTransactions: false 
-    });
+    }) as { timestamp: bigint };
     const currentTime = Number(block.timestamp);
 
     // Fetch details for each lockup
