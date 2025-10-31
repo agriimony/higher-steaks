@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
+import { StakingModal } from '@/components/StakingModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 
 interface User {
@@ -39,9 +40,24 @@ interface LeaderboardEntry {
   rank: number;
 }
 
+interface LockupDetail {
+  lockupId: string;
+  amount: string;
+  amountFormatted: string;
+  unlockTime: number;
+  timeRemaining: number;
+  receiver: string;
+}
+
+interface WalletDetail {
+  address: string;
+  balance: string;
+  balanceFormatted: string;
+}
+
 export default function HigherSteakMenu() {
   // Development mode: Enable to test with simulated profiles
-  const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
+  const [isDevelopmentMode, setIsDevelopmentMode] = useState(true);
   const [simulatedProfile, setSimulatedProfile] = useState<SimulatedProfile | null>(null);
   
   const [user, setUser] = useState<User | null>(null);
@@ -58,6 +74,12 @@ export default function HigherSteakMenu() {
     totalAmount?: string;
     minimumRequired?: string;
   }>({});
+  const [showStakingModal, setShowStakingModal] = useState(false);
+  const [stakingDetails, setStakingDetails] = useState<{
+    lockups: LockupDetail[];
+    wallets: WalletDetail[];
+  } | null>(null);
+  const [loadingStakingDetails, setLoadingStakingDetails] = useState(false);
   
   // Detect pixel density for ASCII art scaling
   const [pixelDensity, setPixelDensity] = useState(1);
@@ -269,9 +291,42 @@ export default function HigherSteakMenu() {
     }
   }, [isDevelopmentMode, simulatedProfile]);
 
+  // Fetch staking details when modal opens
+  const fetchStakingDetails = async (fid: number) => {
+    setLoadingStakingDetails(true);
+    try {
+      const response = await fetch(`/api/user/staking-details?fid=${fid}`);
+      if (response.ok) {
+        const data = await response.json();
+        setStakingDetails(data);
+      } else {
+        console.error('Failed to fetch staking details');
+        setStakingDetails({ lockups: [], wallets: [] });
+      }
+    } catch (error) {
+      console.error('Error fetching staking details:', error);
+      setStakingDetails({ lockups: [], wallets: [] });
+    } finally {
+      setLoadingStakingDetails(false);
+    }
+  };
+
+  // Handle balance pill click
+  const handleBalancePillClick = () => {
+    if (user?.fid && balance) {
+      setShowStakingModal(true);
+      fetchStakingDetails(user.fid);
+    }
+  };
+
   // Check onboarding status after all data is loaded
+  // DISABLED: Onboarding modal is disabled for now
   useEffect(() => {
     const checkOnboardingStatus = () => {
+      // Onboarding modal disabled
+      return;
+      
+      /* DISABLED CODE
       if (!user?.fid || loadingLeaderboard || loadingBalance) {
         return; // Wait for all data to load
       }
@@ -349,6 +404,7 @@ export default function HigherSteakMenu() {
         console.log('Onboarding: State 2b - Needs more HIGHER');
         return;
       }
+      */
     };
 
     checkOnboardingStatus();
@@ -373,12 +429,27 @@ export default function HigherSteakMenu() {
         />
       )}
 
+      {/* Staking Modal */}
+      {showStakingModal && balance && (
+        <StakingModal
+          onClose={() => setShowStakingModal(false)}
+          balance={balance}
+          lockups={stakingDetails?.lockups || []}
+          wallets={stakingDetails?.wallets || []}
+          connectedWalletAddress={user?.walletAddress || undefined}
+          loading={loadingStakingDetails || !stakingDetails}
+        />
+      )}
+
       <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
         <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
         {/* Header Row - Balance left, Profile right */}
         <div className="flex justify-between items-center gap-2 mb-3 sm:mb-4">
           {/* Token Balance Pill - Left */}
-          <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1.5 shadow-sm">
+          <div 
+            className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            onClick={handleBalancePillClick}
+          >
             {loadingBalance ? (
               <div className="flex items-center gap-2">
                 <div className="animate-spin h-3 w-3 border-2 border-purple-600 border-t-transparent rounded-full"></div>
@@ -398,7 +469,7 @@ export default function HigherSteakMenu() {
                 <span className="text-[0.65rem] sm:text-xs font-bold text-purple-700">
                   {formatTokenAmount(balance.lockedBalanceFormatted)}/{formatTokenAmount(balance.totalBalanceFormatted)}
                 </span>
-                <span className="text-[0.65rem] sm:text-xs">🔒</span>
+                <span className="text-[0.65rem] sm:text-xs">🥩</span>
                 <span className="text-gray-400">•</span>
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue}

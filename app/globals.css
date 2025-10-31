@@ -67,3 +67,21 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes loadingDots {
+  0%, 20% { opacity: 0.2; }
+  50% { opacity: 1; }
+  80%, 100% { opacity: 0.2; }
+}
+
+.loading-dot-1 { 
+  animation: loadingDots 1.5s ease-in-out infinite; 
+}
+
+.loading-dot-2 { 
+  animation: loadingDots 1.5s ease-in-out infinite 0.5s; 
+}
+
+.loading-dot-3 { 
+  animation: loadingDots 1.5s ease-in-out infinite 1s; 
+}
