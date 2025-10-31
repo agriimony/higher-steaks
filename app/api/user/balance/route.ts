@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
                 abi: LOCKUP_ABI,
                 functionName: 'lockUps',
                 args: [id],
-              });
+              }) as unknown as readonly [`0x${string}`, boolean, number, boolean, bigint, `0x${string}`, string];
               return { id, lockUp };
             } catch (error) {
               console.error(`Error fetching lockup ${id}:`, error);
