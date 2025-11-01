@@ -242,7 +242,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                 console.log('Unstake lockup:', lockup.lockupId);
                               }}
                             >
-                              Unstake
+                              Withdraw
                             </button>
                           ) : lockup.timeRemaining > 0 ? (
                             <span className="text-gray-600 text-s flex-shrink-0">
@@ -347,7 +347,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                           
                           {/* Stake input row (only visible when stake input is open for this wallet) */}
                           {isConnected && isStakeInputOpen && (
-                            <div className="flex items-center gap-2 pl-6">
+                            <div className="flex items-center gap-2">
                               <input
                                 type="text"
                                 value={stakeAmount}
