@@ -115,6 +115,13 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
     setStakeAmount(wallet.balanceFormatted.replace(/,/g, ''));
   };
 
+  // Handle percentage buttons - fill with percentage of wallet balance
+  const handlePercentage = (wallet: WalletDetail, percentage: number) => {
+    const balance = parseFloat(wallet.balanceFormatted.replace(/,/g, ''));
+    const amount = (balance * percentage).toFixed(2);
+    setStakeAmount(amount);
+  };
+
   // Handle Stake button toggle
   const handleStakeClick = (walletAddress: string) => {
     if (stakeInputOpen === walletAddress) {
@@ -288,21 +295,35 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                 {formatTokenAmount(wallet.balanceFormatted)}
                               </span>
                             </div>
-                            {isConnected && (
+                            {isConnected && !isStakeInputOpen && (
                               <button
                                 className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
-                                onClick={() => {
-                                  if (isStakeInputOpen) {
-                                    // Max button - fill with wallet balance
-                                    handleMax(wallet);
-                                  } else {
-                                    // Stake button - open input
-                                    handleStakeClick(wallet.address);
-                                  }
-                                }}
+                                onClick={() => handleStakeClick(wallet.address)}
                               >
-                                {isStakeInputOpen ? 'Max' : 'Stake'}
+                                Stake
                               </button>
+                            )}
+                            {isConnected && isStakeInputOpen && (
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+                                  onClick={() => handleMax(wallet)}
+                                >
+                                  Max
+                                </button>
+                                <button
+                                  className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+                                  onClick={() => handlePercentage(wallet, 0.5)}
+                                >
+                                  50%
+                                </button>
+                                <button
+                                  className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+                                  onClick={() => handlePercentage(wallet, 0.25)}
+                                >
+                                  25%
+                                </button>
+                              </div>
                             )}
                             <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                             <div className="flex items-center gap-1 flex-shrink-0">
