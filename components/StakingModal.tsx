@@ -362,7 +362,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                   value={lockupDuration}
                                   onChange={(e) => setLockupDuration(e.target.value)}
                                   placeholder="1"
-                                  className="w-12 px-1 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  className="w-10 px-1 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
                                 />
                                 <select
                                   value={lockupDurationUnit}
@@ -382,7 +382,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                   console.log('Stake HIGHER:', stakeAmount, 'for', lockupDuration, lockupDurationUnit, 'from wallet:', wallet.address);
                                 }}
                               >
-                                Stake Now
+                                Stake!
                               </button>
                             </div>
                           )}
