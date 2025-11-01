@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http, formatUnits } from 'viem';
+import { createPublicClient, http, formatUnits, getAddress } from 'viem';
 import { base } from 'viem/chains';
 
 // Force Node.js runtime
@@ -140,13 +140,19 @@ export async function GET(request: NextRequest) {
 
     if (action === 'by-receiver' && receiver) {
       try {
+        // Normalize receiver address to checksum format (same as balance endpoint)
+        const normalizedReceiver = getAddress(receiver);
+        console.log(`[Lockup Debug] Receiver: ${receiver} -> normalized: ${normalizedReceiver}`);
+        
         const lockUpIds = await client.readContract({
           address: LOCKUP_CONTRACT,
           abi: LOCKUP_ABI,
           functionName: 'getLockUpIdsByReceiver',
-          args: [receiver as `0x${string}`, BigInt(0), lockUpCount],
+          args: [normalizedReceiver, BigInt(0), lockUpCount],
           blockNumber: currentBlock, // Use consistent block number
         }) as bigint[];
+
+        console.log(`[Lockup Debug] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for ${normalizedReceiver}`);
 
         const lockupPromises = lockUpIds.map(async (id: bigint) => {
           try {
@@ -155,6 +161,7 @@ export async function GET(request: NextRequest) {
               abi: LOCKUP_ABI,
               functionName: 'lockUps',
               args: [id],
+              blockNumber: currentBlock, // Use consistent block number
             }) as unknown as readonly [`0x${string}`, boolean, number, boolean, bigint, `0x${string}`, string];
 
             const [token, isERC20, unlockTime, unlocked, amount, receiverAddr, title] = lockUp;

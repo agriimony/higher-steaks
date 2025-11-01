@@ -267,39 +267,39 @@ export async function GET(request: NextRequest) {
             };
           }
 
-          // Use address exactly as received from Neynar (like debug endpoint)
-          // Try different address formats until one works
-          console.log(`[Balance API] Querying getLockUpIdsByReceiver with: address=${address}, start=0, stop=${lockUpCount.toString()}`);
+          // Match debug endpoint exactly: use normalized (checksum) address first
+          // The debug endpoint works when you manually enter checksum addresses, so prioritize that format
+          console.log(`[Balance API] Querying getLockUpIdsByReceiver with: address=${address}, normalized=${normalizedAddress}, start=0, stop=${lockUpCount.toString()}`);
 
           let lockUpIds: bigint[] = [];
-          let workingAddressFormat: string = address; // Track which format worked
+          let workingAddressFormat: string = normalizedAddress; // Default to normalized (checksum) like debug endpoint
 
-          // Try original address first
+          // Try normalized (checksum) address first (matches what debug endpoint likely uses)
           lockUpIds = await client.readContract({
             address: LOCKUP_CONTRACT,
             abi: LOCKUP_ABI,
             functionName: 'getLockUpIdsByReceiver',
-            args: [address as `0x${string}`, BigInt(0), lockUpCount],
+            args: [normalizedAddress, BigInt(0), lockUpCount],
             blockNumber: currentBlock, // Use consistent block number
           }) as bigint[];
 
-          console.log(`[Balance API] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for ${address}`);
+          console.log(`[Balance API] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for normalized address ${normalizedAddress}`);
 
-          // If no IDs found, try normalized address (checksum format)
+          // If no IDs found with normalized, try original address from Neynar
           if (lockUpIds.length === 0) {
-            console.log(`[Balance API] Trying with normalized (checksum) address: ${normalizedAddress}`);
+            console.log(`[Balance API] Trying with original Neynar address format: ${address}`);
             lockUpIds = await client.readContract({
               address: LOCKUP_CONTRACT,
               abi: LOCKUP_ABI,
               functionName: 'getLockUpIdsByReceiver',
-              args: [normalizedAddress, BigInt(0), lockUpCount],
+              args: [address as `0x${string}`, BigInt(0), lockUpCount],
               blockNumber: currentBlock,
             }) as bigint[];
             if (lockUpIds.length > 0) {
-              workingAddressFormat = normalizedAddress;
-              console.log(`[Balance API] ✓ Found ${lockUpIds.length} IDs with normalized address`);
+              workingAddressFormat = address;
+              console.log(`[Balance API] ✓ Found ${lockUpIds.length} IDs with original address`);
             } else {
-              console.log(`[Balance API] No IDs found with normalized address`);
+              console.log(`[Balance API] No IDs found with original address`);
             }
           }
 
