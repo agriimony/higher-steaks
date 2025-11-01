@@ -174,49 +174,59 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                 <p className="text-sm text-gray-600 italic">No active lockups</p>
               ) : (
                 <ul className="space-y-3">
-                  {lockups.map((lockup) => (
-                    <li key={lockup.lockupId} className="text-sm">
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <img 
-                            src={balance.higherLogoUrl || '/higher-logo.png'} 
-                            alt="HIGHER" 
-                            className="w-4 h-4 rounded-full"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                          <span className="font-bold text-black">
-                            {formatTokenAmount(lockup.amountFormatted)}
-                          </span>
+                  {lockups.map((lockup) => {
+                    const isConnected = connectedWalletAddress?.toLowerCase() === lockup.receiver.toLowerCase();
+                    return (
+                      <li key={lockup.lockupId} className="text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <img 
+                              src={balance.higherLogoUrl || '/higher-logo.png'} 
+                              alt="HIGHER" 
+                              className="w-4 h-4 rounded-full"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <span className="font-bold text-black">
+                              {formatTokenAmount(lockup.amountFormatted)}
+                            </span>
+                          </div>
+                          <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {isConnected && <span className="text-purple-500 text-xs">•</span>}
+                            <a
+                              href={`https://basescan.org/address/${lockup.receiver}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`text-xs transition underline text-right ${
+                                isConnected 
+                                  ? 'font-bold text-purple-500 border-2 border-purple-500 px-1.5 py-0.5 rounded' 
+                                  : 'text-gray-600 hover:text-black'
+                              }`}
+                            >
+                              {truncateAddress(lockup.receiver)}
+                            </a>
+                          </div>
+                          {lockup.timeRemaining <= 0 ? (
+                            <button
+                              className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
+                              onClick={() => {
+                                // Placeholder for unstake functionality
+                                console.log('Unstake lockup:', lockup.lockupId);
+                              }}
+                            >
+                              Unstake
+                            </button>
+                          ) : (
+                            <span className="text-gray-600 text-xs flex-shrink-0">
+                              {formatTimeRemaining(lockup.timeRemaining)}
+                            </span>
+                          )}
                         </div>
-                        <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
-                        <a
-                          href={`https://basescan.org/address/${lockup.receiver}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-gray-600 hover:text-black transition underline text-right flex-shrink-0"
-                        >
-                          {truncateAddress(lockup.receiver)}
-                        </a>
-                        {lockup.timeRemaining <= 0 ? (
-                          <button
-                            className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
-                            onClick={() => {
-                              // Placeholder for unstake functionality
-                              console.log('Unstake lockup:', lockup.lockupId);
-                            }}
-                          >
-                            Unstake
-                          </button>
-                        ) : (
-                          <span className="text-gray-600 text-xs flex-shrink-0">
-                            {formatTimeRemaining(lockup.timeRemaining)}
-                          </span>
-                        )}
-                      </div>
-                    </li>
-                  ))}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -244,32 +254,35 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                 (e.target as HTMLImageElement).style.display = 'none';
                               }}
                             />
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-bold text-black">
-                                {formatTokenAmount(wallet.balanceFormatted)}
-                              </span>
-                              {isConnected && (
-                                <button
-                                  className="px-1 py-1 bg-[#fefdfb] text-xs font-bold border-2 border-purple-500 text-purple-700 hover:bg-black hover:text-white hover:border-black transition-all"
-                                  onClick={() => {
-                                    // Placeholder for stake functionality
-                                    console.log('Stake HIGHER from wallet:', wallet.address);
-                                  }}
-                                >
-                                  Connected→🥩
-                                </button>
-                              )}
-                            </div>
+                            <span className="font-bold text-black">
+                              {formatTokenAmount(wallet.balanceFormatted)}
+                            </span>
                           </div>
                           <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
-                          <a
-                            href={`https://basescan.org/address/${wallet.address}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-gray-600 hover:text-black transition underline text-right flex-shrink-0"
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {isConnected && <span className="text-purple-500 text-xs">•</span>}
+                            <a
+                              href={`https://basescan.org/address/${wallet.address}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`text-xs transition underline text-right ${
+                                isConnected 
+                                  ? 'font-bold text-purple-500 border-2 border-purple-500 px-1.5 py-0.5 rounded' 
+                                  : 'text-gray-600 hover:text-black'
+                              }`}
+                            >
+                              {truncateAddress(wallet.address)}
+                            </a>
+                          </div>
+                          <button
+                            className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
+                            onClick={() => {
+                              // Placeholder for stake functionality
+                              console.log('Stake HIGHER from wallet:', wallet.address);
+                            }}
                           >
-                            {truncateAddress(wallet.address)}
-                          </a>
+                            Stake
+                          </button>
                         </div>
                       </li>
                     );
