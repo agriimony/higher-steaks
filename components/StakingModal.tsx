@@ -170,7 +170,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     return parseFloat(b.balanceFormatted.replace(/,/g, '')) - parseFloat(a.balanceFormatted.replace(/,/g, ''));
   });
 
-  // Sort lockups: connected wallet first, then by amount descending
+  // Sort lockups: connected wallet first, then by time remaining ascending (earlier expiry first)
   const sortedLockups = [...lockups].sort((a, b) => {
     if (wagmiAddress) {
       const aIsConnected = a.receiver.toLowerCase() === wagmiAddress.toLowerCase();
@@ -178,7 +178,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       if (aIsConnected && !bIsConnected) return -1;
       if (!aIsConnected && bIsConnected) return 1;
     }
-    return parseFloat(b.amountFormatted.replace(/,/g, '')) - parseFloat(a.amountFormatted.replace(/,/g, ''));
+    // Sort by time remaining ascending (earlier expiry = higher priority)
+    return a.timeRemaining - b.timeRemaining;
   });
 
   // Handle Max button - fill with wallet balance
