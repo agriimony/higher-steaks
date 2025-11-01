@@ -115,6 +115,46 @@ export default function HigherSteakMenu() {
       });
     }
   };
+
+  const fetchTokenBalance = async (fid: number) => {
+    setLoadingBalance(true);
+    setLoadingStakingDetails(true);
+    setBalanceError(null);
+    try {
+      const response = await fetch(`/api/user/balance?fid=${fid}`);
+      if (response.ok) {
+        const balanceData = await response.json();
+        console.log('Balance data:', balanceData);
+        console.log('Higher logo URL:', balanceData.higherLogoUrl);
+        setBalance(balanceData);
+        // Extract staking details from the same response (single source of truth)
+        updateStakingDetailsFromBalance(balanceData);
+      } else {
+        console.error('Failed to fetch balance');
+        const errorData = await response.json().catch(() => ({}));
+        
+        // Check if it's a stale block error (503)
+        if (response.status === 503 && errorData.message) {
+          setBalanceError('stale');
+          setBalance(null);
+        } else {
+          setBalanceError(null);
+          setBalance(null);
+        }
+        
+        setStakingDetails({ lockups: [], wallets: [] });
+        setLoadingStakingDetails(false);
+      }
+    } catch (error) {
+      console.error('Error fetching balance:', error);
+      setBalanceError(null);
+      setBalance(null);
+      setStakingDetails({ lockups: [], wallets: [] });
+      setLoadingStakingDetails(false);
+    } finally {
+      setLoadingBalance(false);
+    }
+  };
   
   // Format large numbers with K/M/B suffixes
   const formatTokenAmount = (amount: string): string => {
@@ -223,46 +263,6 @@ export default function HigherSteakMenu() {
         }
       } catch (error) {
         console.log('Not in Farcaster client:', error);
-      }
-    };
-
-    const fetchTokenBalance = async (fid: number) => {
-      setLoadingBalance(true);
-      setLoadingStakingDetails(true);
-      setBalanceError(null);
-      try {
-        const response = await fetch(`/api/user/balance?fid=${fid}`);
-        if (response.ok) {
-          const balanceData = await response.json();
-          console.log('Balance data:', balanceData);
-          console.log('Higher logo URL:', balanceData.higherLogoUrl);
-          setBalance(balanceData);
-          // Extract staking details from the same response (single source of truth)
-          updateStakingDetailsFromBalance(balanceData);
-        } else {
-          console.error('Failed to fetch balance');
-          const errorData = await response.json().catch(() => ({}));
-          
-          // Check if it's a stale block error (503)
-          if (response.status === 503 && errorData.message) {
-            setBalanceError('stale');
-            setBalance(null);
-          } else {
-            setBalanceError(null);
-            setBalance(null);
-          }
-          
-          setStakingDetails({ lockups: [], wallets: [] });
-          setLoadingStakingDetails(false);
-        }
-      } catch (error) {
-        console.error('Error fetching balance:', error);
-        setBalanceError(null);
-        setBalance(null);
-        setStakingDetails({ lockups: [], wallets: [] });
-        setLoadingStakingDetails(false);
-      } finally {
-        setLoadingBalance(false);
       }
     };
 
