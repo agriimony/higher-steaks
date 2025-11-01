@@ -203,8 +203,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                               Unstake
                             </button>
                           ) : lockup.timeRemaining > 0 ? (
-                            <span className="text-gray-600 text-xs flex-shrink-0">
-                              {formatTimeRemaining(lockup.timeRemaining)}
+                            <span className="text-gray-600 text-s flex-shrink-0">
+                              {formatTimeRemaining(lockup.timeRemaining)} left
                             </span>
                           ) : null}
                           <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
