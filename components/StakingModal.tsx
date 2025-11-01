@@ -312,11 +312,10 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       wagmiAddress: !!wagmiAddress
     });
     
+    // Set the ref FIRST before any state updates
     hasScheduledCreateLockUp.current = true;
-    setPendingCreateLockUp(true);
-    // Clear params immediately to prevent running this effect again
+    
     const paramsToUse = createLockUpParams;
-    setCreateLockUpParams(null);
     
     // Add a delay to ensure the approval state has propagated
     // Base network has ~2s block times, waiting for receipt + 3s should ensure
@@ -341,13 +340,19 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         console.error('[Staking] CreateLockUp error:', error);
         setStakeError(error?.message || 'Failed to create lockup');
         setPendingCreateLockUp(false);
+        hasScheduledCreateLockUp.current = false;
       }
     }, 3000); // Wait 3 seconds after approval confirmation for state propagation
     
+    // Now update state AFTER setting up the timeout
+    setPendingCreateLockUp(true);
+    setCreateLockUpParams(null);
+    
     return () => {
-      console.log('[Staking] Cleaning up createLockUp timeout');
+      console.log('[Staking] Cleaning up createLockUp timeout', { hasRef: hasScheduledCreateLockUp.current });
       clearTimeout(delay);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isApproveSuccess, approveReceipt, createLockUpParams, wagmiAddress]);
 
   // Handle transaction success - refresh balance
