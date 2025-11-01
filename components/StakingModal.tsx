@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface LockupDetail {
   lockupId: string;
@@ -80,17 +80,26 @@ function formatTokenAmount(amount: string): string {
 }
 
 export function StakingModal({ onClose, balance, lockups, wallets, connectedWalletAddress, loading = false }: StakingModalProps) {
+  // State for stake input
+  const [stakeInputOpen, setStakeInputOpen] = useState<string | null>(null);
+  const [stakeAmount, setStakeAmount] = useState<string>('');
+
   // Handle escape key to close
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (stakeInputOpen) {
+          setStakeInputOpen(null);
+          setStakeAmount('');
+        } else {
+          onClose();
+        }
       }
     };
     
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
+  }, [onClose, stakeInputOpen]);
 
   // Sort wallets: connected first, then by balance descending
   const sortedWallets = [...wallets].sort((a, b) => {
@@ -100,6 +109,24 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
     }
     return parseFloat(b.balanceFormatted.replace(/,/g, '')) - parseFloat(a.balanceFormatted.replace(/,/g, ''));
   });
+
+  // Handle Max button - fill with wallet balance
+  const handleMax = (wallet: WalletDetail) => {
+    setStakeAmount(wallet.balanceFormatted.replace(/,/g, ''));
+  };
+
+  // Handle Stake button toggle
+  const handleStakeClick = (walletAddress: string) => {
+    if (stakeInputOpen === walletAddress) {
+      // If already open, close it
+      setStakeInputOpen(null);
+      setStakeAmount('');
+    } else {
+      // Open input for this wallet
+      setStakeInputOpen(walletAddress);
+      setStakeAmount('');
+    }
+  };
 
   return (
     <div 
@@ -242,49 +269,80 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                 <ul className="space-y-3">
                   {sortedWallets.map((wallet) => {
                     const isConnected = connectedWalletAddress?.toLowerCase() === wallet.address.toLowerCase();
+                    const isStakeInputOpen = stakeInputOpen === wallet.address;
                     return (
                       <li key={wallet.address} className="text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <img 
-                              src={balance.higherLogoUrl || '/higher-logo.png'} 
-                              alt="HIGHER" 
-                              className="w-4 h-4 rounded-full"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                            <span className="font-bold text-black">
-                              {formatTokenAmount(wallet.balanceFormatted)}
-                            </span>
+                        <div className="space-y-2">
+                          {/* Main row: Balance, Button, Address */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <img 
+                                src={balance.higherLogoUrl || '/higher-logo.png'} 
+                                alt="HIGHER" 
+                                className="w-4 h-4 rounded-full"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                              <span className="font-bold text-black">
+                                {formatTokenAmount(wallet.balanceFormatted)}
+                              </span>
+                            </div>
+                            {isConnected && (
+                              <button
+                                className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
+                                onClick={() => {
+                                  if (isStakeInputOpen) {
+                                    // Max button - fill with wallet balance
+                                    handleMax(wallet);
+                                  } else {
+                                    // Stake button - open input
+                                    handleStakeClick(wallet.address);
+                                  }
+                                }}
+                              >
+                                {isStakeInputOpen ? 'Max' : 'Stake'}
+                              </button>
+                            )}
+                            <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {isConnected && <span className="text-purple-500 text-xs">•</span>}
+                              <a
+                                href={`https://basescan.org/address/${wallet.address}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`text-xs transition underline text-right ${
+                                  isConnected 
+                                    ? 'font-bold text-purple-500 border-2 border-purple-500 px-1.5 py-0.5 rounded' 
+                                    : 'text-gray-600 hover:text-black'
+                                }`}
+                              >
+                                {truncateAddress(wallet.address)}
+                              </a>
+                            </div>
                           </div>
-                          {isConnected && (
-                            <button
-                              className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
-                              onClick={() => {
-                                // Placeholder for stake functionality
-                                console.log('Stake HIGHER from wallet:', wallet.address);
-                              }}
-                            >
-                              Stake
-                            </button>
+                          
+                          {/* Stake input row (only visible when stake input is open for this wallet) */}
+                          {isConnected && isStakeInputOpen && (
+                            <div className="flex items-center gap-2 pl-6">
+                              <input
+                                type="text"
+                                value={stakeAmount}
+                                onChange={(e) => setStakeAmount(e.target.value)}
+                                placeholder="0.00"
+                                className="flex-1 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              />
+                              <button
+                                className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 ml-auto"
+                                onClick={() => {
+                                  // Placeholder for stake functionality
+                                  console.log('Stake HIGHER:', stakeAmount, 'from wallet:', wallet.address);
+                                }}
+                              >
+                                Stake Now
+                              </button>
+                            </div>
                           )}
-                          <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            {isConnected && <span className="text-purple-500 text-xs">•</span>}
-                            <a
-                              href={`https://basescan.org/address/${wallet.address}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`text-xs transition underline text-right ${
-                                isConnected 
-                                  ? 'font-bold text-purple-500 border-2 border-purple-500 px-1.5 py-0.5 rounded' 
-                                  : 'text-gray-600 hover:text-black'
-                              }`}
-                            >
-                              {truncateAddress(wallet.address)}
-                            </a>
-                          </div>
                         </div>
                       </li>
                     );
