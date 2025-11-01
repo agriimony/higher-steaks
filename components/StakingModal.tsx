@@ -306,22 +306,16 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                             {isConnected && isStakeInputOpen && (
                               <div className="flex items-center gap-1 flex-shrink-0">
                                 <button
-                                  className="px-1 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+                                  className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
                                   onClick={() => handleMax(wallet)}
                                 >
                                   Max
                                 </button>
                                 <button
-                                  className="px-1 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+                                  className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
                                   onClick={() => handlePercentage(wallet, 0.5)}
                                 >
                                   50%
-                                </button>
-                                <button
-                                  className="px-1 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
-                                  onClick={() => handlePercentage(wallet, 0.25)}
-                                >
-                                  25%
                                 </button>
                               </div>
                             )}
