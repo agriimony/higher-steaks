@@ -56,8 +56,12 @@ export async function GET(request: NextRequest) {
     const receiver = searchParams.get('receiver');
     const lockupId = searchParams.get('id');
 
-    // Create Base RPC client
-    const rpcUrl = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+    // Create Alchemy RPC client (or fallback to BASE_RPC_URL)
+    const alchemyApiKey = process.env.ALCHEMY_API_KEY;
+    const rpcUrl = alchemyApiKey 
+      ? `https://base-mainnet.g.alchemy.com/v2/${alchemyApiKey}`
+      : (process.env.BASE_RPC_URL || 'https://mainnet.base.org');
+    
     const client = createPublicClient({
       chain: base,
       transport: http(rpcUrl),

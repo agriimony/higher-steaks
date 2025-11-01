@@ -35,7 +35,10 @@ Create a `.env.local` file in the root directory:
 # Required: Neynar API Key
 NEYNAR_API_KEY=your_neynar_api_key_here
 
-# Optional: Base RPC URL (defaults to public RPC)
+# Optional: Alchemy API Key (recommended for production, provides robust RPC with higher rate limits)
+ALCHEMY_API_KEY=your_alchemy_api_key_here
+
+# Optional: Base RPC URL (fallback if ALCHEMY_API_KEY not set, defaults to public RPC)
 BASE_RPC_URL=https://mainnet.base.org
 
 # Required for Production: Vercel Postgres (auto-added by Vercel)
@@ -51,6 +54,14 @@ CRON_SECRET=your_random_secret_here
 1. Visit [https://neynar.com](https://neynar.com)
 2. Sign up or log in
 3. Generate an API key from your dashboard
+
+**Get your Alchemy API key (recommended for production):**
+1. Visit [https://www.alchemy.com](https://www.alchemy.com)
+2. Sign up or log in
+3. Create a new app on **Base Mainnet**
+4. Copy your API key from the app dashboard
+5. The endpoint format is: `https://base-mainnet.g.alchemy.com/v2/{YOUR_API_KEY}`
+6. Alchemy provides better rate limits, reliability, and supports optimized batch requests
 
 **Vercel Postgres Setup:**
 See [DATABASE_SETUP.md](./DATABASE_SETUP.md) for detailed database configuration instructions.

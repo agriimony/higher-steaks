@@ -107,7 +107,11 @@ export async function GET(request: NextRequest) {
     
     // Initialize clients
     const neynarClient = new NeynarAPIClient({ apiKey: neynarApiKey });
-    const rpcUrl = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+    // Use Alchemy if available, otherwise fallback to BASE_RPC_URL or public RPC
+    const alchemyApiKey = process.env.ALCHEMY_API_KEY;
+    const rpcUrl = alchemyApiKey 
+      ? `https://base-mainnet.g.alchemy.com/v2/${alchemyApiKey}`
+      : (process.env.BASE_RPC_URL || 'https://mainnet.base.org');
     const baseClient = createPublicClient({
       chain: base,
       transport: http(rpcUrl),
