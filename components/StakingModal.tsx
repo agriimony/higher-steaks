@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { parseUnits } from 'viem';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
@@ -136,6 +136,9 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     amountWei: bigint;
     unlockTime: number;
   } | null>(null);
+  
+  // Use ref to track if we've already scheduled the createLockUp call
+  const hasScheduledCreateLockUp = useRef(false);
 
   // Handle escape key to close
   useEffect(() => {
@@ -291,46 +294,53 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   // Chain createLockUp after approve succeeds
   // Wait for approval receipt + delay to ensure state propagation
   useEffect(() => {
-    if (isApproveSuccess && approveReceipt && createLockUpParams && wagmiAddress && !pendingCreateLockUp) {
-      console.log('[Staking] Approval succeeded, scheduling createLockUp after delay');
-      setPendingCreateLockUp(true);
-      // Clear params immediately to prevent running this effect again
-      const paramsToUse = createLockUpParams;
-      setCreateLockUpParams(null);
-      
-      // Add a delay to ensure the approval state has propagated
-      // Base network has ~2s block times, waiting for receipt + 3s should ensure
-      // the approval state is visible to the createLockUp transaction
-      const delay = setTimeout(() => {
-        console.log('[Staking] Calling createLockUp after approval delay');
-        try {
-          writeContractCreateLockUp({
-            address: LOCKUP_CONTRACT,
-            abi: LOCKUP_ABI,
-            functionName: 'createLockUp',
-            args: [
-              HIGHER_TOKEN_ADDRESS,
-              true, // isERC20
-              paramsToUse.amountWei,
-              paramsToUse.unlockTime,
-              wagmiAddress,
-              'Higher Steaks!'
-            ],
-          });
-        } catch (error: any) {
-          console.error('[Staking] CreateLockUp error:', error);
-          setStakeError(error?.message || 'Failed to create lockup');
-          setPendingCreateLockUp(false);
-        }
-      }, 3000); // Wait 3 seconds after approval confirmation for state propagation
-      
-      return () => {
-        console.log('[Staking] Cleaning up createLockUp timeout');
-        clearTimeout(delay);
-      };
+    // Only run when we have success and params, haven't already scheduled the call
+    if (!isApproveSuccess || !approveReceipt || !createLockUpParams || !wagmiAddress || hasScheduledCreateLockUp.current) {
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApproveSuccess, approveReceipt, createLockUpParams, wagmiAddress, pendingCreateLockUp]);
+
+    console.log('[Staking] Approval succeeded, scheduling createLockUp after delay', { 
+      createLockUpParams: !!createLockUpParams, 
+      wagmiAddress: !!wagmiAddress
+    });
+    
+    hasScheduledCreateLockUp.current = true;
+    setPendingCreateLockUp(true);
+    // Clear params immediately to prevent running this effect again
+    const paramsToUse = createLockUpParams;
+    setCreateLockUpParams(null);
+    
+    // Add a delay to ensure the approval state has propagated
+    // Base network has ~2s block times, waiting for receipt + 3s should ensure
+    // the approval state is visible to the createLockUp transaction
+    const delay = setTimeout(() => {
+      console.log('[Staking] Calling createLockUp after approval delay');
+      try {
+        writeContractCreateLockUp({
+          address: LOCKUP_CONTRACT,
+          abi: LOCKUP_ABI,
+          functionName: 'createLockUp',
+          args: [
+            HIGHER_TOKEN_ADDRESS,
+            true, // isERC20
+            paramsToUse.amountWei,
+            paramsToUse.unlockTime,
+            wagmiAddress,
+            'Higher Steaks!'
+          ],
+        });
+      } catch (error: any) {
+        console.error('[Staking] CreateLockUp error:', error);
+        setStakeError(error?.message || 'Failed to create lockup');
+        setPendingCreateLockUp(false);
+      }
+    }, 3000); // Wait 3 seconds after approval confirmation for state propagation
+    
+    return () => {
+      console.log('[Staking] Cleaning up createLockUp timeout');
+      clearTimeout(delay);
+    };
+  }, [isApproveSuccess, approveReceipt, createLockUpParams, wagmiAddress]);
 
   // Handle transaction success - refresh balance
   useEffect(() => {
@@ -347,6 +357,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         setLockupDurationUnit('day');
         setPendingCreateLockUp(false);
         setCreateLockUpParams(null);
+        hasScheduledCreateLockUp.current = false; // Reset ref for next time
       }
       
       // Call refresh callback
@@ -379,6 +390,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       setStakeError(approveError.message || 'Approve transaction failed');
       setStakePending(false);
       setCreateLockUpParams(null);
+      hasScheduledCreateLockUp.current = false; // Reset ref on error
     }
   }, [approveError]);
 
@@ -388,6 +400,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       setStakePending(false);
       setPendingCreateLockUp(false);
       setCreateLockUpParams(null);
+      hasScheduledCreateLockUp.current = false; // Reset ref on error
     }
   }, [createLockUpError]);
 
