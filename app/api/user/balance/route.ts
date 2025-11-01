@@ -197,7 +197,7 @@ export async function GET(request: NextRequest) {
     });
     let currentTime = Number(block.timestamp);
     const realTime = Math.floor(Date.now() / 1000);
-    const blockAge = realTime - currentTime;
+    let blockAge = realTime - currentTime;
     
     // If block is too old, try to get a newer block (up to 3 retries)
     let retries = 0;
