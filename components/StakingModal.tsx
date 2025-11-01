@@ -345,7 +345,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         setPendingCreateLockUp(false);
         hasScheduledCreateLockUp.current = false;
       }
-    }, 3000); // Wait 3 seconds after approval confirmation for state propagation
+    }, 1000); // Wait 1 second after approval confirmation for state propagation
     
     // Store timeout ID in ref
     createLockUpTimeoutRef.current = delay;
