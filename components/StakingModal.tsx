@@ -120,8 +120,9 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   
   // Separate hooks for approve and createLockUp
   const { writeContract: writeContractApprove, data: approveHash, isPending: isApprovePending, error: approveError } = useWriteContract();
-  const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
+  const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess, data: approveReceipt } = useWaitForTransactionReceipt({
     hash: approveHash,
+    confirmations: 1, // Wait for at least 1 confirmation
   });
   
   const { writeContract: writeContractCreateLockUp, data: createLockUpHash, isPending: isCreateLockUpPending, error: createLockUpError } = useWriteContract();
@@ -288,34 +289,43 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   };
 
   // Chain createLockUp after approve succeeds
+  // Wait for approval receipt + delay to ensure state propagation
   useEffect(() => {
-    if (isApproveSuccess && createLockUpParams && wagmiAddress && !pendingCreateLockUp) {
+    if (isApproveSuccess && approveReceipt && createLockUpParams && wagmiAddress && !pendingCreateLockUp) {
       setPendingCreateLockUp(true);
       // Clear params immediately to prevent running this effect again
       const paramsToUse = createLockUpParams;
       setCreateLockUpParams(null);
       
-      try {
-        writeContractCreateLockUp({
-          address: LOCKUP_CONTRACT,
-          abi: LOCKUP_ABI,
-          functionName: 'createLockUp',
-          args: [
-            HIGHER_TOKEN_ADDRESS,
-            true, // isERC20
-            paramsToUse.amountWei,
-            paramsToUse.unlockTime,
-            wagmiAddress,
-            'Higher Steaks!'
-          ],
-        });
-      } catch (error: any) {
-        setStakeError(error?.message || 'Failed to create lockup');
-        setPendingCreateLockUp(false);
-        console.error('CreateLockUp error:', error);
-      }
+      // Add a delay to ensure the approval state has propagated
+      // Base network has ~2s block times, waiting for receipt + 3s should ensure
+      // the approval state is visible to the createLockUp transaction
+      const delay = setTimeout(() => {
+        try {
+          console.log('[Staking] Calling createLockUp after approval delay');
+          writeContractCreateLockUp({
+            address: LOCKUP_CONTRACT,
+            abi: LOCKUP_ABI,
+            functionName: 'createLockUp',
+            args: [
+              HIGHER_TOKEN_ADDRESS,
+              true, // isERC20
+              paramsToUse.amountWei,
+              paramsToUse.unlockTime,
+              wagmiAddress,
+              'Higher Steaks!'
+            ],
+          });
+        } catch (error: any) {
+          setStakeError(error?.message || 'Failed to create lockup');
+          setPendingCreateLockUp(false);
+          console.error('CreateLockUp error:', error);
+        }
+      }, 3000); // Wait 3 seconds after approval confirmation for state propagation
+      
+      return () => clearTimeout(delay);
     }
-  }, [isApproveSuccess, createLockUpParams, wagmiAddress, pendingCreateLockUp, writeContractCreateLockUp]);
+  }, [isApproveSuccess, approveReceipt, createLockUpParams, wagmiAddress, pendingCreateLockUp, writeContractCreateLockUp]);
 
   // Handle transaction success - refresh balance
   useEffect(() => {
