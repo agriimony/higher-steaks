@@ -367,7 +367,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApproveSuccess, approveReceipt, createLockUpParams, wagmiAddress]);
+  }, [isApproveSuccess, approveReceipt, wagmiAddress]);
 
   // Handle transaction success - refresh balance
   useEffect(() => {
