@@ -294,6 +294,14 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   // Chain createLockUp after approve succeeds
   // Wait for approval receipt + delay to ensure state propagation
   useEffect(() => {
+    console.log('[Staking] Effect running with:', {
+      isApproveSuccess,
+      hasReceipt: !!approveReceipt,
+      hasParams: !!createLockUpParams,
+      hasAddress: !!wagmiAddress,
+      alreadyScheduled: hasScheduledCreateLockUp.current
+    });
+    
     // Only run when we have success and params, haven't already scheduled the call
     if (!isApproveSuccess || !approveReceipt || !createLockUpParams || !wagmiAddress || hasScheduledCreateLockUp.current) {
       return;
