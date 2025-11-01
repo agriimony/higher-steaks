@@ -2,14 +2,9 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { MiniAppProvider } from "@/components/MiniAppProvider";
-import { WagmiProvider } from 'wagmi';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { wagmiConfig } from '@/lib/wagmi-config';
+import { Providers } from "@/components/Providers";
 
 const inter = Inter({ subsets: ["latin"] });
-
-// Create a client for React Query
-const queryClient = new QueryClient();
 
 export const metadata: Metadata = {
   title: "Higher Steaks",
@@ -46,11 +41,9 @@ export default function RootLayout({
         <link rel="preconnect" href="https://auth.farcaster.xyz" />
       </head>
       <body className={inter.className}>
-        <WagmiProvider config={wagmiConfig}>
-          <QueryClientProvider client={queryClient}>
-            <MiniAppProvider>{children}</MiniAppProvider>
-          </QueryClientProvider>
-        </WagmiProvider>
+        <Providers>
+          <MiniAppProvider>{children}</MiniAppProvider>
+        </Providers>
       </body>
     </html>
   );
