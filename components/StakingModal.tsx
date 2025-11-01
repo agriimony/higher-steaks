@@ -164,6 +164,17 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     return parseFloat(b.balanceFormatted.replace(/,/g, '')) - parseFloat(a.balanceFormatted.replace(/,/g, ''));
   });
 
+  // Sort lockups: connected wallet first, then by amount descending
+  const sortedLockups = [...lockups].sort((a, b) => {
+    if (wagmiAddress) {
+      const aIsConnected = a.receiver.toLowerCase() === wagmiAddress.toLowerCase();
+      const bIsConnected = b.receiver.toLowerCase() === wagmiAddress.toLowerCase();
+      if (aIsConnected && !bIsConnected) return -1;
+      if (!aIsConnected && bIsConnected) return 1;
+    }
+    return parseFloat(b.amountFormatted.replace(/,/g, '')) - parseFloat(a.amountFormatted.replace(/,/g, ''));
+  });
+
   // Handle Max button - fill with wallet balance
   const handleMax = (wallet: WalletDetail) => {
     setStakeAmount(wallet.balanceFormatted.replace(/,/g, ''));
@@ -434,11 +445,11 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
               <h3 className="text-lg font-bold mb-4 text-black border-b-2 border-black pb-2">
                 Staked Positions
               </h3>
-              {lockups.length === 0 ? (
+              {sortedLockups.length === 0 ? (
                 <p className="text-sm text-gray-600 italic">No active lockups</p>
               ) : (
                 <ul className="space-y-3">
-                  {lockups.map((lockup) => {
+                  {sortedLockups.map((lockup) => {
                     const isConnected = wagmiAddress?.toLowerCase() === lockup.receiver.toLowerCase();
                     return (
                       <li key={lockup.lockupId} className="text-sm">
