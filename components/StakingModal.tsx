@@ -83,15 +83,19 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
   // State for stake input
   const [stakeInputOpen, setStakeInputOpen] = useState<string | null>(null);
   const [stakeAmount, setStakeAmount] = useState<string>('');
+  const [lockupDuration, setLockupDuration] = useState<string>('');
+  const [lockupDurationUnit, setLockupDurationUnit] = useState<'day' | 'week' | 'month' | 'year'>('day');
 
   // Handle escape key to close
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (stakeInputOpen) {
-          setStakeInputOpen(null);
-          setStakeAmount('');
-        } else {
+      if (stakeInputOpen) {
+        setStakeInputOpen(null);
+        setStakeAmount('');
+        setLockupDuration('');
+        setLockupDurationUnit('day');
+      } else {
           onClose();
         }
       }
@@ -128,10 +132,14 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
       // If already open, close it
       setStakeInputOpen(null);
       setStakeAmount('');
+      setLockupDuration('');
+      setLockupDurationUnit('day');
     } else {
       // Open input for this wallet
       setStakeInputOpen(walletAddress);
       setStakeAmount('');
+      setLockupDuration('');
+      setLockupDurationUnit('day');
     }
   };
 
@@ -345,13 +353,33 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                 value={stakeAmount}
                                 onChange={(e) => setStakeAmount(e.target.value)}
                                 placeholder="0.00"
-                                className="flex-1 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-24 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
                               />
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs text-gray-600">for</span>
+                                <input
+                                  type="text"
+                                  value={lockupDuration}
+                                  onChange={(e) => setLockupDuration(e.target.value)}
+                                  placeholder="1"
+                                  className="w-16 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                />
+                                <select
+                                  value={lockupDurationUnit}
+                                  onChange={(e) => setLockupDurationUnit(e.target.value as 'day' | 'week' | 'month' | 'year')}
+                                  className="px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                >
+                                  <option value="day">day</option>
+                                  <option value="week">week</option>
+                                  <option value="month">month</option>
+                                  <option value="year">year</option>
+                                </select>
+                              </div>
                               <button
                                 className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 ml-auto"
                                 onClick={() => {
                                   // Placeholder for stake functionality
-                                  console.log('Stake HIGHER:', stakeAmount, 'from wallet:', wallet.address);
+                                  console.log('Stake HIGHER:', stakeAmount, 'for', lockupDuration, lockupDurationUnit, 'from wallet:', wallet.address);
                                 }}
                               >
                                 Stake Now
