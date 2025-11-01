@@ -139,6 +139,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   
   // Use ref to track if we've already scheduled the createLockUp call
   const hasScheduledCreateLockUp = useRef(false);
+  // Use ref to store the timeout ID to prevent cleanup if it's been scheduled
+  const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle escape key to close
   useEffect(() => {
@@ -322,6 +324,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     // the approval state is visible to the createLockUp transaction
     const delay = setTimeout(() => {
       console.log('[Staking] Calling createLockUp after approval delay');
+      createLockUpTimeoutRef.current = null; // Clear the ref now that we're executing
       try {
         writeContractCreateLockUp({
           address: LOCKUP_CONTRACT,
@@ -344,13 +347,20 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       }
     }, 3000); // Wait 3 seconds after approval confirmation for state propagation
     
+    // Store timeout ID in ref
+    createLockUpTimeoutRef.current = delay;
+    
     // Now update state AFTER setting up the timeout
     setPendingCreateLockUp(true);
     setCreateLockUpParams(null);
     
     return () => {
-      console.log('[Staking] Cleaning up createLockUp timeout', { hasRef: hasScheduledCreateLockUp.current });
-      clearTimeout(delay);
+      // Only cleanup if the timeout hasn't fired yet
+      if (createLockUpTimeoutRef.current) {
+        console.log('[Staking] Cleaning up createLockUp timeout');
+        clearTimeout(createLockUpTimeoutRef.current);
+        createLockUpTimeoutRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isApproveSuccess, approveReceipt, createLockUpParams, wagmiAddress]);
