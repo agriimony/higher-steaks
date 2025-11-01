@@ -355,6 +355,10 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     setCreateLockUpParams(null);
     
     return () => {
+      console.log('[Staking] Effect cleanup running', { 
+        hasTimeout: !!createLockUpTimeoutRef.current,
+        scheduled: hasScheduledCreateLockUp.current 
+      });
       // Only cleanup if the timeout hasn't fired yet
       if (createLockUpTimeoutRef.current) {
         console.log('[Staking] Cleaning up createLockUp timeout');
