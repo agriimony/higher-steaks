@@ -192,6 +192,21 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                               {formatTokenAmount(lockup.amountFormatted)}
                             </span>
                           </div>
+                          {isConnected && lockup.timeRemaining <= 0 ? (
+                            <button
+                              className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
+                              onClick={() => {
+                                // Placeholder for unstake functionality
+                                console.log('Unstake lockup:', lockup.lockupId);
+                              }}
+                            >
+                              Unstake
+                            </button>
+                          ) : lockup.timeRemaining > 0 ? (
+                            <span className="text-gray-600 text-xs flex-shrink-0">
+                              {formatTimeRemaining(lockup.timeRemaining)}
+                            </span>
+                          ) : null}
                           <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             {isConnected && <span className="text-purple-500 text-xs">•</span>}
@@ -208,21 +223,6 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                               {truncateAddress(lockup.receiver)}
                             </a>
                           </div>
-                          {lockup.timeRemaining <= 0 ? (
-                            <button
-                              className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
-                              onClick={() => {
-                                // Placeholder for unstake functionality
-                                console.log('Unstake lockup:', lockup.lockupId);
-                              }}
-                            >
-                              Unstake
-                            </button>
-                          ) : (
-                            <span className="text-gray-600 text-xs flex-shrink-0">
-                              {formatTimeRemaining(lockup.timeRemaining)}
-                            </span>
-                          )}
                         </div>
                       </li>
                     );
@@ -258,6 +258,17 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                               {formatTokenAmount(wallet.balanceFormatted)}
                             </span>
                           </div>
+                          {isConnected && (
+                            <button
+                              className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
+                              onClick={() => {
+                                // Placeholder for stake functionality
+                                console.log('Stake HIGHER from wallet:', wallet.address);
+                              }}
+                            >
+                              Stake
+                            </button>
+                          )}
                           <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             {isConnected && <span className="text-purple-500 text-xs">•</span>}
@@ -274,15 +285,6 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                               {truncateAddress(wallet.address)}
                             </a>
                           </div>
-                          <button
-                            className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
-                            onClick={() => {
-                              // Placeholder for stake functionality
-                              console.log('Stake HIGHER from wallet:', wallet.address);
-                            }}
-                          >
-                            Stake
-                          </button>
                         </div>
                       </li>
                     );
