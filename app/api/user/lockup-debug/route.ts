@@ -67,15 +67,59 @@ export async function GET(request: NextRequest) {
       transport: http(rpcUrl),
     });
 
-    // Get current block number and timestamp once - use this same block for all contract calls to ensure consistency
-    const currentBlock = await client.getBlockNumber();
-    const block = await client.getBlock({ 
-      blockNumber: currentBlock,
-      includeTransactions: false 
-    });
-    const currentTime = Number(block.timestamp);
+        // Get current block number and timestamp once - use this same block for all contract calls to ensure consistency
+        // Validate that the block is not stale (more than 5 minutes old)
+        const MAX_BLOCK_AGE_SECONDS = 5 * 60; // 5 minutes
+        let currentBlock = await client.getBlockNumber();
+        let block = await client.getBlock({ 
+          blockNumber: currentBlock,
+          includeTransactions: false 
+        });
+        let currentTime = Number(block.timestamp);
+        const realTime = Math.floor(Date.now() / 1000);
+        let blockAge = realTime - currentTime;
+        
+        // If block is too old, try to get a newer block (up to 3 retries)
+        let retries = 0;
+        const MAX_RETRIES = 3;
+        while (blockAge > MAX_BLOCK_AGE_SECONDS && retries < MAX_RETRIES) {
+          console.log(`[Lockup Debug] WARNING: Block ${currentBlock.toString()} is ${blockAge}s old (max ${MAX_BLOCK_AGE_SECONDS}s). Attempting to get newer block...`);
+          
+          // Wait a bit for new blocks to be mined
+          await new Promise(resolve => setTimeout(resolve, 2000)); // 2 seconds
+          
+          currentBlock = await client.getBlockNumber();
+          block = await client.getBlock({ 
+            blockNumber: currentBlock,
+            includeTransactions: false 
+          });
+          currentTime = Number(block.timestamp);
+          blockAge = Math.floor(Date.now() / 1000) - currentTime;
+          
+          if (blockAge <= MAX_BLOCK_AGE_SECONDS) {
+            console.log(`[Lockup Debug] ✓ Got fresh block ${currentBlock.toString()} (age: ${blockAge}s)`);
+            break;
+          }
+          
+          retries++;
+        }
+        
+        // Recalculate final blockAge after retries
+        const finalBlockAge = Math.floor(Date.now() / 1000) - currentTime;
+        if (finalBlockAge > MAX_BLOCK_AGE_SECONDS) {
+          console.error(`[Lockup Debug] ERROR: Block ${currentBlock.toString()} is still ${finalBlockAge}s old after ${MAX_RETRIES} retries. This may indicate RPC sync issues.`);
+          return NextResponse.json(
+            { 
+              error: 'Blockchain data is stale',
+              message: `Block ${currentBlock.toString()} is ${finalBlockAge} seconds old (max allowed: ${MAX_BLOCK_AGE_SECONDS}s). Please try again.`,
+              blockAge: finalBlockAge,
+              maxAllowedAge: MAX_BLOCK_AGE_SECONDS,
+            },
+            { status: 503 } // Service Unavailable
+          );
+        }
 
-    console.log(`[Lockup Debug] Using block ${currentBlock.toString()} at timestamp ${currentTime} (${new Date(currentTime * 1000).toISOString()}) for all contract calls`);
+        console.log(`[Lockup Debug] Using block ${currentBlock.toString()} at timestamp ${currentTime} (${new Date(currentTime * 1000).toISOString()}), age: ${finalBlockAge}s for all contract calls`);
 
     // Get total lockup count at this specific block
     const lockUpCount = await client.readContract({

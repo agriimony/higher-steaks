@@ -366,12 +366,12 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                   value={lockupDuration}
                                   onChange={(e) => setLockupDuration(e.target.value)}
                                   placeholder="1"
-                                  className="w-10 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  className="w-12 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
                                 />
                                 <select
                                   value={lockupDurationUnit}
                                   onChange={(e) => setLockupDurationUnit(e.target.value as 'day' | 'week' | 'month' | 'year')}
-                                  className="px-1 py-2 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  className="px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
                                 >
                                   <option value="day">day</option>
                                   <option value="week">week</option>
