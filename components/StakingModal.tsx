@@ -242,13 +242,17 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                 console.log('Unstake lockup:', lockup.lockupId);
                               }}
                             >
-                              Withdraw
+                              Unstake
                             </button>
                           ) : lockup.timeRemaining > 0 ? (
                             <span className="text-gray-600 text-s flex-shrink-0">
                               {formatTimeRemaining(lockup.timeRemaining)} left
                             </span>
-                          ) : null}
+                          ) : (
+                            <span className="text-gray-600 text-s flex-shrink-0">
+                              Expired
+                            </span>
+                          )}
                           <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             {isConnected && <span className="text-purple-500 text-xs">•</span>}
@@ -353,7 +357,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                 value={stakeAmount}
                                 onChange={(e) => setStakeAmount(e.target.value)}
                                 placeholder="0.00"
-                                className="w-24 px-1 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                className="w-24 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
                               />
                               <div className="flex items-center gap-1">
                                 <span className="text-xs text-gray-600">⌛</span>
@@ -362,12 +366,12 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                                   value={lockupDuration}
                                   onChange={(e) => setLockupDuration(e.target.value)}
                                   placeholder="1"
-                                  className="w-10 px-1 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  className="w-10 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
                                 />
                                 <select
                                   value={lockupDurationUnit}
                                   onChange={(e) => setLockupDurationUnit(e.target.value as 'day' | 'week' | 'month' | 'year')}
-                                  className="px-1 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  className="px-1 py-2 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
                                 >
                                   <option value="day">day</option>
                                   <option value="week">week</option>
