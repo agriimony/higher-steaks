@@ -292,6 +292,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   // Wait for approval receipt + delay to ensure state propagation
   useEffect(() => {
     if (isApproveSuccess && approveReceipt && createLockUpParams && wagmiAddress && !pendingCreateLockUp) {
+      console.log('[Staking] Approval succeeded, scheduling createLockUp after delay');
       setPendingCreateLockUp(true);
       // Clear params immediately to prevent running this effect again
       const paramsToUse = createLockUpParams;
@@ -301,8 +302,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       // Base network has ~2s block times, waiting for receipt + 3s should ensure
       // the approval state is visible to the createLockUp transaction
       const delay = setTimeout(() => {
+        console.log('[Staking] Calling createLockUp after approval delay');
         try {
-          console.log('[Staking] Calling createLockUp after approval delay');
           writeContractCreateLockUp({
             address: LOCKUP_CONTRACT,
             abi: LOCKUP_ABI,
@@ -317,15 +318,19 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
             ],
           });
         } catch (error: any) {
+          console.error('[Staking] CreateLockUp error:', error);
           setStakeError(error?.message || 'Failed to create lockup');
           setPendingCreateLockUp(false);
-          console.error('CreateLockUp error:', error);
         }
       }, 3000); // Wait 3 seconds after approval confirmation for state propagation
       
-      return () => clearTimeout(delay);
+      return () => {
+        console.log('[Staking] Cleaning up createLockUp timeout');
+        clearTimeout(delay);
+      };
     }
-  }, [isApproveSuccess, approveReceipt, createLockUpParams, wagmiAddress, pendingCreateLockUp, writeContractCreateLockUp]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isApproveSuccess, approveReceipt, createLockUpParams, wagmiAddress, pendingCreateLockUp]);
 
   // Handle transaction success - refresh balance
   useEffect(() => {
