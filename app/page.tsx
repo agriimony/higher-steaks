@@ -440,8 +440,24 @@ export default function HigherSteakMenu() {
           balance={balance}
           lockups={stakingDetails?.lockups || []}
           wallets={stakingDetails?.wallets || []}
-          connectedWalletAddress={user?.walletAddress || undefined}
           loading={loadingStakingDetails || !stakingDetails}
+          onTransactionSuccess={async () => {
+            // Refresh balance after successful transaction
+            if (user?.fid) {
+              // Refetch balance data
+              try {
+                const response = await fetch(`/api/user/balance?fid=${user.fid}`);
+                if (response.ok) {
+                  const balanceData = await response.json();
+                  // Update balance and staking details
+                  // The parent component will handle updating state
+                  window.location.reload(); // Simple refresh for now - could be optimized later
+                }
+              } catch (error) {
+                console.error('Error refreshing balance after transaction:', error);
+              }
+            }
+          }}
         />
       )}
 

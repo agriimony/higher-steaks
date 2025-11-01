@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
+import { useSendCalls } from 'wagmi';
+import { encodeFunctionData, parseUnits } from 'viem';
+import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
 
 interface LockupDetail {
   lockupId: string;
@@ -29,8 +33,8 @@ interface StakingModalProps {
   balance: TokenBalance;
   lockups: LockupDetail[];
   wallets: WalletDetail[];
-  connectedWalletAddress?: string;
   loading?: boolean;
+  onTransactionSuccess?: () => void;
 }
 
 // Format time remaining to show only largest unit
@@ -79,12 +83,45 @@ function formatTokenAmount(amount: string): string {
   }
 }
 
-export function StakingModal({ onClose, balance, lockups, wallets, connectedWalletAddress, loading = false }: StakingModalProps) {
+// Convert duration and unit to seconds
+function durationToSeconds(duration: number, unit: 'day' | 'week' | 'month' | 'year'): number {
+  switch (unit) {
+    case 'day':
+      return duration * 86400;
+    case 'week':
+      return duration * 604800;
+    case 'month':
+      return duration * 2592000; // 30 days
+    case 'year':
+      return duration * 31536000; // 365 days
+    default:
+      return duration * 86400;
+  }
+}
+
+export function StakingModal({ onClose, balance, lockups, wallets, loading = false, onTransactionSuccess }: StakingModalProps) {
   // State for stake input
   const [stakeInputOpen, setStakeInputOpen] = useState<string | null>(null);
   const [stakeAmount, setStakeAmount] = useState<string>('');
   const [lockupDuration, setLockupDuration] = useState<string>('');
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'day' | 'week' | 'month' | 'year'>('day');
+  
+  // Transaction state
+  const [unstakeLockupId, setUnstakeLockupId] = useState<string | null>(null);
+  const [unstakeError, setUnstakeError] = useState<string | null>(null);
+  const [stakeError, setStakeError] = useState<string | null>(null);
+  const [stakePending, setStakePending] = useState(false);
+  
+  // Wagmi hooks
+  const { address: wagmiAddress } = useAccount();
+  const { writeContract, data: unstakeHash, isPending: isUnstakePending, error: unstakeWriteError } = useWriteContract();
+  const { isLoading: isUnstakeConfirming, isSuccess: isUnstakeSuccess } = useWaitForTransactionReceipt({
+    hash: unstakeHash,
+  });
+  const { sendCalls, data: stakeHash, isPending: isStakeSending, error: stakeSendError } = useSendCalls();
+  const { isLoading: isStakeConfirming, isSuccess: isStakeSuccess } = useWaitForTransactionReceipt({
+    hash: stakeHash as `0x${string}` | undefined,
+  });
 
   // Handle escape key to close
   useEffect(() => {
@@ -107,9 +144,9 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
 
   // Sort wallets: connected first, then by balance descending
   const sortedWallets = [...wallets].sort((a, b) => {
-    if (connectedWalletAddress) {
-      if (a.address.toLowerCase() === connectedWalletAddress.toLowerCase()) return -1;
-      if (b.address.toLowerCase() === connectedWalletAddress.toLowerCase()) return 1;
+    if (wagmiAddress) {
+      if (a.address.toLowerCase() === wagmiAddress.toLowerCase()) return -1;
+      if (b.address.toLowerCase() === wagmiAddress.toLowerCase()) return 1;
     }
     return parseFloat(b.balanceFormatted.replace(/,/g, '')) - parseFloat(a.balanceFormatted.replace(/,/g, ''));
   });
@@ -134,14 +171,166 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
       setStakeAmount('');
       setLockupDuration('');
       setLockupDurationUnit('day');
+      setStakeError(null);
     } else {
       // Open input for this wallet
       setStakeInputOpen(walletAddress);
       setStakeAmount('');
       setLockupDuration('');
       setLockupDurationUnit('day');
+      setStakeError(null);
     }
   };
+
+  // Handle Unstake
+  const handleUnstake = (lockupId: string) => {
+    setUnstakeLockupId(lockupId);
+    setUnstakeError(null);
+    
+    try {
+      writeContract({
+        address: LOCKUP_CONTRACT,
+        abi: LOCKUP_ABI,
+        functionName: 'unlock',
+        args: [BigInt(lockupId)],
+      });
+    } catch (error: any) {
+      setUnstakeError(error?.message || 'Failed to initiate unstake');
+      console.error('Unstake error:', error);
+    }
+  };
+
+  // Handle Stake - batch approve + createLockUp
+  const handleStake = async (wallet: WalletDetail) => {
+    if (!wagmiAddress) {
+      setStakeError('No wallet connected');
+      return;
+    }
+
+    // Validation
+    const amountNum = parseFloat(stakeAmount.replace(/,/g, ''));
+    const durationNum = parseFloat(lockupDuration);
+    
+    if (isNaN(amountNum) || amountNum <= 0) {
+      setStakeError('Please enter a valid stake amount');
+      return;
+    }
+    
+    if (isNaN(durationNum) || durationNum <= 0) {
+      setStakeError('Please enter a valid duration');
+      return;
+    }
+
+    // Check balance
+    const walletBalance = parseFloat(wallet.balanceFormatted.replace(/,/g, ''));
+    if (amountNum > walletBalance) {
+      setStakeError('Amount exceeds wallet balance');
+      return;
+    }
+
+    setStakeError(null);
+    setStakePending(true);
+
+    try {
+      // Convert amount to wei (18 decimals)
+      const amountWei = parseUnits(stakeAmount.replace(/,/g, ''), 18);
+      
+      // Calculate unlock time (current time + duration in seconds)
+      const durationSeconds = durationToSeconds(durationNum, lockupDurationUnit);
+      const unlockTime = Math.floor(Date.now() / 1000) + durationSeconds;
+      
+      // Validate unlockTime fits in uint40
+      if (unlockTime > 0xFFFFFFFF) {
+        setStakeError('Duration too long (exceeds maximum)');
+        setStakePending(false);
+        return;
+      }
+
+      // Encode approve call
+      const approveData = encodeFunctionData({
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [LOCKUP_CONTRACT, amountWei],
+      });
+
+      // Encode createLockUp call
+      const createLockUpData = encodeFunctionData({
+        abi: LOCKUP_ABI,
+        functionName: 'createLockUp',
+        args: [
+          HIGHER_TOKEN_ADDRESS,
+          true, // isERC20
+          amountWei,
+          unlockTime as number, // uint40
+          wagmiAddress as `0x${string}`,
+          'Higher Steaks!'
+        ],
+      });
+
+      // Send batch transaction
+      sendCalls({
+        calls: [
+          {
+            to: HIGHER_TOKEN_ADDRESS,
+            data: approveData,
+          },
+          {
+            to: LOCKUP_CONTRACT,
+            data: createLockUpData,
+          },
+        ],
+      });
+    } catch (error: any) {
+      setStakeError(error?.message || 'Failed to initiate stake');
+      setStakePending(false);
+      console.error('Stake error:', error);
+    }
+  };
+
+  // Handle transaction success - refresh balance
+  useEffect(() => {
+    if (isUnstakeSuccess || isStakeSuccess) {
+      // Reset state
+      if (isUnstakeSuccess) {
+        setUnstakeLockupId(null);
+      }
+      if (isStakeSuccess) {
+        setStakePending(false);
+        setStakeInputOpen(null);
+        setStakeAmount('');
+        setLockupDuration('');
+        setLockupDurationUnit('day');
+      }
+      
+      // Call refresh callback
+      if (onTransactionSuccess) {
+        setTimeout(() => {
+          onTransactionSuccess();
+        }, 1000); // Wait a bit for blockchain to update
+      }
+    }
+  }, [isUnstakeSuccess, isStakeSuccess, onTransactionSuccess]);
+
+  // Update stake pending state based on transaction status
+  useEffect(() => {
+    if (!isStakeSending && !isStakeConfirming) {
+      setStakePending(false);
+    }
+  }, [isStakeSending, isStakeConfirming]);
+
+  // Update error states
+  useEffect(() => {
+    if (unstakeWriteError) {
+      setUnstakeError(unstakeWriteError.message || 'Transaction failed');
+    }
+  }, [unstakeWriteError]);
+
+  useEffect(() => {
+    if (stakeSendError) {
+      setStakeError(stakeSendError.message || 'Transaction failed');
+      setStakePending(false);
+    }
+  }, [stakeSendError]);
 
   return (
     <div 
@@ -217,7 +406,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
               ) : (
                 <ul className="space-y-3">
                   {lockups.map((lockup) => {
-                    const isConnected = connectedWalletAddress?.toLowerCase() === lockup.receiver.toLowerCase();
+                    const isConnected = wagmiAddress?.toLowerCase() === lockup.receiver.toLowerCase();
                     return (
                       <li key={lockup.lockupId} className="text-sm">
                         <div className="flex items-center gap-2">
@@ -236,13 +425,11 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                           </div>
                           {isConnected && lockup.timeRemaining <= 0 ? (
                             <button
-                              className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0"
-                              onClick={() => {
-                                // Placeholder for unstake functionality
-                                console.log('Unstake lockup:', lockup.lockupId);
-                              }}
+                              className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                              onClick={() => handleUnstake(lockup.lockupId)}
+                              disabled={isUnstakePending || isUnstakeConfirming || (unstakeLockupId === lockup.lockupId && isUnstakeConfirming)}
                             >
-                              Unstake
+                              {unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming) ? 'Processing...' : 'Unstake'}
                             </button>
                           ) : lockup.timeRemaining > 0 ? (
                             <span className="text-gray-600 text-s flex-shrink-0">
@@ -287,7 +474,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
               ) : (
                 <ul className="space-y-3">
                   {sortedWallets.map((wallet) => {
-                    const isConnected = connectedWalletAddress?.toLowerCase() === wallet.address.toLowerCase();
+                    const isConnected = wagmiAddress?.toLowerCase() === wallet.address.toLowerCase();
                     const isStakeInputOpen = stakeInputOpen === wallet.address;
                     return (
                       <li key={wallet.address} className="text-sm">
@@ -351,43 +538,81 @@ export function StakingModal({ onClose, balance, lockups, wallets, connectedWall
                           
                           {/* Stake input row (only visible when stake input is open for this wallet) */}
                           {isConnected && isStakeInputOpen && (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                value={stakeAmount}
-                                onChange={(e) => setStakeAmount(e.target.value)}
-                                placeholder="0.00"
-                                className="w-24 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
-                              />
-                              <div className="flex items-center gap-1">
-                                <span className="text-xs text-gray-600">⌛</span>
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-2">
                                 <input
                                   type="text"
-                                  value={lockupDuration}
-                                  onChange={(e) => setLockupDuration(e.target.value)}
-                                  placeholder="1"
-                                  className="w-12 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  value={stakeAmount}
+                                  onChange={(e) => {
+                                    setStakeAmount(e.target.value);
+                                    setStakeError(null);
+                                  }}
+                                  placeholder="0.00"
+                                  className="w-24 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                                  disabled={stakePending || isStakeSending || isStakeConfirming}
                                 />
-                                <select
-                                  value={lockupDurationUnit}
-                                  onChange={(e) => setLockupDurationUnit(e.target.value as 'day' | 'week' | 'month' | 'year')}
-                                  className="px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-gray-600">⌛</span>
+                                  <input
+                                    type="text"
+                                    value={lockupDuration}
+                                    onChange={(e) => {
+                                      setLockupDuration(e.target.value);
+                                      setStakeError(null);
+                                    }}
+                                    placeholder="1"
+                                    className="w-12 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                                    disabled={stakePending || isStakeSending || isStakeConfirming}
+                                  />
+                                  <select
+                                    value={lockupDurationUnit}
+                                    onChange={(e) => setLockupDurationUnit(e.target.value as 'day' | 'week' | 'month' | 'year')}
+                                    className="px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+                                    disabled={stakePending || isStakeSending || isStakeConfirming}
+                                  >
+                                    <option value="day">day</option>
+                                    <option value="week">week</option>
+                                    <option value="month">month</option>
+                                    <option value="year">year</option>
+                                  </select>
+                                </div>
+                                <button
+                                  className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
+                                  onClick={() => handleStake(wallet)}
+                                  disabled={stakePending || isStakeSending || isStakeConfirming}
                                 >
-                                  <option value="day">day</option>
-                                  <option value="week">week</option>
-                                  <option value="month">month</option>
-                                  <option value="year">year</option>
-                                </select>
+                                  {stakePending || isStakeSending || isStakeConfirming ? 'Processing...' : 'Stake!'}
+                                </button>
                               </div>
-                              <button
-                                className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 ml-auto"
-                                onClick={() => {
-                                  // Placeholder for stake functionality
-                                  console.log('Stake HIGHER:', stakeAmount, 'for', lockupDuration, lockupDurationUnit, 'from wallet:', wallet.address);
-                                }}
-                              >
-                                Stake!
-                              </button>
+                              {stakeError && (
+                                <div className="text-xs text-red-600 px-2">
+                                  {stakeError}
+                                </div>
+                              )}
+                              {(unstakeHash || stakeHash) && (
+                                <div className="text-xs text-gray-600 px-2">
+                                  {unstakeHash && (
+                                    <a 
+                                      href={`https://basescan.org/tx/${unstakeHash}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="underline"
+                                    >
+                                      View transaction
+                                    </a>
+                                  )}
+                                  {stakeHash && (
+                                    <a 
+                                      href={`https://basescan.org/tx/${stakeHash}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="underline"
+                                    >
+                                      View transaction
+                                    </a>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
