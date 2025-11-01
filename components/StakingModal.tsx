@@ -278,8 +278,12 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
 
   // Chain createLockUp after approve succeeds
   useEffect(() => {
-    if (isApproveSuccess && createLockUpParams && wagmiAddress) {
+    if (isApproveSuccess && createLockUpParams && wagmiAddress && !pendingCreateLockUp) {
       setPendingCreateLockUp(true);
+      // Clear params immediately to prevent running this effect again
+      const paramsToUse = createLockUpParams;
+      setCreateLockUpParams(null);
+      
       try {
         writeContractCreateLockUp({
           address: LOCKUP_CONTRACT,
@@ -288,8 +292,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
           args: [
             HIGHER_TOKEN_ADDRESS,
             true, // isERC20
-            createLockUpParams.amountWei,
-            createLockUpParams.unlockTime,
+            paramsToUse.amountWei,
+            paramsToUse.unlockTime,
             wagmiAddress,
             'Higher Steaks!'
           ],
@@ -297,11 +301,10 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       } catch (error: any) {
         setStakeError(error?.message || 'Failed to create lockup');
         setPendingCreateLockUp(false);
-        setCreateLockUpParams(null);
         console.error('CreateLockUp error:', error);
       }
     }
-  }, [isApproveSuccess, createLockUpParams, wagmiAddress, writeContractCreateLockUp]);
+  }, [isApproveSuccess, createLockUpParams, wagmiAddress, pendingCreateLockUp, writeContractCreateLockUp]);
 
   // Handle transaction success - refresh balance
   useEffect(() => {
