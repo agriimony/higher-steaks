@@ -79,9 +79,9 @@ CREATE INDEX idx_fid ON leaderboard_entries(fid);
 2. Filter for specific keyphrase (e.g., "gm higher" or "#higher")
 3. For each unique FID (most recent cast only):
 
-                                - Get user's total HIGHER balance from existing `/api/user/balance` endpoint
-                                - Calculate USD value
-                                - Upsert into database
+                                                                                                                                - Get user's total HIGHER balance from existing `/api/user/balance` endpoint
+                                                                                                                                - Calculate USD value
+                                                                                                                                - Upsert into database
 
 4. Clean up old entries (optional: keep only top 100)
 

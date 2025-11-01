@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
-import { useSendCalls } from 'wagmi';
-import { encodeFunctionData, parseUnits } from 'viem';
+import { parseUnits } from 'viem';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
 
 interface LockupDetail {
@@ -114,14 +113,28 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
-  const { writeContract, data: unstakeHash, isPending: isUnstakePending, error: unstakeWriteError } = useWriteContract();
+  const { writeContract: writeContractUnstake, data: unstakeHash, isPending: isUnstakePending, error: unstakeWriteError } = useWriteContract();
   const { isLoading: isUnstakeConfirming, isSuccess: isUnstakeSuccess } = useWaitForTransactionReceipt({
     hash: unstakeHash,
   });
-  const { sendCalls, data: stakeHash, isPending: isStakeSending, error: stakeSendError } = useSendCalls();
-  const { isLoading: isStakeConfirming, isSuccess: isStakeSuccess } = useWaitForTransactionReceipt({
-    hash: stakeHash as `0x${string}` | undefined,
+  
+  // Separate hooks for approve and createLockUp
+  const { writeContract: writeContractApprove, data: approveHash, isPending: isApprovePending, error: approveError } = useWriteContract();
+  const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
+    hash: approveHash,
   });
+  
+  const { writeContract: writeContractCreateLockUp, data: createLockUpHash, isPending: isCreateLockUpPending, error: createLockUpError } = useWriteContract();
+  const { isLoading: isCreateLockUpConfirming, isSuccess: isCreateLockUpSuccess } = useWaitForTransactionReceipt({
+    hash: createLockUpHash,
+  });
+  
+  // Track if we need to initiate createLockUp after approve succeeds
+  const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
+  const [createLockUpParams, setCreateLockUpParams] = useState<{
+    amountWei: bigint;
+    unlockTime: number;
+  } | null>(null);
 
   // Handle escape key to close
   useEffect(() => {
@@ -188,7 +201,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     setUnstakeError(null);
     
     try {
-      writeContract({
+      writeContractUnstake({
         address: LOCKUP_CONTRACT,
         abi: LOCKUP_ABI,
         functionName: 'unlock',
@@ -200,7 +213,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     }
   };
 
-  // Handle Stake - batch approve + createLockUp
+  // Handle Stake - sequential approve + createLockUp
   const handleStake = async (wallet: WalletDetail) => {
     if (!wagmiAddress) {
       setStakeError('No wallet connected');
@@ -246,39 +259,15 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         return;
       }
 
-      // Encode approve call
-      const approveData = encodeFunctionData({
+      // Store params for createLockUp (will be called after approve succeeds)
+      setCreateLockUpParams({ amountWei, unlockTime });
+
+      // Step 1: Approve the lockup contract to spend tokens
+      writeContractApprove({
+        address: HIGHER_TOKEN_ADDRESS,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: [LOCKUP_CONTRACT, amountWei],
-      });
-
-      // Encode createLockUp call
-      const createLockUpData = encodeFunctionData({
-        abi: LOCKUP_ABI,
-        functionName: 'createLockUp',
-        args: [
-          HIGHER_TOKEN_ADDRESS,
-          true, // isERC20
-          amountWei,
-          unlockTime as number, // uint40
-          wagmiAddress as `0x${string}`,
-          'Higher Steaks!'
-        ],
-      });
-
-      // Send batch transaction
-      sendCalls({
-        calls: [
-          {
-            to: HIGHER_TOKEN_ADDRESS,
-            data: approveData,
-          },
-          {
-            to: LOCKUP_CONTRACT,
-            data: createLockUpData,
-          },
-        ],
       });
     } catch (error: any) {
       setStakeError(error?.message || 'Failed to initiate stake');
@@ -287,19 +276,48 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     }
   };
 
+  // Chain createLockUp after approve succeeds
+  useEffect(() => {
+    if (isApproveSuccess && createLockUpParams && wagmiAddress) {
+      setPendingCreateLockUp(true);
+      try {
+        writeContractCreateLockUp({
+          address: LOCKUP_CONTRACT,
+          abi: LOCKUP_ABI,
+          functionName: 'createLockUp',
+          args: [
+            HIGHER_TOKEN_ADDRESS,
+            true, // isERC20
+            createLockUpParams.amountWei,
+            createLockUpParams.unlockTime,
+            wagmiAddress,
+            'Higher Steaks!'
+          ],
+        });
+      } catch (error: any) {
+        setStakeError(error?.message || 'Failed to create lockup');
+        setPendingCreateLockUp(false);
+        setCreateLockUpParams(null);
+        console.error('CreateLockUp error:', error);
+      }
+    }
+  }, [isApproveSuccess, createLockUpParams, wagmiAddress, writeContractCreateLockUp]);
+
   // Handle transaction success - refresh balance
   useEffect(() => {
-    if (isUnstakeSuccess || isStakeSuccess) {
+    if (isUnstakeSuccess || isCreateLockUpSuccess) {
       // Reset state
       if (isUnstakeSuccess) {
         setUnstakeLockupId(null);
       }
-      if (isStakeSuccess) {
+      if (isCreateLockUpSuccess) {
         setStakePending(false);
         setStakeInputOpen(null);
         setStakeAmount('');
         setLockupDuration('');
         setLockupDurationUnit('day');
+        setPendingCreateLockUp(false);
+        setCreateLockUpParams(null);
       }
       
       // Call refresh callback
@@ -309,14 +327,16 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         }, 1000); // Wait a bit for blockchain to update
       }
     }
-  }, [isUnstakeSuccess, isStakeSuccess, onTransactionSuccess]);
+  }, [isUnstakeSuccess, isCreateLockUpSuccess, onTransactionSuccess]);
 
   // Update stake pending state based on transaction status
+  const isStakeProcessing = isApprovePending || isApproveConfirming || isCreateLockUpPending || isCreateLockUpConfirming || pendingCreateLockUp;
+  
   useEffect(() => {
-    if (!isStakeSending && !isStakeConfirming) {
+    if (!isStakeProcessing) {
       setStakePending(false);
     }
-  }, [isStakeSending, isStakeConfirming]);
+  }, [isStakeProcessing]);
 
   // Update error states
   useEffect(() => {
@@ -326,11 +346,21 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   }, [unstakeWriteError]);
 
   useEffect(() => {
-    if (stakeSendError) {
-      setStakeError(stakeSendError.message || 'Transaction failed');
+    if (approveError) {
+      setStakeError(approveError.message || 'Approve transaction failed');
       setStakePending(false);
+      setCreateLockUpParams(null);
     }
-  }, [stakeSendError]);
+  }, [approveError]);
+
+  useEffect(() => {
+    if (createLockUpError) {
+      setStakeError(createLockUpError.message || 'Create lockup transaction failed');
+      setStakePending(false);
+      setPendingCreateLockUp(false);
+      setCreateLockUpParams(null);
+    }
+  }, [createLockUpError]);
 
   return (
     <div 
@@ -549,7 +579,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                                   }}
                                   placeholder="0.00"
                                   className="w-24 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-                                  disabled={stakePending || isStakeSending || isStakeConfirming}
+                                  disabled={stakePending || isStakeProcessing}
                                 />
                                 <div className="flex items-center gap-1">
                                   <span className="text-xs text-gray-600">⌛</span>
@@ -562,13 +592,13 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                                     }}
                                     placeholder="1"
                                     className="w-12 px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-                                    disabled={stakePending || isStakeSending || isStakeConfirming}
+                                    disabled={stakePending || isStakeProcessing}
                                   />
                                   <select
                                     value={lockupDurationUnit}
                                     onChange={(e) => setLockupDurationUnit(e.target.value as 'day' | 'week' | 'month' | 'year')}
                                     className="px-2 py-1 text-xs border-2 border-black font-mono bg-[#fefdfb] focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
-                                    disabled={stakePending || isStakeSending || isStakeConfirming}
+                                    disabled={stakePending || isStakeProcessing}
                                   >
                                     <option value="day">day</option>
                                     <option value="week">week</option>
@@ -579,9 +609,9 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                                 <button
                                   className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 ml-auto disabled:opacity-50 disabled:cursor-not-allowed"
                                   onClick={() => handleStake(wallet)}
-                                  disabled={stakePending || isStakeSending || isStakeConfirming}
+                                  disabled={stakePending || isStakeProcessing}
                                 >
-                                  {stakePending || isStakeSending || isStakeConfirming ? 'Processing...' : 'Stake!'}
+                                  {stakePending || isStakeProcessing ? 'Processing...' : 'Stake!'}
                                 </button>
                               </div>
                               {stakeError && (
@@ -589,28 +619,33 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                                   {stakeError}
                                 </div>
                               )}
-                              {(unstakeHash || stakeHash) && (
+                              {unstakeHash && (
                                 <div className="text-xs text-gray-600 px-2">
-                                  {unstakeHash && (
-                                    <a 
-                                      href={`https://basescan.org/tx/${unstakeHash}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="underline"
-                                    >
-                                      View transaction
-                                    </a>
-                                  )}
-                                  {stakeHash && (
-                                    <a 
-                                      href={`https://basescan.org/tx/${stakeHash}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="underline"
-                                    >
-                                      View transaction
-                                    </a>
-                                  )}
+                                  <a 
+                                    href={`https://basescan.org/tx/${unstakeHash}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline"
+                                  >
+                                    View transaction
+                                  </a>
+                                </div>
+                              )}
+                              {createLockUpHash && (
+                                <div className="text-xs text-gray-600 px-2">
+                                  <a 
+                                    href={`https://basescan.org/tx/${createLockUpHash}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline"
+                                  >
+                                    View transaction
+                                  </a>
+                                </div>
+                              )}
+                              {isCreateLockUpSuccess && (
+                                <div className="text-xs text-green-600 px-2">
+                                  ✓ Transaction confirmed!
                                 </div>
                               )}
                             </div>
