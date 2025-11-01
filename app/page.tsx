@@ -65,6 +65,7 @@ export default function HigherSteakMenu() {
   const [user, setUser] = useState<User | null>(null);
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
+  const [balanceError, setBalanceError] = useState<string | null>(null);
   const [stakingBalance, setStakingBalance] = useState<StakingBalance | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
@@ -228,6 +229,7 @@ export default function HigherSteakMenu() {
     const fetchTokenBalance = async (fid: number) => {
       setLoadingBalance(true);
       setLoadingStakingDetails(true);
+      setBalanceError(null);
       try {
         const response = await fetch(`/api/user/balance?fid=${fid}`);
         if (response.ok) {
@@ -239,11 +241,24 @@ export default function HigherSteakMenu() {
           updateStakingDetailsFromBalance(balanceData);
         } else {
           console.error('Failed to fetch balance');
+          const errorData = await response.json().catch(() => ({}));
+          
+          // Check if it's a stale block error (503)
+          if (response.status === 503 && errorData.message) {
+            setBalanceError('stale');
+            setBalance(null);
+          } else {
+            setBalanceError(null);
+            setBalance(null);
+          }
+          
           setStakingDetails({ lockups: [], wallets: [] });
           setLoadingStakingDetails(false);
         }
       } catch (error) {
         console.error('Error fetching balance:', error);
+        setBalanceError(null);
+        setBalance(null);
         setStakingDetails({ lockups: [], wallets: [] });
         setLoadingStakingDetails(false);
       } finally {
@@ -494,6 +509,21 @@ export default function HigherSteakMenu() {
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue}
                 </span>
+              </div>
+            ) : balanceError === 'stale' ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[0.65rem] sm:text-xs text-orange-600">⚠️</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (user?.fid) {
+                      fetchTokenBalance(user.fid);
+                    }
+                  }}
+                  className="text-[0.65rem] sm:text-xs text-purple-600 hover:text-purple-700 underline font-bold"
+                >
+                  Retry
+                </button>
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
