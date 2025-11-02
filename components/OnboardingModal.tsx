@@ -19,6 +19,7 @@ interface OnboardingModalProps {
     rank: number | null;
   } | null;
   walletBalance?: number;
+  onCastUpdated?: () => void;
 }
 
 // Format timestamp to readable date
@@ -47,10 +48,12 @@ function durationToSeconds(duration: number, unit: 'day' | 'week' | 'month' | 'y
   }
 }
 
-export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0 }: OnboardingModalProps) {
+export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0, onCastUpdated }: OnboardingModalProps) {
   const [customMessage, setCustomMessage] = useState('');
   const [castUrl, setCastUrl] = useState('');
   const [showStakingForm, setShowStakingForm] = useState(false);
+  const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
+  const [validatingUrl, setValidatingUrl] = useState(false);
   const [stakeAmount, setStakeAmount] = useState('');
   const [lockupDuration, setLockupDuration] = useState<string>('');
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'day' | 'week' | 'month' | 'year'>('day');
@@ -173,6 +176,17 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0 
         channelKey: "higher"
       });
       console.log('Compose cast result:', result);
+      
+      // If result contains cast hash, we can use it immediately
+      if (result?.cast?.hash) {
+        console.log('Got cast hash from composeCast:', result.cast.hash);
+        // Refresh cast data to pick up the new cast
+        if (onCastUpdated) {
+          onCastUpdated();
+        }
+      }
+      
+      // Close modal - user will see updated state when they reopen
       onClose();
     } catch (error) {
       console.error("Failed to open cast composer:", error);
@@ -180,9 +194,52 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0 
   };
 
   const handleValidateAndUseCastUrl = async () => {
-    // TODO: Implement cast URL validation
-    // For now, just show a placeholder message
-    alert('Cast URL validation coming soon!');
+    setUrlValidationError(null);
+    setValidatingUrl(true);
+    
+    try {
+      // Extract hash from URL (could be Warpcast URL or direct hash)
+      let hashToLookup = castUrl.trim();
+      
+      // If it's a Warpcast URL, extract the hash
+      const urlMatch = castUrl.match(/(?:^https?:\/\/)?(?:.*\.)?warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)/);
+      if (urlMatch && urlMatch[1]) {
+        hashToLookup = urlMatch[1];
+      }
+      
+      // If it looks like a hash, add 0x prefix if missing
+      if (hashToLookup && !hashToLookup.startsWith('0x')) {
+        hashToLookup = '0x' + hashToLookup;
+      }
+      
+      if (!hashToLookup) {
+        setUrlValidationError('Invalid cast URL format');
+        setValidatingUrl(false);
+        return;
+      }
+      
+      // Validate the cast using Neynar API
+      const response = await fetch(`/api/validate-cast?hash=${encodeURIComponent(hashToLookup)}`);
+      const data = await response.json();
+      
+      if (data.valid && data.fid === userFid) {
+        // Valid cast by this user - refresh cast data
+        setUrlValidationError(null);
+        setCastUrl('');
+        if (onCastUpdated) {
+          onCastUpdated();
+        }
+      } else if (data.valid && data.fid !== userFid) {
+        setUrlValidationError('This cast belongs to a different user');
+      } else {
+        setUrlValidationError('Cast not found or invalid');
+      }
+    } catch (error) {
+      console.error('Error validating cast URL:', error);
+      setUrlValidationError('Failed to validate cast URL');
+    } finally {
+      setValidatingUrl(false);
+    }
   };
 
   const handleSwapToHigher = async () => {
@@ -306,11 +363,11 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0 
           </button>
           
           <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
-            How are you aiming higher today?
+            How are you aiming higher?
           </h2>
           
           <p className="mb-3 text-black text-sm">
-            Start your journey by casting to /higher:
+            Start your journey with /higher:
           </p>
           
           <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
@@ -339,10 +396,18 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0 
             <input
               type="text"
               value={castUrl}
-              onChange={(e) => setCastUrl(e.target.value)}
+              onChange={(e) => {
+                setCastUrl(e.target.value);
+                setUrlValidationError(null);
+              }}
               placeholder="Paste your cast URL here..."
               className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
             />
+            {urlValidationError && (
+              <div className="mt-2 text-xs text-red-600">
+                {urlValidationError}
+              </div>
+            )}
           </div>
           
           <div className="flex gap-3 border-t border-black/20 pt-4">
@@ -355,9 +420,10 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0 
             {castUrl && (
               <button
                 onClick={handleValidateAndUseCastUrl}
-                className="flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm"
+                disabled={validatingUrl}
+                className="flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Use URL
+                {validatingUrl ? 'Validating...' : 'Use URL'}
               </button>
             )}
           </div>
