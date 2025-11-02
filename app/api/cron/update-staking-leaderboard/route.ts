@@ -65,7 +65,11 @@ function extractDescription(castText: string): string | null {
 
 // Helper to check if a string is a valid cast hash (starts with 0x, is 42 chars)
 function isValidCastHash(hash: string): boolean {
-  return typeof hash === 'string' && hash.startsWith('0x') && hash.length === 42;
+  const isValid = typeof hash === 'string' && hash.startsWith('0x') && hash.length === 42;
+  if (!isValid && hash && hash.length > 0) {
+    console.log(`Invalid cast hash: "${hash}" (length=${hash.length}, startsWith0x=${hash.startsWith('0x')})`);
+  }
+  return isValid;
 }
 
 // Get HIGHER token price from CoinGecko
@@ -170,6 +174,11 @@ export async function GET(request: NextRequest) {
       receivers: Set<string>; // Track unique receiver addresses per cast
     }>();
     
+    let lockupsProcessed = 0;
+    let lockupsUnlocked = 0;
+    let lockupsInvalidHash = 0;
+    let lockupsWithValidHash = 0;
+    
     for (const lockupId of higherLockupIds) {
       try {
         const lockup = await baseClient.readContract({
@@ -179,11 +188,23 @@ export async function GET(request: NextRequest) {
           args: [lockupId],
         }) as readonly [string, boolean, number, boolean, bigint, string, string];
         
+        lockupsProcessed++;
+        
         // Destructure for clarity: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
         const [token, isERC20, unlockTime, unlocked, amount, receiver, title] = lockup;
         
+        // Log for debugging
+        if (lockupsProcessed <= 5 || title.length > 0) {
+          console.log(`  Lockup ${lockupId}: unlocked=${unlocked}, title="${title.substring(0, 50)}...", isValidHash=${isValidCastHash(title)}`);
+        }
+        
         // Only include active (not unlocked) lockups with valid cast hashes
-        if (!unlocked && isValidCastHash(title)) {
+        if (unlocked) {
+          lockupsUnlocked++;
+        } else if (!isValidCastHash(title)) {
+          lockupsInvalidHash++;
+        } else {
+          lockupsWithValidHash++;
           const existing = castBalances.get(title);
           if (existing) {
             existing.totalAmount += amount;
@@ -201,6 +222,11 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    console.log(`Lockup processing summary:`);
+    console.log(`  Total lockups processed: ${lockupsProcessed}`);
+    console.log(`  Unlocked (skipped): ${lockupsUnlocked}`);
+    console.log(`  Invalid cast hash (skipped): ${lockupsInvalidHash}`);
+    console.log(`  Valid cast hash (included): ${lockupsWithValidHash}`);
     console.log(`Found ${castBalances.size} unique cast hashes with active lockups`);
     
     // Step 4: Fetch cast details and validate keyphrase
@@ -224,6 +250,7 @@ export async function GET(request: NextRequest) {
         console.log(`Checking cast ${castHash} with ${formatUnits(totalAmount, 18)} HIGHER staked from ${receivers.size} staker(s)`);
         
         // Fetch cast details from Neynar
+        console.log(`  Calling Neynar lookupCastByHashOrUrl with identifier=${castHash}, type=hash`);
         const castResponse = await neynarClient.lookupCastByHashOrUrl({ 
           identifier: castHash,
           type: 'hash'
@@ -235,6 +262,8 @@ export async function GET(request: NextRequest) {
           continue;
         }
         
+        console.log(`  Cast found: author=@${cast.author.username}, text="${cast.text.substring(0, 100)}..."`);
+        
         // Validate keyphrase
         const description = extractDescription(cast.text);
         if (!description) {
@@ -242,10 +271,12 @@ export async function GET(request: NextRequest) {
           continue;
         }
         
+        console.log(`  Keyphrase validated, description="${description.substring(0, 50)}..."`);
+        
         // Validate /higher channel
         const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
         if (!isHigherChannel) {
-          console.log(`  ✗ Cast not in /higher channel: ${castHash}`);
+          console.log(`  ✗ Cast not in /higher channel: ${castHash}, channel=${cast.channel?.id || 'none'}, parent_url=${cast.parent_url || 'none'}`);
           continue;
         }
         
@@ -263,8 +294,10 @@ export async function GET(request: NextRequest) {
           stakerAddresses: Array.from(receivers),
           stakerFids: [], // Will be populated in Step 4b
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error fetching cast ${castHash}:`, error);
+        console.error(`Error message: ${error.message}`);
+        console.error(`Error stack: ${error.stack}`);
         // Continue with other casts
       }
     }
