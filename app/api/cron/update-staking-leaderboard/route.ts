@@ -212,7 +212,10 @@ export async function GET(request: NextRequest) {
         console.log(`Checking cast ${castHash} with ${formatUnits(totalAmount, 18)} HIGHER staked from ${receivers.size} staker(s)`);
         
         // Fetch cast details from Neynar
-        const castResponse = await neynarClient.lookupCastByHashOrUrl({ hashOrUrl: castHash });
+        const castResponse = await neynarClient.lookupCastByHashOrUrl({ 
+          identifier: castHash,
+          type: 'hash'
+        });
         const cast = castResponse.result?.cast;
         
         if (!cast) {
