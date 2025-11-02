@@ -200,25 +200,15 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
     try {
       console.log('[Onboarding] Validating cast URL:', castUrl);
       
-      // Extract hash from URL (could be Warpcast URL or direct hash)
-      let hashToLookup = castUrl.trim();
+      // Check if it's a full Warpcast URL or a shorter identifier
+      let identifierToLookup = castUrl.trim();
+      const isFullUrl = identifierToLookup.includes('warpcast.com');
       
-      // If it's a Warpcast URL, extract the hash
-      const urlMatch = castUrl.match(/(?:^https?:\/\/)?(?:.*\.)?warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)/);
-      console.log('[Onboarding] URL match result:', urlMatch);
+      // If it's a Warpcast URL, use the full URL with 'url' type
+      // Otherwise, use it as-is (could be a hash or short identifier)
+      console.log('[Onboarding] Identifier to lookup:', identifierToLookup, 'isFullUrl:', isFullUrl);
       
-      if (urlMatch && urlMatch[1]) {
-        hashToLookup = urlMatch[1];
-      }
-      
-      // If it looks like a hash, add 0x prefix if missing
-      if (hashToLookup && !hashToLookup.startsWith('0x')) {
-        hashToLookup = '0x' + hashToLookup;
-      }
-      
-      console.log('[Onboarding] Hash to lookup:', hashToLookup);
-      
-      if (!hashToLookup) {
+      if (!identifierToLookup) {
         setUrlValidationError('Invalid cast URL format');
         setValidatingUrl(false);
         return;
@@ -226,7 +216,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       
       // Validate the cast using Neynar API
       console.log('[Onboarding] Calling validation API...');
-      const response = await fetch(`/api/validate-cast?hash=${encodeURIComponent(hashToLookup)}`);
+      const response = await fetch(`/api/validate-cast?hash=${encodeURIComponent(identifierToLookup)}&isUrl=${isFullUrl}`);
       const data = await response.json();
       
       console.log('[Onboarding] Validation response:', data);

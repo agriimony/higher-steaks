@@ -10,13 +10,14 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const hashParam = searchParams.get('hash');
+    const isUrlParam = searchParams.get('isUrl');
 
-    console.log('[Validate Cast] Request received:', { hashParam });
+    console.log('[Validate Cast] Request received:', { hashParam, isUrlParam });
 
     if (!hashParam) {
       console.log('[Validate Cast] Missing hash parameter');
       return NextResponse.json(
-        { error: 'Cast hash is required' },
+        { error: 'Cast hash or URL is required' },
         { status: 400 }
       );
     }
@@ -35,15 +36,18 @@ export async function GET(request: NextRequest) {
     const { NeynarAPIClient } = await import('@neynar/nodejs-sdk');
     const neynarClient = new NeynarAPIClient({ apiKey: neynarApiKey });
 
+    // Determine the type based on whether it's a URL
+    const lookupType = isUrlParam === 'true' ? 'url' : 'hash';
+    
     console.log('[Validate Cast] Calling Neynar lookupCastByHashOrUrl with:', {
       identifier: hashParam,
-      type: 'hash'
+      type: lookupType
     });
 
-    // Fetch cast by hash
+    // Fetch cast by hash or URL
     const castResponse = await neynarClient.lookupCastByHashOrUrl({ 
       identifier: hashParam,
-      type: 'hash'
+      type: lookupType
     });
 
     console.log('[Validate Cast] Neynar response:', {
