@@ -37,18 +37,34 @@ export async function GET(request: NextRequest) {
     const neynarClient = new NeynarAPIClient({ apiKey: neynarApiKey });
 
     // Determine the type based on whether it's a URL
-    const lookupType = isUrlParam === 'true' ? 'url' : 'hash';
+    // Try 'url' type for full URLs, otherwise try 'hash'
+    let lookupType: 'hash' | 'url' = isUrlParam === 'true' ? 'url' : 'hash';
     
     console.log('[Validate Cast] Calling Neynar lookupCastByHashOrUrl with:', {
       identifier: hashParam,
       type: lookupType
     });
 
-    // Fetch cast by hash or URL
-    const castResponse = await neynarClient.lookupCastByHashOrUrl({ 
-      identifier: hashParam,
-      type: lookupType
-    });
+    // Fetch cast by hash or URL - try both if first attempt fails
+    let castResponse;
+    try {
+      castResponse = await neynarClient.lookupCastByHashOrUrl({ 
+        identifier: hashParam,
+        type: lookupType
+      });
+    } catch (firstError: any) {
+      // If URL type failed, try hash type as fallback
+      if (lookupType === 'url' && firstError.message?.includes('400')) {
+        console.log('[Validate Cast] URL type failed, trying hash type instead');
+        lookupType = 'hash';
+        castResponse = await neynarClient.lookupCastByHashOrUrl({ 
+          identifier: hashParam,
+          type: lookupType
+        });
+      } else {
+        throw firstError;
+      }
+    }
 
     console.log('[Validate Cast] Neynar response:', {
       hasCast: !!castResponse.cast,
