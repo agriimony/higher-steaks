@@ -216,7 +216,7 @@ export async function GET(request: NextRequest) {
           identifier: castHash,
           type: 'hash'
         });
-        const cast = castResponse.result?.cast;
+        const cast = castResponse.cast;
         
         if (!cast) {
           console.log(`  ✗ Cast not found: ${castHash}`);
