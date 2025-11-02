@@ -42,14 +42,14 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
   const lockUpCreatedTopic = useCallback(() => {
     try {
       // Find LockUpCreated event in ABI
-      const eventAbi = LOCKUP_ABI.find(item => item.type === 'event' && item.name === 'LockUpCreated');
+      const eventAbi = LOCKUP_ABI.find((item: any) => item.type === 'event' && item.name === 'LockUpCreated');
       if (!eventAbi || eventAbi.type !== 'event') {
         console.error('LockUpCreated event not found in ABI');
         return null;
       }
 
       // Generate keccak256 hash of event signature: LockUpCreated(uint256,address,address,uint256,uint40,string)
-      const signature = `${eventAbi.name}(${eventAbi.inputs.map(inp => inp.internalType || inp.type).join(',')})`;
+      const signature = `${eventAbi.name}(${eventAbi.inputs.map((inp: any) => inp.internalType || inp.type).join(',')})`;
       const hash = keccak256(toHex(signature));
       console.log('[WebSocket] LockUpCreated event signature:', signature);
       console.log('[WebSocket] LockUpCreated topic:', hash);
