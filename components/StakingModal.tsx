@@ -11,6 +11,7 @@ interface LockupDetail {
   unlockTime: number;
   timeRemaining: number;
   receiver: string;
+  title: string;
 }
 
 interface WalletDetail {
@@ -257,53 +258,67 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                     const isConnected = wagmiAddress?.toLowerCase() === lockup.receiver.toLowerCase();
                     return (
                       <li key={lockup.lockupId} className="text-sm">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <img 
-                              src={balance.higherLogoUrl || '/higher-logo.png'} 
-                              alt="HIGHER" 
-                              className="w-4 h-4 rounded-full"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                            <span className="font-bold text-black">
-                              {formatTokenAmount(lockup.amountFormatted)}
-                            </span>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <img 
+                                src={balance.higherLogoUrl || '/higher-logo.png'} 
+                                alt="HIGHER" 
+                                className="w-4 h-4 rounded-full"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                              <span className="font-bold text-black">
+                                {formatTokenAmount(lockup.amountFormatted)}
+                              </span>
+                            </div>
+                            {isConnected && lockup.timeRemaining <= 0 ? (
+                              <button
+                                className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => handleUnstake(lockup.lockupId)}
+                                disabled={isUnstakePending || isUnstakeConfirming || (unstakeLockupId === lockup.lockupId && isUnstakeConfirming)}
+                              >
+                                {unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming) ? '📲...' : 'Unstake'}
+                              </button>
+                            ) : lockup.timeRemaining > 0 ? (
+                              <span className="text-gray-600 text-s flex-shrink-0">
+                                {formatTimeRemaining(lockup.timeRemaining)} left
+                              </span>
+                            ) : (
+                              <span className="text-gray-600 text-s flex-shrink-0">
+                                Expired
+                              </span>
+                            )}
+                            <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {isConnected && <span className="text-purple-500 text-xs">•</span>}
+                              <a
+                                href={`https://basescan.org/address/${lockup.receiver}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`text-xs transition underline text-right ${
+                                  isConnected 
+                                    ? 'font-bold text-purple-500 border-2 border-purple-500 px-1.5 py-0.5 rounded' 
+                                    : 'text-gray-600 hover:text-black'
+                                }`}
+                              >
+                                {truncateAddress(lockup.receiver)}
+                              </a>
+                            </div>
                           </div>
-                          {isConnected && lockup.timeRemaining <= 0 ? (
-                            <button
-                              className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                              onClick={() => handleUnstake(lockup.lockupId)}
-                              disabled={isUnstakePending || isUnstakeConfirming || (unstakeLockupId === lockup.lockupId && isUnstakeConfirming)}
-                            >
-                              {unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming) ? '📲...' : 'Unstake'}
-                            </button>
-                          ) : lockup.timeRemaining > 0 ? (
-                            <span className="text-gray-600 text-s flex-shrink-0">
-                              {formatTimeRemaining(lockup.timeRemaining)} left
-                            </span>
-                          ) : (
-                            <span className="text-gray-600 text-s flex-shrink-0">
-                              Expired
-                            </span>
-                          )}
-                          <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            {isConnected && <span className="text-purple-500 text-xs">•</span>}
+                          {/* Cast link */}
+                          {lockup.title && lockup.title.startsWith('0x') && lockup.title.length === 66 && (
                             <a
-                              href={`https://basescan.org/address/${lockup.receiver}`}
+                              href={`https://farcaster.xyz/~/channel/higher/${lockup.title}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`text-xs transition underline text-right ${
-                                isConnected 
-                                  ? 'font-bold text-purple-500 border-2 border-purple-500 px-1.5 py-0.5 rounded' 
-                                  : 'text-gray-600 hover:text-black'
-                              }`}
+                              className="block mt-1 text-[0.6rem] text-gray-500 hover:text-gray-900 transition-colors italic truncate"
+                              title={lockup.title}
                             >
-                              {truncateAddress(lockup.receiver)}
+                              {lockup.title.substring(2, 10)}...
                             </a>
-                          </div>
+                          )}
                         </div>
                       </li>
                     );

@@ -46,6 +46,7 @@ type DetailedLockupResult = {
     unlockTime: number;
     timeRemaining: number;
     receiver: string;
+    title: string;
   }>;
   unlockedBalance: bigint;
   lockedBalance: bigint;
@@ -423,6 +424,7 @@ export async function GET(request: NextRequest) {
             unlockTime: number;
             timeRemaining: number;
             receiver: string;
+            title: string;
           }> = [];
           
           let unlockedBalance = BigInt(0);
@@ -431,7 +433,7 @@ export async function GET(request: NextRequest) {
           for (const result of lockUpResults) {
             if (!result) continue;
             const { id, lockUp } = result;
-            const [token, isERC20, unlockTime, unlocked, amount, receiver] = lockUp;
+            const [token, isERC20, unlockTime, unlocked, amount, receiver, title] = lockUp;
             const tokenAddress = (token as string).toLowerCase();
             const receiverAddr = receiver as string;
 
@@ -475,6 +477,7 @@ export async function GET(request: NextRequest) {
                   unlockTime: unlockTimeNum,
                   timeRemaining,
                   receiver: receiverAddr,
+                  title: title as string,
                 });
                 console.log(`[Balance API] ✓ Added lockup ${id.toString()} to details array`);
               } else {
