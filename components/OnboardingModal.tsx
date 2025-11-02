@@ -198,11 +198,15 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
     setValidatingUrl(true);
     
     try {
+      console.log('[Onboarding] Validating cast URL:', castUrl);
+      
       // Extract hash from URL (could be Warpcast URL or direct hash)
       let hashToLookup = castUrl.trim();
       
       // If it's a Warpcast URL, extract the hash
       const urlMatch = castUrl.match(/(?:^https?:\/\/)?(?:.*\.)?warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)/);
+      console.log('[Onboarding] URL match result:', urlMatch);
+      
       if (urlMatch && urlMatch[1]) {
         hashToLookup = urlMatch[1];
       }
@@ -212,6 +216,8 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
         hashToLookup = '0x' + hashToLookup;
       }
       
+      console.log('[Onboarding] Hash to lookup:', hashToLookup);
+      
       if (!hashToLookup) {
         setUrlValidationError('Invalid cast URL format');
         setValidatingUrl(false);
@@ -219,20 +225,26 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       }
       
       // Validate the cast using Neynar API
+      console.log('[Onboarding] Calling validation API...');
       const response = await fetch(`/api/validate-cast?hash=${encodeURIComponent(hashToLookup)}`);
       const data = await response.json();
       
+      console.log('[Onboarding] Validation response:', data);
+      
       if (data.valid && data.fid === userFid) {
         // Valid cast by this user - refresh cast data
+        console.log('[Onboarding] Cast is valid, refreshing data');
         setUrlValidationError(null);
         setCastUrl('');
         if (onCastUpdated) {
           onCastUpdated();
         }
       } else if (data.valid && data.fid !== userFid) {
+        console.log('[Onboarding] Cast belongs to different user:', data.fid, 'vs', userFid);
         setUrlValidationError('This cast belongs to a different user');
       } else {
-        setUrlValidationError('Cast not found or invalid');
+        console.log('[Onboarding] Cast invalid, reason:', data.reason || 'unknown');
+        setUrlValidationError(data.reason || 'Cast not found or invalid');
       }
     } catch (error) {
       console.error('Error validating cast URL:', error);
