@@ -205,16 +205,9 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       
       // Extract hash from various URL formats
       if (identifierToLookup.includes('farcaster.xyz')) {
-        // Extract hash from farcaster.xyz URLs: https://farcaster.xyz/username/0x...
-        const match = identifierToLookup.match(/farcaster\.xyz\/[^/]+\/(0x[a-fA-F0-9]+)$/);
-        if (match && match[1]) {
-          identifierToLookup = match[1];
-          console.log('[Onboarding] Extracted hash from farcaster.xyz URL:', identifierToLookup);
-        } else {
-          setUrlValidationError('Invalid cast URL format (could not extract hash)');
-          setValidatingUrl(false);
-          return;
-        }
+        // For farcaster.xyz URLs, use the full URL with 'url' type
+        isFullUrl = true;
+        console.log('[Onboarding] Using full farcaster.xyz URL as-is:', identifierToLookup);
       } else if (identifierToLookup.includes('warpcast.com')) {
         // For Warpcast URLs, extract the hash part
         const match = identifierToLookup.match(/warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)$/);
