@@ -92,4 +92,22 @@ export const LOCKUP_ABI = [
     name: 'LockUpCreated',
     type: 'event',
   },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'uint256', name: 'lockUpId', type: 'uint256' },
+      { indexed: true, internalType: 'address', name: 'token', type: 'address' },
+      { indexed: true, internalType: 'address', name: 'receiver', type: 'address' },
+    ],
+    name: 'Unlock',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'uint256', name: 'lockUpId', type: 'uint256' },
+    ],
+    name: 'LockUpUnlocked',
+    type: 'event',
+  },
 ] as const;

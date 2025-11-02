@@ -431,6 +431,29 @@ export default function HigherSteakMenu() {
     }
   }, [ws.newLockupEvent, user?.fid, wagmiAddress]);
 
+  // Handle WebSocket unlock events
+  useEffect(() => {
+    if (ws.unlockEvent && user?.fid) {
+      const eventId = `unlock-${ws.unlockEvent.lockUpId}-${ws.unlockEvent.receiver}`;
+      
+      // Avoid processing duplicate events
+      if (eventId === lastEventRef.current) {
+        return;
+      }
+      lastEventRef.current = eventId;
+
+      console.log('[WebSocket] Unlock event detected:', ws.unlockEvent);
+
+      // Check if this event is relevant to the current user
+      if (wagmiAddress && ws.unlockEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()) {
+        console.log('[WebSocket] Unlock involves current user, refreshing balance');
+        
+        // Refresh balance (unlock doesn't affect leaderboard, only individual balance)
+        fetchTokenBalance(user.fid);
+      }
+    }
+  }, [ws.unlockEvent, user?.fid, wagmiAddress]);
+
   // Get block freshness indicator color
   const getBlockFreshnessColor = (): string => {
     if (!ws.latestBlockAge) return '#9ca3af'; // gray
@@ -464,21 +487,9 @@ export default function HigherSteakMenu() {
           wallets={stakingDetails?.wallets || []}
           loading={loadingStakingDetails || !stakingDetails}
           onTransactionSuccess={async () => {
-            // Refresh balance after successful transaction
-            if (user?.fid) {
-              // Refetch balance data
-              try {
-                const response = await fetch(`/api/user/balance?fid=${user.fid}`);
-                if (response.ok) {
-                  const balanceData = await response.json();
-                  // Update balance and staking details
-                  // The parent component will handle updating state
-                  window.location.reload(); // Simple refresh for now - could be optimized later
-                }
-              } catch (error) {
-                console.error('Error refreshing balance after transaction:', error);
-              }
-            }
+            // WebSocket will automatically detect the transaction and refresh the balance
+            // No manual refresh needed
+            console.log('[Transaction] Success - waiting for WebSocket event to refresh UI');
           }}
         />
       )}

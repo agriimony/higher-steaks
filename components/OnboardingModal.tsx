@@ -153,20 +153,9 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       setLockupDurationUnit('day');
       hasScheduledCreateLockUp.current = false;
       
-      // Trigger leaderboard refresh
-      fetch('/api/leaderboard/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }).catch(err => {
-        console.error('Failed to refresh leaderboard:', err);
-      });
-      
-      // Refresh the page to update balance and cast data
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      // WebSocket will automatically detect the transaction and refresh the balance
+      // Leaderboard refresh will be triggered by WebSocket in app/page.tsx
+      console.log('[Onboarding] Stake transaction successful - WebSocket will refresh UI');
     }
   }, [isCreateLockUpSuccess]);
 

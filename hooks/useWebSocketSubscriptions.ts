@@ -15,6 +15,11 @@ interface WebSocketSubscriptionState {
     unlockTime: string;
     title: string;
   } | null;
+  unlockEvent: {
+    lockUpId: string;
+    token: string;
+    receiver: string;
+  } | null;
   isConnected: boolean;
   error: string | null;
 }
@@ -23,12 +28,14 @@ interface WebSocketSubscriptionState {
  * React hook to manage Alchemy WebSocket subscriptions for real-time blockchain events
  * - Subscribes to new block headers (newHeads) for freshness monitoring
  * - Subscribes to LockUpCreated events from the lockup contract
+ * - Subscribes to Unlock events from the lockup contract
  */
 export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSubscriptionState {
   const [state, setState] = useState<WebSocketSubscriptionState>({
     latestBlock: null,
     latestBlockAge: null,
     newLockupEvent: null,
+    unlockEvent: null,
     isConnected: false,
     error: null,
   });
@@ -56,6 +63,28 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
       return hash;
     } catch (error) {
       console.error('[WebSocket] Error generating event topic:', error);
+      return null;
+    }
+  }, []);
+
+  // Get Unlock event topic from ABI
+  const unlockTopic = useCallback(() => {
+    try {
+      // Find Unlock event in ABI
+      const eventAbi = LOCKUP_ABI.find((item: any) => item.type === 'event' && item.name === 'Unlock');
+      if (!eventAbi || eventAbi.type !== 'event') {
+        console.error('Unlock event not found in ABI');
+        return null;
+      }
+
+      // Generate keccak256 hash of event signature: Unlock(uint256,address,address)
+      const signature = `${eventAbi.name}(${eventAbi.inputs.map((inp: any) => inp.internalType || inp.type).join(',')})`;
+      const hash = keccak256(toHex(signature));
+      console.log('[WebSocket] Unlock event signature:', signature);
+      console.log('[WebSocket] Unlock topic:', hash);
+      return hash;
+    } catch (error) {
+      console.error('[WebSocket] Error generating Unlock event topic:', error);
       return null;
     }
   }, []);
@@ -99,9 +128,9 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
         ws.send(JSON.stringify(newHeadsSub));
 
         // Subscribe to logs for LockUpCreated events
-        const eventTopic = lockUpCreatedTopic();
-        if (eventTopic) {
-          const logsSub = {
+        const createdTopic = lockUpCreatedTopic();
+        if (createdTopic) {
+          const createLogsSub = {
             jsonrpc: '2.0',
             id: 2,
             method: 'eth_subscribe',
@@ -109,14 +138,35 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
               'logs',
               {
                 address: LOCKUP_CONTRACT,
-                topics: [eventTopic],
+                topics: [createdTopic],
               },
             ],
           };
-          ws.send(JSON.stringify(logsSub));
+          ws.send(JSON.stringify(createLogsSub));
           console.log('[WebSocket] Subscribed to LockUpCreated events');
         } else {
           console.error('[WebSocket] Failed to subscribe to LockUpCreated events');
+        }
+
+        // Subscribe to logs for Unlock events
+        const unlockEventTopic = unlockTopic();
+        if (unlockEventTopic) {
+          const unlockLogsSub = {
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'eth_subscribe',
+            params: [
+              'logs',
+              {
+                address: LOCKUP_CONTRACT,
+                topics: [unlockEventTopic],
+              },
+            ],
+          };
+          ws.send(JSON.stringify(unlockLogsSub));
+          console.log('[WebSocket] Subscribed to Unlock events');
+        } else {
+          console.error('[WebSocket] Failed to subscribe to Unlock events');
         }
       };
 
@@ -145,31 +195,59 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
               console.log(`[WebSocket] New block #${blockNumber}, age: ${blockAge}s`);
             }
 
-            // Handle logs (LockUpCreated events)
+            // Handle logs (events)
             if (result && result.topics && result.data) {
-              console.log('[WebSocket] LockUpCreated event detected:', result);
+              const eventTopic = result.topics[0];
+              const createdTopicHash = lockUpCreatedTopic();
+              const unlockTopicHash = unlockTopic();
 
-              // Decode event data (simplified - topics[0] is event signature, topics[1-3] are indexed params)
-              // For now, just extract what we can from the log
-              const lockUpId = result.topics[1] || '0x0';
-              const token = result.topics[2] || '0x0';
-              const receiver = result.topics[3] || '0x0';
+              // Handle LockUpCreated events
+              if (createdTopicHash && eventTopic === createdTopicHash) {
+                console.log('[WebSocket] LockUpCreated event detected:', result);
 
-              // Note: amount, unlockTime, and title are in result.data as a hex string
-              // Full decoding would require ABI decoding, but for detection purposes this is sufficient
-              setState(prev => ({
-                ...prev,
-                newLockupEvent: {
-                  lockUpId,
-                  token,
-                  receiver,
-                  amount: '0x0', // Would need full decoding
-                  unlockTime: '0x0',
-                  title: '',
-                },
-              }));
+                // Decode event data (simplified - topics[0] is event signature, topics[1-3] are indexed params)
+                // For now, just extract what we can from the log
+                const lockUpId = result.topics[1] || '0x0';
+                const token = result.topics[2] || '0x0';
+                const receiver = result.topics[3] || '0x0';
 
-              console.log('[WebSocket] LockUpCreated:', { lockUpId, receiver });
+                // Note: amount, unlockTime, and title are in result.data as a hex string
+                // Full decoding would require ABI decoding, but for detection purposes this is sufficient
+                setState(prev => ({
+                  ...prev,
+                  newLockupEvent: {
+                    lockUpId,
+                    token,
+                    receiver,
+                    amount: '0x0', // Would need full decoding
+                    unlockTime: '0x0',
+                    title: '',
+                  },
+                }));
+
+                console.log('[WebSocket] LockUpCreated:', { lockUpId, receiver });
+              }
+
+              // Handle Unlock events
+              if (unlockTopicHash && eventTopic === unlockTopicHash) {
+                console.log('[WebSocket] Unlock event detected:', result);
+
+                // Decode event data (simplified - topics[0] is event signature, topics[1-3] are indexed params)
+                const lockUpId = result.topics[1] || '0x0';
+                const token = result.topics[2] || '0x0';
+                const receiver = result.topics[3] || '0x0';
+
+                setState(prev => ({
+                  ...prev,
+                  unlockEvent: {
+                    lockUpId,
+                    token,
+                    receiver,
+                  },
+                }));
+
+                console.log('[WebSocket] Unlock:', { lockUpId, receiver });
+              }
             }
           }
 
@@ -210,7 +288,7 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
       console.error('[WebSocket] Failed to create connection:', error);
       setState(prev => ({ ...prev, error: 'Failed to create WebSocket connection' }));
     }
-  }, [enabled, lockUpCreatedTopic]);
+  }, [enabled, lockUpCreatedTopic, unlockTopic]);
 
   // Cleanup on unmount
   useEffect(() => {
