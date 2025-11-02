@@ -354,7 +354,7 @@ export async function GET(request: NextRequest) {
             ${entry.description},
             ${entry.timestamp},
             ${entry.balanceFormatted},
-            ${entry.stakerFids},
+            ${entry.stakerFids as any},
             ${entry.usdValue},
             ${i + 1}
           )
