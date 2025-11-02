@@ -249,6 +249,7 @@ export async function GET(request: NextRequest) {
           timestamp: cast.timestamp,
           stakedBalance: totalAmount,
           stakerAddresses: Array.from(receivers),
+          stakerFids: [], // Will be populated in Step 4b
         });
       } catch (error) {
         console.error(`Error fetching cast ${castHash}:`, error);
