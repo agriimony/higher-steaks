@@ -539,7 +539,7 @@ export default function HigherSteakMenu() {
                   }}
                   className="text-[0.65rem] sm:text-xs text-purple-600 hover:text-purple-700 underline font-bold"
                 >
-
+                  Retry
                 </button>
               </div>
             ) : (
