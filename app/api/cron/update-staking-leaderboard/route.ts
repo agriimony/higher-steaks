@@ -126,6 +126,30 @@ export async function GET(request: NextRequest) {
       transport: http(rpcUrl),
     });
     
+    // Check RPC block freshness
+    console.log('Checking RPC block freshness...');
+    try {
+      const latestBlock = await baseClient.getBlock({ blockTag: 'latest' });
+      const blockTime = latestBlock.timestamp;
+      const currentTime = BigInt(Math.floor(Date.now() / 1000));
+      const ageInSeconds = Number(currentTime - blockTime);
+      const ageInMinutes = ageInSeconds / 60;
+      
+      console.log(`Latest block: #${latestBlock.number}, timestamp: ${blockTime} (${new Date(Number(blockTime) * 1000).toISOString()})`);
+      console.log(`Current time: ${currentTime} (${new Date().toISOString()})`);
+      console.log(`Block age: ${ageInSeconds}s (${ageInMinutes.toFixed(2)} minutes)`);
+      
+      if (ageInMinutes > 5) {
+        console.warn(`⚠️  WARNING: Block is ${ageInMinutes.toFixed(2)} minutes old (> 5 minutes). RPC may be stale!`);
+      } else if (ageInMinutes > 1) {
+        console.warn(`⚠️  Block is ${ageInMinutes.toFixed(2)} minutes old (> 1 minute)`);
+      } else {
+        console.log(`✓ Block is fresh (${ageInSeconds}s old)`);
+      }
+    } catch (error) {
+      console.error('Error checking block freshness:', error);
+    }
+    
     // Step 1: Get total lockup count
     console.log('Step 1: Getting total lockup count...');
     const totalLockups = await baseClient.readContract({
