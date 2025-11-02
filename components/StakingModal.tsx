@@ -170,16 +170,30 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     return parseFloat(b.balanceFormatted.replace(/,/g, '')) - parseFloat(a.balanceFormatted.replace(/,/g, ''));
   });
 
-  // Sort lockups: connected wallet first, then by time remaining ascending (earlier expiry first)
+  // Sort lockups: (1) connected wallet first, (2) expired first, then by time remaining
+  // (3) then by amount descending
   const sortedLockups = [...lockups].sort((a, b) => {
+    // (1) Connected wallet first
     if (wagmiAddress) {
       const aIsConnected = a.receiver.toLowerCase() === wagmiAddress.toLowerCase();
       const bIsConnected = b.receiver.toLowerCase() === wagmiAddress.toLowerCase();
       if (aIsConnected && !bIsConnected) return -1;
       if (!aIsConnected && bIsConnected) return 1;
     }
-    // Sort by time remaining ascending (earlier expiry = higher priority)
-    return a.timeRemaining - b.timeRemaining;
+    
+    // (2) Expired lockups first
+    const aExpired = a.timeRemaining <= 0;
+    const bExpired = b.timeRemaining <= 0;
+    if (aExpired && !bExpired) return -1;
+    if (!aExpired && bExpired) return 1;
+    
+    // (3) Then by time remaining ascending (earlier expiry first)
+    if (a.timeRemaining !== b.timeRemaining) {
+      return a.timeRemaining - b.timeRemaining;
+    }
+    
+    // (4) Finally by amount descending (largest first)
+    return parseFloat(b.amountFormatted.replace(/,/g, '')) - parseFloat(a.amountFormatted.replace(/,/g, ''));
   });
 
   // Handle Max button - fill with wallet balance
@@ -505,7 +519,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                 <p className="text-sm text-gray-600 italic">No active lockups</p>
               ) : (
                 <ul className="space-y-3">
-                  {sortedLockups.map((lockup) => {
+                  {sortedLockups.slice(0, 5).map((lockup) => {
                     const isConnected = wagmiAddress?.toLowerCase() === lockup.receiver.toLowerCase();
                     return (
                       <li key={lockup.lockupId} className="text-sm">
@@ -561,6 +575,13 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                     );
                   })}
                 </ul>
+              )}
+              {sortedLockups.length > 5 && (
+                <div className="mt-3 text-center">
+                  <p className="text-xs text-gray-600 italic">
+                    ... and {sortedLockups.length - 5} more
+                  </p>
+                </div>
               )}
             </div>
 
