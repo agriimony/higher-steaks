@@ -412,7 +412,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
           </button>
           
           <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
-            How are you aiming higher?
+            Are you aiming higher today?
           </h2>
           
           <p className="mb-3 text-black text-sm">
@@ -470,9 +470,13 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
               <button
                 onClick={handleValidateAndUseCastUrl}
                 disabled={validatingUrl}
-                className="flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="relative group flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {validatingUrl ? 'Validating...' : 'Use URL'}
+                <span className="absolute top-0 right-0 text-xs opacity-60 group-hover:opacity-100">ⓘ</span>
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Valid cast must begin with "started aiming higher and it worked out!" and be cast by you
+                </div>
               </button>
             )}
           </div>
@@ -615,9 +619,13 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
               <button
                 onClick={handleStake}
                 disabled={isLoadingTransaction}
-                className="flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="relative group flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoadingTransaction ? 'Staking...' : 'Stake'}
+                <span className="absolute top-0 right-0 text-xs opacity-60 group-hover:opacity-100">ⓘ</span>
+                <div className="absolute bottom-full left-0 mb-2 w-72 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Uses mint.club lockup contracts for secure token staking (<a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">https://mint.club/lockup/create</a>)
+                </div>
               </button>
               <button
                 onClick={() => {
