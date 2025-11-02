@@ -114,6 +114,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Extract description from cast text
+    const descriptionMatch = cast.text.match(KEYPHRASE_REGEX);
+    const description = descriptionMatch && descriptionMatch[1] 
+      ? descriptionMatch[1].trim() 
+      : null;
+
     console.log('[Validate Cast] Validation successful:', {
       hash: cast.hash,
       fid: cast.author.fid
@@ -124,6 +130,7 @@ export async function GET(request: NextRequest) {
       hash: cast.hash,
       fid: cast.author.fid,
       text: cast.text,
+      description: description,
       timestamp: cast.timestamp
     });
 

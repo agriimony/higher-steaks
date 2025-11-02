@@ -6,20 +6,22 @@ import { parseUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
 
+interface CastData {
+  hasCast: boolean;
+  hash?: string;
+  text?: string;
+  description?: string;
+  timestamp?: string;
+  totalStaked: number;
+  rank: number | null;
+}
+
 interface OnboardingModalProps {
   onClose: () => void;
   userFid: number;
-  castData: {
-    hasCast: boolean;
-    hash?: string;
-    text?: string;
-    description?: string;
-    timestamp?: string;
-    totalStaked: number;
-    rank: number | null;
-  } | null;
+  castData: CastData | null;
   walletBalance?: number;
-  onCastUpdated?: () => void;
+  onCastUpdated?: (newCastData: CastData) => void;
 }
 
 // Format timestamp to readable date
@@ -178,11 +180,26 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       console.log('Compose cast result:', result);
       
       // If result contains cast hash, we can use it immediately
-      if (result?.cast?.hash) {
+      if (result?.cast?.hash && result?.cast?.text) {
         console.log('Got cast hash from composeCast:', result.cast.hash);
-        // Refresh cast data to pick up the new cast
+        
+        // Extract description from cast text
+        const keyphraseMatch = result.cast.text.match(/started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i);
+        const description = keyphraseMatch && keyphraseMatch[1] 
+          ? keyphraseMatch[1].trim() 
+          : '';
+        
+        // Update cast data directly with the new cast
         if (onCastUpdated) {
-          onCastUpdated();
+          onCastUpdated({
+            hasCast: true,
+            hash: result.cast.hash,
+            text: result.cast.text,
+            description: description,
+            timestamp: new Date().toISOString(),
+            totalStaked: 0,
+            rank: null,
+          });
         }
       }
       
@@ -246,12 +263,20 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       console.log('[Onboarding] Validation response:', data);
       
       if (data.valid && data.fid === userFid) {
-        // Valid cast by this user - refresh cast data
-        console.log('[Onboarding] Cast is valid, refreshing data');
+        // Valid cast by this user - update cast data directly
+        console.log('[Onboarding] Cast is valid, updating cast data');
         setUrlValidationError(null);
         setCastUrl('');
         if (onCastUpdated) {
-          onCastUpdated();
+          onCastUpdated({
+            hasCast: true,
+            hash: data.hash,
+            text: data.text,
+            description: data.description || '',
+            timestamp: data.timestamp,
+            totalStaked: 0,
+            rank: null,
+          });
         }
       } else if (data.valid && data.fid !== userFid) {
         console.log('[Onboarding] Cast belongs to different user:', data.fid, 'vs', userFid);

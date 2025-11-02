@@ -395,11 +395,9 @@ export default function HigherSteakMenu() {
           userFid={user.fid}
           castData={castData}
           walletBalance={getWalletBalance()}
-          onCastUpdated={() => {
-            // Refresh cast data when user creates/validates a cast
-            if (user?.fid) {
-              fetchCastData(user.fid);
-            }
+          onCastUpdated={(newCastData) => {
+            // Update cast data when user creates/validates a cast
+            setCastData(newCastData);
           }}
         />
       )}
