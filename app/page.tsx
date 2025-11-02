@@ -365,6 +365,9 @@ export default function HigherSteakMenu() {
   };
 
   const handleFabClick = () => {
+    // Close any other open modals first
+    setShowStakingModal(false);
+    // Then open onboarding modal
     setShowOnboardingModal(true);
   };
 
