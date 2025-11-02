@@ -92,7 +92,7 @@ Vercel will automatically deploy with the new database connection.
 You can manually trigger the cron job to populate the database:
 
 ```bash
-curl -X GET https://higher-steaks.vercel.app/api/cron/update-leaderboard \
+curl -X GET https://higher-steaks.vercel.app/api/cron/update-staking-leaderboard \
   -H "Authorization: Bearer YOUR_CRON_SECRET"
 ```
 
@@ -108,7 +108,7 @@ You can change this in `vercel.json`:
 {
   "crons": [
     {
-      "path": "/api/cron/update-leaderboard",
+      "path": "/api/cron/update-staking-leaderboard",
       "schedule": "0 0 * * *"  // Cron expression
     }
   ]
@@ -132,7 +132,7 @@ You can change this in `vercel.json`:
 
 1. Go to Vercel dashboard → Your deployment
 2. Click **Functions** tab
-3. Find `/api/cron/update-leaderboard`
+3. Find `/api/cron/update-staking-leaderboard`
 4. View logs for execution status
 
 ## Troubleshooting

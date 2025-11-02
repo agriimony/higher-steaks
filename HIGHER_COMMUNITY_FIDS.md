@@ -8,7 +8,7 @@ This file contains a curated list of Farcaster FIDs for active members of the /h
 2. Find active members who post frequently
 3. Click on their profile → Look at the URL: `warpcast.com/username`
 4. Use Neynar to get their FID: `https://api.neynar.com/v2/farcaster/user/by_username?username=USERNAME`
-5. Add the FID to the list in `app/api/cron/update-leaderboard/route.ts`
+5. Add the FID to the list in `app/api/cron/update-staking-leaderboard/route.ts`
 
 ## Current Seed List
 

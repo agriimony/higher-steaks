@@ -15,13 +15,14 @@
 - Returns formatted data with USD values
 - Used by frontend to populate menu
 
-#### `/api/cron/update-leaderboard` (GET)
+#### `/api/cron/update-staking-leaderboard` (GET)
 - Daily automated update via Vercel Cron (midnight UTC)
-- Fetches casts from `/higher` channel via Neynar
+- Reads HIGHER token lockups from on-chain contract
+- Aggregates staked amounts by cast hash
+- Fetches cast details from Neynar
 - Filters for keyphrase: **"started aiming higher and it worked out!"**
 - Extracts description from text after the "!"
-- Calculates HIGHER balances for all verified addresses
-- Fetches token price from CoinGecko
+- Calculates USD values from CoinGecko
 - Stores top 100 entries in database
 - Protected by `CRON_SECRET` header
 
@@ -110,7 +111,7 @@ The code is already pushed to GitHub. Vercel will automatically deploy with the 
 After deployment, manually populate the database:
 
 ```bash
-curl -X GET https://higher-steaks.vercel.app/api/cron/update-leaderboard \
+curl -X GET https://higher-steaks.vercel.app/api/cron/update-staking-leaderboard \
   -H "Authorization: Bearer YOUR_CRON_SECRET_HERE"
 ```
 
@@ -132,7 +133,7 @@ Schedule is configured in `vercel.json`:
 ```json
 {
   "crons": [{
-    "path": "/api/cron/update-leaderboard",
+    "path": "/api/cron/update-staking-leaderboard",
     "schedule": "0 0 * * *"
   }]
 }
@@ -238,7 +239,7 @@ Schedule is configured in `vercel.json`:
 - `README.md` - Updated project documentation
 - `sql/schema.sql` - Database schema
 - `vercel.json` - Cron job configuration
-- `app/api/cron/update-leaderboard/route.ts` - Cron job logic
+- `app/api/cron/update-staking-leaderboard/route.ts` - Cron job logic
 - `app/api/leaderboard/top/route.ts` - Leaderboard API
 - `app/page.tsx` - Frontend menu display
 

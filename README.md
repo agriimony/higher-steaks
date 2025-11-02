@@ -113,10 +113,10 @@ npm run build
   - Returns: FID, username, cast text, description, HIGHER balance, USD value
 
 ### Cron Jobs
-- `GET /api/cron/update-leaderboard` - Daily leaderboard update (Vercel Cron)
+- `GET /api/cron/update-staking-leaderboard` - Daily leaderboard update (Vercel Cron)
   - Runs at midnight UTC
-  - Fetches /higher channel casts with keyphrase "started aiming higher and it worked out!"
-  - Calculates HIGHER balances and USD values
+  - Aggregates HIGHER token staked on casts from lockup contracts
+  - Fetches cast details from Neynar and validates keyphrase
   - Stores top 100 entries in database
   - Protected by `CRON_SECRET` header
 

@@ -6,7 +6,7 @@ echo ""
 
 # Test locally first
 echo -e "\033[33m1. Testing LOCAL endpoint (http://localhost:3000)...\033[0m"
-response=$(curl -s -w "\n%{http_code}" http://localhost:3000/api/cron/update-leaderboard)
+response=$(curl -s -w "\n%{http_code}" http://localhost:3000/api/cron/update-staking-leaderboard)
 http_code=$(echo "$response" | tail -n1)
 body=$(echo "$response" | sed '$d')
 
@@ -22,7 +22,7 @@ fi
 
 echo ""
 echo -e "\033[33m2. Testing PRODUCTION endpoint (https://higher-steaks.vercel.app)...\033[0m"
-response=$(curl -s -w "\n%{http_code}" https://higher-steaks.vercel.app/api/cron/update-leaderboard)
+response=$(curl -s -w "\n%{http_code}" https://higher-steaks.vercel.app/api/cron/update-staking-leaderboard)
 http_code=$(echo "$response" | tail -n1)
 body=$(echo "$response" | sed '$d')
 

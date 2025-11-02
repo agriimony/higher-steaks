@@ -6,7 +6,7 @@ Write-Host ""
 # Test locally first
 Write-Host "1. Testing LOCAL endpoint (http://localhost:3000)..." -ForegroundColor Yellow
 try {
-    $response = Invoke-WebRequest -Uri "http://localhost:3000/api/cron/update-leaderboard" -Method Get -UseBasicParsing
+    $response = Invoke-WebRequest -Uri "http://localhost:3000/api/cron/update-staking-leaderboard" -Method Get -UseBasicParsing
     Write-Host "✓ Status Code: $($response.StatusCode)" -ForegroundColor Green
     Write-Host "Response:" -ForegroundColor Gray
     $response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
@@ -18,7 +18,7 @@ try {
 Write-Host ""
 Write-Host "2. Testing PRODUCTION endpoint (https://higher-steaks.vercel.app)..." -ForegroundColor Yellow
 try {
-    $response = Invoke-WebRequest -Uri "https://higher-steaks.vercel.app/api/cron/update-leaderboard" -Method Get -UseBasicParsing
+    $response = Invoke-WebRequest -Uri "https://higher-steaks.vercel.app/api/cron/update-staking-leaderboard" -Method Get -UseBasicParsing
     Write-Host "✓ Status Code: $($response.StatusCode)" -ForegroundColor Green
     Write-Host "Response:" -ForegroundColor Gray
     $response.Content | ConvertFrom-Json | ConvertTo-Json -Depth 10
