@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { StakingModal } from '@/components/StakingModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
+import { useWebSocketSubscriptions } from '@/hooks/useWebSocketSubscriptions';
+import { useAccount } from 'wagmi';
 
 interface User {
   fid: number;
@@ -90,6 +92,12 @@ export default function HigherSteakMenu() {
   // Detect pixel density for ASCII art scaling
   const [pixelDensity, setPixelDensity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(0);
+  
+  // WebSocket subscriptions for real-time updates
+  const { address: wagmiAddress } = useAccount();
+  const wsEnabled = user !== null && !isDevelopmentMode;
+  const ws = useWebSocketSubscriptions(wsEnabled);
+  const lastEventRef = useRef<string | null>(null);
   
   // Extract staking details and calculate staked balance from balance data (single source of truth)
   const updateStakingDetailsFromBalance = (balanceData: TokenBalance) => {
@@ -390,6 +398,47 @@ export default function HigherSteakMenu() {
 
   const filteredLeaderboard = getFilteredLeaderboard();
 
+  // Handle WebSocket lockup events
+  useEffect(() => {
+    if (ws.newLockupEvent && user?.fid) {
+      const eventId = `${ws.newLockupEvent.lockUpId}-${ws.newLockupEvent.receiver}`;
+      
+      // Avoid processing duplicate events
+      if (eventId === lastEventRef.current) {
+        return;
+      }
+      lastEventRef.current = eventId;
+
+      console.log('[WebSocket] New lockup event detected:', ws.newLockupEvent);
+
+      // Check if this event is relevant to the current user
+      if (wagmiAddress && ws.newLockupEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()) {
+        console.log('[WebSocket] Lockup involves current user, refreshing balance and leaderboard');
+        
+        // Refresh balance
+        fetchTokenBalance(user.fid);
+        
+        // Refresh leaderboard
+        fetch('/api/leaderboard/refresh', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }).catch(err => {
+          console.error('Failed to refresh leaderboard:', err);
+        });
+      }
+    }
+  }, [ws.newLockupEvent, user?.fid, wagmiAddress]);
+
+  // Get block freshness indicator color
+  const getBlockFreshnessColor = (): string => {
+    if (!ws.latestBlockAge) return '#9ca3af'; // gray
+    if (ws.latestBlockAge < 30) return '#10b981'; // green
+    if (ws.latestBlockAge < 300) return '#eab308'; // yellow (5 minutes)
+    return '#ef4444'; // red
+  };
+
   return (
     <>
       {/* Onboarding Modal */}
@@ -466,6 +515,17 @@ export default function HigherSteakMenu() {
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue}
                 </span>
+                {/* Block freshness indicator */}
+                {ws.latestBlockAge !== null && (
+                  <div className="flex items-center gap-0.5">
+                    <span className="text-gray-400">•</span>
+                    <div 
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ backgroundColor: getBlockFreshnessColor() }}
+                      title={`Block age: ${ws.latestBlockAge}s (${ws.isConnected ? 'synced' : 'disconnected'})`}
+                    />
+                  </div>
+                )}
               </div>
             ) : balanceError === 'stale' ? (
               <div className="flex items-center gap-1.5">
@@ -479,7 +539,7 @@ export default function HigherSteakMenu() {
                   }}
                   className="text-[0.65rem] sm:text-xs text-purple-600 hover:text-purple-700 underline font-bold"
                 >
-                  Retry
+
                 </button>
               </div>
             ) : (

@@ -79,4 +79,17 @@ export const LOCKUP_ABI = [
     stateMutability: 'nonpayable',
     type: 'function',
   },
+  {
+    anonymous: false,
+    inputs: [
+      { indexed: true, internalType: 'uint256', name: 'lockUpId', type: 'uint256' },
+      { indexed: true, internalType: 'address', name: 'token', type: 'address' },
+      { indexed: true, internalType: 'address', name: 'receiver', type: 'address' },
+      { indexed: false, internalType: 'uint256', name: 'amount', type: 'uint256' },
+      { indexed: false, internalType: 'uint40', name: 'unlockTime', type: 'uint40' },
+      { indexed: false, internalType: 'string', name: 'title', type: 'string' },
+    ],
+    name: 'LockUpCreated',
+    type: 'event',
+  },
 ] as const;

@@ -14,6 +14,9 @@ A Farcaster Mini App for the higher network discovery. This Mini App can be embe
 - 🗄️ Vercel Postgres database integration
 - 🎨 Modern, responsive design optimized for 424px modal
 - 📐 3:2 aspect ratio embed images
+- 🔴 Real-time blockchain event monitoring via WebSocket
+- ⚡ Instant UI updates when users stake tokens
+- 🟢 Block freshness indicator for data synchronization
 
 ## Setup
 
@@ -35,8 +38,10 @@ Create a `.env.local` file in the root directory:
 # Required: Neynar API Key
 NEYNAR_API_KEY=your_neynar_api_key_here
 
-# Optional: Alchemy API Key (recommended for production, provides robust RPC with higher rate limits)
+# Optional: Alchemy API Key (recommended for production, provides robust RPC with higher rate limits and WebSocket support)
+# For frontend WebSocket features, also expose as NEXT_PUBLIC_ALCHEMY_API_KEY
 ALCHEMY_API_KEY=your_alchemy_api_key_here
+NEXT_PUBLIC_ALCHEMY_API_KEY=your_alchemy_api_key_here
 
 # Optional: Base RPC URL (fallback if ALCHEMY_API_KEY not set, defaults to public RPC)
 BASE_RPC_URL=https://mainnet.base.org
@@ -62,6 +67,7 @@ CRON_SECRET=your_random_secret_here
 4. Copy your API key from the app dashboard
 5. The endpoint format is: `https://base-mainnet.g.alchemy.com/v2/{YOUR_API_KEY}`
 6. Alchemy provides better rate limits, reliability, and supports optimized batch requests
+7. **Important**: Set `NEXT_PUBLIC_ALCHEMY_API_KEY` to the same value as `ALCHEMY_API_KEY` to enable frontend WebSocket features (real-time updates). WebSocket features gracefully degrade if not set.
 
 **Vercel Postgres Setup:**
 See [DATABASE_SETUP.md](./DATABASE_SETUP.md) for detailed database configuration instructions.
@@ -119,6 +125,15 @@ npm run build
   - Fetches cast details from Neynar and validates keyphrase
   - Stores top 100 entries in database
   - Protected by `CRON_SECRET` header
+  - **Block freshness check**: Retries up to 3 minutes if latest block is >10 minutes old
+
+### Real-time Features
+- **WebSocket Subscriptions**: Monitors Base blockchain for new lockup events and block headers
+- **Instant Updates**: UI refreshes automatically when users stake tokens (when connected via Wagmi)
+- **Block Freshness Indicator**: Visual indicator showing data synchronization status:
+  - Green: Block age < 30 seconds
+  - Yellow: Block age 30s-5min
+  - Red: Block age > 5 minutes
 
 ## Development
 

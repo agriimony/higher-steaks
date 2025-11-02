@@ -126,28 +126,65 @@ export async function GET(request: NextRequest) {
       transport: http(rpcUrl),
     });
     
-    // Check RPC block freshness
+    // Check RPC block freshness with retry logic
     console.log('Checking RPC block freshness...');
-    try {
-      const latestBlock = await baseClient.getBlock({ blockTag: 'latest' });
-      const blockTime = latestBlock.timestamp;
-      const currentTime = BigInt(Math.floor(Date.now() / 1000));
-      const ageInSeconds = Number(currentTime - blockTime);
-      const ageInMinutes = ageInSeconds / 60;
-      
-      console.log(`Latest block: #${latestBlock.number}, timestamp: ${blockTime} (${new Date(Number(blockTime) * 1000).toISOString()})`);
-      console.log(`Current time: ${currentTime} (${new Date().toISOString()})`);
-      console.log(`Block age: ${ageInSeconds}s (${ageInMinutes.toFixed(2)} minutes)`);
-      
-      if (ageInMinutes > 5) {
-        console.warn(`⚠️  WARNING: Block is ${ageInMinutes.toFixed(2)} minutes old (> 5 minutes). RPC may be stale!`);
-      } else if (ageInMinutes > 1) {
-        console.warn(`⚠️  Block is ${ageInMinutes.toFixed(2)} minutes old (> 1 minute)`);
-      } else {
-        console.log(`✓ Block is fresh (${ageInSeconds}s old)`);
+    let latestBlock;
+    const MAX_RETRY_DURATION = 180000; // 3 minutes in milliseconds
+    const STALE_THRESHOLD = 600; // 10 minutes in seconds
+    const retryDelays = [5000, 10000, 20000, 40000, 45000]; // exponential backoff delays in ms
+    const startTime = Date.now();
+    let attempt = 0;
+    let blockIsFresh = false;
+    
+    while (Date.now() - startTime < MAX_RETRY_DURATION) {
+      try {
+        latestBlock = await baseClient.getBlock({ blockTag: 'latest' });
+        const blockTime = latestBlock.timestamp;
+        const currentTime = BigInt(Math.floor(Date.now() / 1000));
+        const ageInSeconds = Number(currentTime - blockTime);
+        const ageInMinutes = ageInSeconds / 60;
+        
+        console.log(`Attempt ${attempt + 1}: Block #${latestBlock.number}, age: ${ageInSeconds}s (${ageInMinutes.toFixed(2)} min)`);
+        
+        if (ageInSeconds <= STALE_THRESHOLD) {
+          console.log(`✓ Block is fresh (≤ 10 minutes old)`);
+          blockIsFresh = true;
+          break;
+        } else {
+          console.warn(`⚠️  Block is stale (${ageInMinutes.toFixed(2)} min old), retrying...`);
+        }
+      } catch (error) {
+        console.error(`Error fetching block on attempt ${attempt + 1}:`, error);
       }
-    } catch (error) {
-      console.error('Error checking block freshness:', error);
+      
+      // Calculate delay for next retry (use exponential backoff, capped at 45s)
+      const delayIndex = Math.min(attempt, retryDelays.length - 1);
+      const delay = retryDelays[delayIndex];
+      const elapsed = Date.now() - startTime;
+      const remaining = MAX_RETRY_DURATION - elapsed;
+      
+      if (remaining > delay) {
+        console.log(`Waiting ${delay}ms before next retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        attempt++;
+      } else {
+        break;
+      }
+    }
+    
+    // Check if we got a fresh block
+    if (!blockIsFresh || !latestBlock) {
+      const finalAge = latestBlock ? Number(BigInt(Math.floor(Date.now() / 1000)) - latestBlock.timestamp) : 'unknown';
+      console.error(`✗ Failed to get fresh block after ${attempt + 1} attempts, age: ${finalAge}s`);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'RPC block is stale after 3 minutes of retries',
+          blockAge: finalAge,
+          attempts: attempt + 1
+        },
+        { status: 503 }
+      );
     }
     
     // Step 1: Get total lockup count
