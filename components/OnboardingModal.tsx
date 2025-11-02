@@ -200,13 +200,44 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
     try {
       console.log('[Onboarding] Validating cast URL:', castUrl);
       
-      // Check if it's a full Warpcast URL or a shorter identifier
       let identifierToLookup = castUrl.trim();
-      const isFullUrl = identifierToLookup.includes('warpcast.com');
+      let isFullUrl = false;
       
-      // If it's a Warpcast URL, use the full URL with 'url' type
-      // Otherwise, use it as-is (could be a hash or short identifier)
-      console.log('[Onboarding] Identifier to lookup:', identifierToLookup, 'isFullUrl:', isFullUrl);
+      // Extract hash from various URL formats
+      if (identifierToLookup.includes('farcaster.xyz')) {
+        // Extract hash from farcaster.xyz URLs: https://farcaster.xyz/username/0x...
+        const match = identifierToLookup.match(/farcaster\.xyz\/[^/]+\/(0x[a-fA-F0-9]+)$/);
+        if (match && match[1]) {
+          identifierToLookup = match[1];
+          console.log('[Onboarding] Extracted hash from farcaster.xyz URL:', identifierToLookup);
+        } else {
+          setUrlValidationError('Invalid cast URL format (could not extract hash)');
+          setValidatingUrl(false);
+          return;
+        }
+      } else if (identifierToLookup.includes('warpcast.com')) {
+        // For Warpcast URLs, extract the hash part
+        const match = identifierToLookup.match(/warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)$/);
+        if (match && match[1]) {
+          // Prepend 0x if it's a hex string
+          if (!match[1].startsWith('0x')) {
+            identifierToLookup = '0x' + match[1];
+          } else {
+            identifierToLookup = match[1];
+          }
+          console.log('[Onboarding] Extracted hash from warpcast.com URL:', identifierToLookup);
+        } else {
+          setUrlValidationError('Invalid Warpcast URL format');
+          setValidatingUrl(false);
+          return;
+        }
+      } else {
+        // Assume it's already a hash - add 0x prefix if missing
+        if (!identifierToLookup.startsWith('0x') && /^[a-fA-F0-9]+$/.test(identifierToLookup)) {
+          identifierToLookup = '0x' + identifierToLookup;
+        }
+        console.log('[Onboarding] Using as-is (assuming hash):', identifierToLookup);
+      }
       
       if (!identifierToLookup) {
         setUrlValidationError('Invalid cast URL format');
@@ -215,7 +246,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       }
       
       // Validate the cast using Neynar API
-      console.log('[Onboarding] Calling validation API...');
+      console.log('[Onboarding] Calling validation API with:', identifierToLookup);
       const response = await fetch(`/api/validate-cast?hash=${encodeURIComponent(identifierToLookup)}&isUrl=${isFullUrl}`);
       const data = await response.json();
       
