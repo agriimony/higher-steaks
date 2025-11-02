@@ -201,10 +201,8 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
             rank: null,
           });
         }
+        // Modal will stay open and automatically show the new cast state
       }
-      
-      // Close modal - user will see updated state when they reopen
-      onClose();
     } catch (error) {
       console.error("Failed to open cast composer:", error);
     }
