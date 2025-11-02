@@ -621,8 +621,11 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
                 disabled={isLoadingTransaction}
                 className="relative group flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoadingTransaction ? 'Staking...' : 'Stake'}
-                <span className="absolute top-0 right-0 text-xs opacity-60 group-hover:opacity-100">ⓘ</span>
+                {isLoadingTransaction ? 'Staking...' : (
+                  <span className="flex items-center justify-center gap-1">
+                    Stake <span className="text-sm">ⓘ</span>
+                  </span>
+                )}
                 <div className="absolute bottom-full left-0 mb-2 w-72 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                   Uses mint.club lockup contracts for secure token staking (<a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">https://mint.club/lockup/create</a>)
                 </div>
