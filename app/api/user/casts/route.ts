@@ -42,27 +42,32 @@ export async function GET(request: NextRequest) {
 
     console.log(`[User Casts API] Fetching casts for FID ${fid}`);
 
-    // Step 1: Query database for cast by creator FID
-    const dbResult = await sql`
-      SELECT * FROM leaderboard_entries 
-      WHERE creator_fid = ${fid} 
-      ORDER BY total_higher_staked DESC 
-      LIMIT 1
-    `;
+    // Step 1: Query database for cast by creator FID (with error handling for schema issues)
+    try {
+      const dbResult = await sql`
+        SELECT * FROM leaderboard_entries 
+        WHERE creator_fid = ${fid} 
+        ORDER BY total_higher_staked DESC 
+        LIMIT 1
+      `;
 
-    if (dbResult.rows && dbResult.rows.length > 0) {
-      const castData = dbResult.rows[0];
-      console.log(`[User Casts API] Found cast in database: ${castData.cast_hash}`);
-      
-      return NextResponse.json({
-        hasCast: true,
-        hash: castData.cast_hash,
-        text: castData.cast_text,
-        description: castData.description,
-        timestamp: castData.cast_timestamp,
-        totalStaked: parseFloat(castData.total_higher_staked),
-        rank: castData.rank,
-      });
+      if (dbResult.rows && dbResult.rows.length > 0) {
+        const castData = dbResult.rows[0];
+        console.log(`[User Casts API] Found cast in database: ${castData.cast_hash}`);
+        
+        return NextResponse.json({
+          hasCast: true,
+          hash: castData.cast_hash,
+          text: castData.cast_text,
+          description: castData.description,
+          timestamp: castData.cast_timestamp,
+          totalStaked: parseFloat(castData.total_higher_staked),
+          rank: castData.rank,
+        });
+      }
+    } catch (dbError: any) {
+      console.log(`[User Casts API] Database query failed (likely schema issue):`, dbError.message);
+      // Continue to Neynar fallback
     }
 
     // Step 2: Fallback to Neynar if not found in database
