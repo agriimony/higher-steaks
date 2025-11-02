@@ -205,7 +205,19 @@ export async function GET(request: NextRequest) {
     
     // Step 4: Fetch cast details and validate keyphrase
     console.log('Step 4: Fetching cast details and validating keyphrase...');
-    const validEntries = [];
+    const validEntries: Array<{
+      castHash: string;
+      creatorFid: number;
+      creatorUsername: string;
+      creatorDisplayName: string;
+      creatorPfpUrl: string;
+      castText: string;
+      description: string;
+      timestamp: string;
+      stakedBalance: bigint;
+      stakerAddresses: string[];
+      stakerFids: number[];
+    }> = [];
     
     for (const [castHash, { totalAmount, receivers }] of castBalances.entries()) {
       try {
