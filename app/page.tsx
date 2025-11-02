@@ -49,6 +49,7 @@ interface LockupDetail {
   unlockTime: number;
   timeRemaining: number;
   receiver: string;
+  title: string;
 }
 
 interface WalletDetail {
