@@ -153,6 +153,16 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       setLockupDurationUnit('day');
       hasScheduledCreateLockUp.current = false;
       
+      // Trigger leaderboard refresh
+      fetch('/api/leaderboard/refresh', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }).catch(err => {
+        console.error('Failed to refresh leaderboard:', err);
+      });
+      
       // Refresh the page to update balance and cast data
       setTimeout(() => {
         window.location.reload();
