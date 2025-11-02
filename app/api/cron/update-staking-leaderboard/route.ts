@@ -63,9 +63,9 @@ function extractDescription(castText: string): string | null {
     : description;
 }
 
-// Helper to check if a string is a valid cast hash (starts with 0x, is 66 chars)
+// Helper to check if a string is a valid cast hash (starts with 0x, is 42 chars)
 function isValidCastHash(hash: string): boolean {
-  return typeof hash === 'string' && hash.startsWith('0x') && hash.length === 66;
+  return typeof hash === 'string' && hash.startsWith('0x') && hash.length === 42;
 }
 
 // Get HIGHER token price from CoinGecko
