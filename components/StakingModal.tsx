@@ -543,7 +543,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                               onClick={() => handleUnstake(lockup.lockupId)}
                               disabled={isUnstakePending || isUnstakeConfirming || (unstakeLockupId === lockup.lockupId && isUnstakeConfirming)}
                             >
-                              {unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming) ? 'Processing...' : 'Unstake'}
+                              {unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming) ? '📲...' : 'Unstake'}
                             </button>
                           ) : lockup.timeRemaining > 0 ? (
                             <span className="text-gray-600 text-s flex-shrink-0">
@@ -702,7 +702,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                                   onClick={() => handleStake(wallet)}
                                   disabled={stakePending || isStakeProcessing}
                                 >
-                                  {stakePending || isStakeProcessing ? 'Processing...' : 'Stake!'}
+                                  {stakePending || isStakeProcessing ? '📲...' : 'Stake!'}
                                 </button>
                               </div>
                               {stakeError && (

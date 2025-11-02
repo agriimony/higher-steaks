@@ -63,6 +63,11 @@ function extractDescription(castText: string): string | null {
     : description;
 }
 
+// Helper to check if a string is a valid cast hash (starts with 0x, is 66 chars)
+function isValidCastHash(hash: string): boolean {
+  return typeof hash === 'string' && hash.startsWith('0x') && hash.length === 66;
+}
+
 // Get HIGHER token price from CoinGecko
 async function getTokenPrice(): Promise<number> {
   try {
@@ -158,9 +163,12 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Step 3: Get lockup details and filter active ones
-    console.log('Step 3: Fetching lockup details...');
-    const receiverBalances = new Map<string, bigint>();
+    // Step 3: Get lockup details and aggregate by cast_hash
+    console.log('Step 3: Fetching lockup details and aggregating by cast hash...');
+    const castBalances = new Map<string, {
+      totalAmount: bigint;
+      receivers: Set<string>; // Track unique receiver addresses per cast
+    }>();
     
     for (const lockupId of higherLockupIds) {
       try {
@@ -174,11 +182,18 @@ export async function GET(request: NextRequest) {
         // Destructure for clarity: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
         const [token, isERC20, unlockTime, unlocked, amount, receiver, title] = lockup;
         
-        // Only include active (not unlocked) lockups
-        if (!unlocked) {
-          const receiverLower = receiver.toLowerCase();
-          const current = receiverBalances.get(receiverLower) || 0n;
-          receiverBalances.set(receiverLower, current + amount);
+        // Only include active (not unlocked) lockups with valid cast hashes
+        if (!unlocked && isValidCastHash(title)) {
+          const existing = castBalances.get(title);
+          if (existing) {
+            existing.totalAmount += amount;
+            existing.receivers.add(receiver.toLowerCase());
+          } else {
+            castBalances.set(title, {
+              totalAmount: amount,
+              receivers: new Set([receiver.toLowerCase()]),
+            });
+          }
         }
       } catch (error) {
         console.error(`Error fetching lockup ${lockupId}:`, error);
@@ -186,126 +201,90 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    console.log(`Found ${receiverBalances.size} unique active stakers`);
+    console.log(`Found ${castBalances.size} unique cast hashes with active lockups`);
     
-    // Step 4: Map addresses to Farcaster accounts
-    console.log('Step 4: Mapping addresses to Farcaster accounts...');
-    const addressToFid = new Map<string, any>();
+    // Step 4: Fetch cast details and validate keyphrase
+    console.log('Step 4: Fetching cast details and validating keyphrase...');
+    const validEntries = [];
     
-    // Batch addresses for Neynar lookup (max 350 per request)
-    const addresses = Array.from(receiverBalances.keys());
+    for (const [castHash, { totalAmount, receivers }] of castBalances.entries()) {
+      try {
+        console.log(`Checking cast ${castHash} with ${formatUnits(totalAmount, 18)} HIGHER staked from ${receivers.size} staker(s)`);
+        
+        // Fetch cast details from Neynar
+        const castResponse = await neynarClient.lookupCastByHashOrWarpcastUrl({ hashOrWarpcastUrl: castHash });
+        const cast = castResponse.result?.cast;
+        
+        if (!cast) {
+          console.log(`  ✗ Cast not found: ${castHash}`);
+          continue;
+        }
+        
+        // Validate keyphrase
+        const description = extractDescription(cast.text);
+        if (!description) {
+          console.log(`  ✗ Cast missing keyphrase: ${castHash}`);
+          continue;
+        }
+        
+        // Validate /higher channel
+        const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
+        if (!isHigherChannel) {
+          console.log(`  ✗ Cast not in /higher channel: ${castHash}`);
+          continue;
+        }
+        
+        console.log(`  ✓ Valid cast found for ${castHash}`);
+        validEntries.push({
+          castHash,
+          creatorFid: cast.author.fid,
+          creatorUsername: cast.author.username,
+          creatorDisplayName: cast.author.display_name || cast.author.username,
+          creatorPfpUrl: cast.author.pfp_url || '',
+          castText: cast.text,
+          description,
+          timestamp: cast.timestamp,
+          stakedBalance: totalAmount,
+          stakerAddresses: Array.from(receivers),
+        });
+      } catch (error) {
+        console.error(`Error fetching cast ${castHash}:`, error);
+        // Continue with other casts
+      }
+    }
+    
+    console.log(`Found ${validEntries.length} valid casts with keyphrase`);
+    
+    // Step 4b: Map staker addresses to FIDs
+    console.log('Step 4b: Mapping staker addresses to FIDs...');
+    const addressToFid = new Map<string, number>();
+    const allStakerAddresses = new Set<string>();
+    validEntries.forEach(entry => entry.stakerAddresses.forEach(addr => allStakerAddresses.add(addr)));
+    
     const batchSize = 350;
-    
+    const addresses = Array.from(allStakerAddresses);
     for (let i = 0; i < addresses.length; i += batchSize) {
       const batch = addresses.slice(i, i + batchSize);
-      
       try {
         const users = await neynarClient.fetchBulkUsersByEthOrSolAddress({
           addresses: batch as `0x${string}`[],
         });
-        
-        // Map addresses to user data
         for (const [address, userArray] of Object.entries(users)) {
           if (userArray && userArray.length > 0) {
-            const user = userArray[0]; // Take first user if multiple
-            addressToFid.set(address.toLowerCase(), user);
+            addressToFid.set(address.toLowerCase(), userArray[0].fid);
           }
         }
       } catch (error) {
         console.error(`Error fetching users for batch ${i / batchSize}:`, error);
-        // Continue with other batches
       }
     }
     
-    console.log(`Mapped ${addressToFid.size} addresses to Farcaster accounts`);
-    
-    // Step 4b: Aggregate balances by FID
-    console.log('Step 4b: Aggregating balances by FID...');
-    const fidBalances = new Map<number, {
-      totalBalance: bigint;
-      user: any;
-      addresses: string[];
-    }>();
-    
-    for (const [address, balance] of receiverBalances.entries()) {
-      const user = addressToFid.get(address);
-      
-      if (!user) {
-        console.log(`No Farcaster account for address ${address}`);
-        continue;
-      }
-      
-      const existing = fidBalances.get(user.fid);
-      if (existing) {
-        // Add to existing balance for this FID
-        existing.totalBalance += balance;
-        existing.addresses.push(address);
-      } else {
-        // Create new entry for this FID
-        fidBalances.set(user.fid, {
-          totalBalance: balance,
-          user,
-          addresses: [address],
-        });
-      }
-    }
-    
-    console.log(`Aggregated to ${fidBalances.size} unique FIDs`);
-    
-    // Step 5: Find casts with keyphrase
-    console.log('Step 5: Finding casts with keyphrase...');
-    const validEntries = [];
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    for (const [fid, { totalBalance, user, addresses }] of fidBalances.entries()) {
-      try {
-        console.log(`Checking FID ${fid} (${user.username}) with total balance ${formatUnits(totalBalance, 18)} HIGHER from ${addresses.length} address(es)`);
-        
-        // Fetch recent casts from user
-        const userCasts = await neynarClient.fetchCastsForUser({
-          fid: user.fid,
-          limit: 25,
-        });
-        
-        // Filter for /higher channel casts with keyphrase
-        const higherCasts = (userCasts.casts || []).filter((cast: any) => {
-          const castTime = new Date(cast.timestamp);
-          const isRecent = castTime > oneDayAgo;
-          const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
-          const hasKeyphrase = extractDescription(cast.text);
-          
-          return isRecent && isHigherChannel && hasKeyphrase;
-        });
-        
-        if (higherCasts.length > 0) {
-          // Take most recent matching cast
-          const latestCast = higherCasts[0];
-          const description = extractDescription(latestCast.text);
-          
-          if (description) {
-            console.log(`  ✓ Found matching cast for ${user.username}`);
-            validEntries.push({
-              fid: user.fid,
-              username: user.username,
-              displayName: user.display_name || user.username,
-              pfpUrl: user.pfp_url || '',
-              castHash: latestCast.hash,
-              castText: latestCast.text,
-              description,
-              timestamp: latestCast.timestamp,
-              stakedBalance: totalBalance, // Total across all addresses
-            });
-          }
-        } else {
-          console.log(`  ✗ No matching cast for ${user.username}`);
-        }
-      } catch (error) {
-        console.error(`Error fetching casts for FID ${fid}:`, error);
-        // Continue with other users
-      }
-    }
-    
-    console.log(`Found ${validEntries.length} entries with matching casts`);
+    // Add staker FIDs to each entry
+    validEntries.forEach(entry => {
+      entry.stakerFids = entry.stakerAddresses
+        .map(addr => addressToFid.get(addr))
+        .filter(fid => fid !== undefined) as number[];
+    });
     
     // Step 6: Calculate USD values and sort
     const tokenPrice = await getTokenPrice();
@@ -322,30 +301,14 @@ export async function GET(request: NextRequest) {
       };
     });
     
-    // Sort by staked balance and keep top 100
+    // Sort by staked balance descending and take top 100
     entriesWithUsd.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
+    
     const top100 = entriesWithUsd.slice(0, 100);
     
     console.log(`Sorted by balance, storing top ${top100.length} entries`);
     
     console.log(`Storing top ${top100.length} entries in database...`);
-    
-    // Validate: Check for duplicate FIDs in top100
-    const fidSet = new Set();
-    const duplicates = [];
-    for (const entry of top100) {
-      if (fidSet.has(entry.fid)) {
-        duplicates.push(entry.fid);
-      }
-      fidSet.add(entry.fid);
-    }
-    
-    if (duplicates.length > 0) {
-      console.error(`ERROR: Found duplicate FIDs in top100:`, duplicates);
-      throw new Error(`Duplicate FIDs found: ${duplicates.join(', ')}`);
-    }
-    
-    console.log('Validation passed: All FIDs are unique');
     
     // Step 7: Update database using UPSERT (INSERT ... ON CONFLICT)
     console.log('Clearing old entries and inserting new ones...');
@@ -357,42 +320,45 @@ export async function GET(request: NextRequest) {
     console.log('Inserting new entries...');
     for (let i = 0; i < top100.length; i++) {
       const entry = top100[i];
-      console.log(`Inserting entry ${i + 1}: FID ${entry.fid}, balance ${entry.balanceFormatted}`);
+      console.log(`Inserting entry ${i + 1}: Cast ${entry.castHash}, Creator FID ${entry.creatorFid}, balance ${entry.balanceFormatted}`);
       
       try {
         const insertResult = await sql`
           INSERT INTO leaderboard_entries (
-            fid, username, display_name, pfp_url, cast_hash, cast_text,
-            description, cast_timestamp, higher_balance, usd_value, rank
+            cast_hash, creator_fid, creator_username, creator_display_name, creator_pfp_url,
+            cast_text, description, cast_timestamp, total_higher_staked, staker_fids,
+            usd_value, rank
           ) VALUES (
-            ${entry.fid},
-            ${entry.username},
-            ${entry.displayName},
-            ${entry.pfpUrl},
             ${entry.castHash},
+            ${entry.creatorFid},
+            ${entry.creatorUsername},
+            ${entry.creatorDisplayName},
+            ${entry.creatorPfpUrl},
             ${entry.castText},
             ${entry.description},
             ${entry.timestamp},
             ${entry.balanceFormatted},
+            ${entry.stakerFids},
             ${entry.usdValue},
             ${i + 1}
           )
-          ON CONFLICT (fid) DO UPDATE SET
-            username = EXCLUDED.username,
-            display_name = EXCLUDED.display_name,
-            pfp_url = EXCLUDED.pfp_url,
-            cast_hash = EXCLUDED.cast_hash,
+          ON CONFLICT (cast_hash) DO UPDATE SET
+            creator_fid = EXCLUDED.creator_fid,
+            creator_username = EXCLUDED.creator_username,
+            creator_display_name = EXCLUDED.creator_display_name,
+            creator_pfp_url = EXCLUDED.creator_pfp_url,
             cast_text = EXCLUDED.cast_text,
             description = EXCLUDED.description,
             cast_timestamp = EXCLUDED.cast_timestamp,
-            higher_balance = EXCLUDED.higher_balance,
+            total_higher_staked = EXCLUDED.total_higher_staked,
+            staker_fids = EXCLUDED.staker_fids,
             usd_value = EXCLUDED.usd_value,
             rank = EXCLUDED.rank,
             updated_at = NOW()
         `;
         console.log(`Inserted/Updated entry ${i + 1}, rowCount: ${insertResult.rowCount}`);
       } catch (insertError: any) {
-        console.error(`Error inserting FID ${entry.fid}:`, insertError.message);
+        console.error(`Error inserting cast ${entry.castHash}:`, insertError.message);
         throw insertError;
       }
     }
@@ -413,9 +379,8 @@ export async function GET(request: NextRequest) {
       success: true,
       totalLockups: Number(totalLockups),
       higherLockups: higherLockupIds.length,
-      activeStakers: receiverBalances.size,
-      mappedToFarcaster: addressToFid.size,
-      withMatchingCasts: validEntries.length,
+      uniqueCasts: castBalances.size,
+      validCasts: validEntries.length,
       stored: top100.length,
       timestamp: new Date().toISOString(),
     });

@@ -70,13 +70,15 @@ export default function HigherSteakMenu() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
-  const [onboardingState, setOnboardingState] = useState<'staked-no-cast' | 'has-enough' | 'needs-more' | null>(null);
-  const [onboardingData, setOnboardingData] = useState<{
-    stakedAmount?: string;
-    walletAmount?: string;
-    totalAmount?: string;
-    minimumRequired?: string;
-  }>({});
+  const [castData, setCastData] = useState<{
+    hasCast: boolean;
+    hash?: string;
+    text?: string;
+    description?: string;
+    timestamp?: string;
+    totalStaked: number;
+    rank: number | null;
+  } | null>(null);
   const [showStakingModal, setShowStakingModal] = useState(false);
   const [stakingDetails, setStakingDetails] = useState<{
     lockups: LockupDetail[];
@@ -153,6 +155,23 @@ export default function HigherSteakMenu() {
       setLoadingStakingDetails(false);
     } finally {
       setLoadingBalance(false);
+    }
+  };
+
+  const fetchCastData = async (fid: number) => {
+    try {
+      const response = await fetch(`/api/user/casts?fid=${fid}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Cast data:', data);
+        setCastData(data);
+      } else {
+        console.error('Failed to fetch cast data');
+        setCastData({ hasCast: false, totalStaked: 0, rank: null });
+      }
+    } catch (error) {
+      console.error('Error fetching cast data:', error);
+      setCastData({ hasCast: false, totalStaked: 0, rank: null });
     }
   };
   
@@ -246,10 +265,11 @@ export default function HigherSteakMenu() {
           console.log('Profile data:', profileData);
           setUser(profileData);
           
-          // Fetch token balance after getting user profile
+          // Fetch token balance and cast data after getting user profile
           // Balance API now includes lockups and wallets (single source of truth)
           // Staking balance is calculated from lockups in the response
           fetchTokenBalance(fid);
+          fetchCastData(fid);
         } else {
           console.error('Failed to fetch profile');
           // Fallback to just FID if profile fetch fails
@@ -338,113 +358,43 @@ export default function HigherSteakMenu() {
     }
   };
 
-  // Check onboarding status after all data is loaded
-  // DISABLED: Onboarding modal is disabled for now
-  useEffect(() => {
-    const checkOnboardingStatus = () => {
-      // Onboarding modal disabled
-      return;
-      
-      /* DISABLED CODE
-      if (!user?.fid || loadingLeaderboard || loadingBalance) {
-        return; // Wait for all data to load
-      }
-
-      // Check if user dismissed modal this session
-      const dismissedKey = `higher-steaks-onboarding-dismissed-${user.fid}`;
-      if (typeof window !== 'undefined' && sessionStorage.getItem(dismissedKey)) {
-        return;
-      }
-
-      // 1. Check if user is already on leaderboard (or simulated profile says so)
-      const isOnLeaderboard = isDevelopmentMode && simulatedProfile 
-        ? simulatedProfile.isOnLeaderboard
-        : leaderboard.some(entry => entry.fid === user.fid);
-        
-      if (isOnLeaderboard) {
-        console.log('User is on leaderboard, skip onboarding modal');
-        return; // Skip modal entirely
-      }
-
-      // Get balances
-      const stakedAmount = parseFloat(stakingBalance?.totalStakedFormatted?.replace(/,/g, '') || '0');
-      const walletAmount = parseFloat(balance?.totalBalanceFormatted?.replace(/,/g, '') || '0');
-      const totalAmount = stakedAmount + walletAmount;
-      
-      // Get minimum leaderboard amount (10th place or 0 if leaderboard is empty)
-      const minimumRequired = leaderboard.length > 0 
-        ? parseFloat(leaderboard[leaderboard.length - 1]?.higherBalance?.replace(/,/g, '') || '0')
-        : 0;
-
-      console.log('Onboarding check:', {
-        stakedAmount,
-        walletAmount,
-        totalAmount,
-        minimumRequired,
-        leaderboardLength: leaderboard.length,
-      });
-
-      // STATE 1: User has staked HIGHER but hasn't made a qualifying cast
-      if (stakedAmount > 0) {
-        setOnboardingState('staked-no-cast');
-        setOnboardingData({
-          stakedAmount: stakingBalance?.totalStakedFormatted || '0',
-        });
-        setShowOnboardingModal(true);
-        console.log('Onboarding: State 1 - Staked but no cast');
-        return;
-      }
-
-      // STATE 2: User is not staked enough
-      // STATE 2a: User has enough HIGHER total but hasn't staked enough
-      if (totalAmount >= minimumRequired && minimumRequired > 0) {
-        setOnboardingState('has-enough');
-        setOnboardingData({
-          stakedAmount: stakingBalance?.totalStakedFormatted || '0',
-          walletAmount: balance?.totalBalanceFormatted || '0',
-          totalAmount: totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-          minimumRequired: minimumRequired.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-        });
-        setShowOnboardingModal(true);
-        console.log('Onboarding: State 2a - Has enough but not staked');
-        return;
-      }
-
-      // STATE 2b: User does not have enough HIGHER total
-      if (totalAmount < minimumRequired || minimumRequired === 0) {
-        setOnboardingState('needs-more');
-        setOnboardingData({
-          totalAmount: totalAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-          minimumRequired: minimumRequired > 0 
-            ? minimumRequired.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            : '1,000.00', // Default minimum if leaderboard is empty
-        });
-        setShowOnboardingModal(true);
-        console.log('Onboarding: State 2b - Needs more HIGHER');
-        return;
-      }
-      */
-    };
-
-    checkOnboardingStatus();
-  }, [user, balance, stakingBalance, leaderboard, loadingLeaderboard, loadingBalance]);
 
   const handleCloseOnboardingModal = () => {
     setShowOnboardingModal(false);
-    // Remember dismissal for this session
-    if (user?.fid && typeof window !== 'undefined') {
-      sessionStorage.setItem(`higher-steaks-onboarding-dismissed-${user.fid}`, 'true');
-    }
   };
+
+  const handleFabClick = () => {
+    setShowOnboardingModal(true);
+  };
+
+  const getWalletBalance = (): number => {
+    if (!balance?.wallets || balance.wallets.length === 0) return 0;
+    return parseFloat(balance.wallets[0].balanceFormatted.replace(/,/g, ''));
+  };
+
+  // Filter leaderboard to show only one cast per creator (first/highest ranked)
+  const getFilteredLeaderboard = () => {
+    const seenFids = new Set<number>();
+    return leaderboard.filter(entry => {
+      if (seenFids.has(entry.fid)) {
+        return false;
+      }
+      seenFids.add(entry.fid);
+      return true;
+    });
+  };
+
+  const filteredLeaderboard = getFilteredLeaderboard();
 
   return (
     <>
       {/* Onboarding Modal */}
-      {showOnboardingModal && onboardingState && (
+      {showOnboardingModal && user && castData !== null && (
         <OnboardingModal
-          state={onboardingState}
           onClose={handleCloseOnboardingModal}
-          data={onboardingData}
+          userFid={user.fid}
+          castData={castData}
+          walletBalance={getWalletBalance()}
         />
       )}
 
@@ -638,10 +588,10 @@ export default function HigherSteakMenu() {
                   <div className="animate-spin h-8 w-8 border-3 border-black border-t-transparent rounded-full mx-auto mb-3"></div>
                   <p className="text-xs sm:text-sm text-gray-600">Loading menu...</p>
                 </div>
-              ) : leaderboard.length > 0 ? (
+              ) : filteredLeaderboard.length > 0 ? (
                 // Leaderboard entries
-                leaderboard.map((entry, index) => (
-                  <div key={entry.fid} className="group">
+                filteredLeaderboard.map((entry, index) => (
+                  <div key={entry.castHash} className="group">
                     <div className="flex items-baseline text-xs sm:text-sm md:text-base">
                       <a 
                         href={`https://farcaster.xyz/${entry.username}`}
@@ -683,6 +633,28 @@ export default function HigherSteakMenu() {
           <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60">Menu Changes Daily · 12PM UTC</p>
         </div>
       </div>
+
+      {/* Floating Action Button */}
+      <button
+        onClick={handleFabClick}
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-black text-white rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-110 flex items-center justify-center border-2 border-white"
+        aria-label="Open onboarding"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
     </main>
     </>
   );

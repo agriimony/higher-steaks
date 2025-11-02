@@ -28,20 +28,20 @@ export async function GET() {
     // Get all entries with full details
     const allEntries = await sql`
       SELECT 
-        fid,
-        username,
-        display_name,
-        pfp_url,
+        creator_fid,
+        creator_username,
+        creator_display_name,
+        creator_pfp_url,
         cast_hash,
         cast_text,
         description,
         cast_timestamp,
-        higher_balance,
+        total_higher_staked,
         usd_value,
         rank,
         updated_at
       FROM leaderboard_entries
-      ORDER BY higher_balance DESC
+      ORDER BY total_higher_staked DESC
     `;
     
     return NextResponse.json({
@@ -49,12 +49,12 @@ export async function GET() {
       envCheck,
       totalEntries: count,
       entries: allEntries.rows.map(row => ({
-        fid: row.fid,
-        username: row.username,
-        displayName: row.display_name,
+        fid: row.creator_fid,
+        username: row.creator_username,
+        displayName: row.creator_display_name,
         castHash: row.cast_hash,
         description: row.description,
-        higherBalance: row.higher_balance?.toString(),
+        higherBalance: row.total_higher_staked?.toString(),
         usdValue: row.usd_value?.toString(),
         rank: row.rank,
         updatedAt: row.updated_at,

@@ -16,11 +16,10 @@ export async function GET() {
     const testQuery = await sql`SELECT 1 as test`;
     console.log('Database connection test:', testQuery.rows[0]);
     
-    // Query top 10 users by HIGHER balance
-    // Using the same query structure that works in /compare
+    // Query top casts by HIGHER staked amount
     const result = await sql`
       SELECT * FROM leaderboard_entries 
-      ORDER BY higher_balance DESC
+      ORDER BY total_higher_staked DESC
       LIMIT 10
     `;
 
@@ -38,24 +37,24 @@ export async function GET() {
       const row = result.rows[i];
       try {
         console.log(`Processing row ${i + 1}:`, {
-          fid: row.fid,
-          username: row.username,
+          creator_fid: row.creator_fid,
+          username: row.creator_username,
           has_description: !!row.description,
-          higher_balance: row.higher_balance?.toString(),
+          total_higher_staked: row.total_higher_staked?.toString(),
           usd_value: row.usd_value?.toString(),
         });
         
         const entry = {
-          fid: row.fid,
-          username: row.username,
-          displayName: row.display_name || row.username,
-          pfpUrl: row.pfp_url || '',
+          fid: row.creator_fid,
+          username: row.creator_username,
+          displayName: row.creator_display_name || row.creator_username,
+          pfpUrl: row.creator_pfp_url || '',
           castHash: row.cast_hash,
           castText: row.cast_text,
           description: row.description,
           castTimestamp: row.cast_timestamp,
-          higherBalance: row.higher_balance 
-            ? parseFloat(row.higher_balance).toLocaleString('en-US', {
+          higherBalance: row.total_higher_staked 
+            ? parseFloat(row.total_higher_staked).toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })

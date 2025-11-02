@@ -18,36 +18,36 @@ export async function GET() {
     // Test the EXACT same query as /api/leaderboard/top
     const topQuery = await sql`
       SELECT 
-        fid,
-        username,
-        display_name,
-        pfp_url,
+        creator_fid,
+        creator_username,
+        creator_display_name,
+        creator_pfp_url,
         cast_hash,
         cast_text,
         description,
         cast_timestamp,
-        higher_balance,
+        total_higher_staked,
         usd_value,
         rank
       FROM leaderboard_entries
-      ORDER BY higher_balance DESC
+      ORDER BY total_higher_staked DESC
       LIMIT 10
     `;
     
     // Get all entries
     const allEntries = await sql`
       SELECT 
-        fid,
-        username,
-        display_name,
+        creator_fid,
+        creator_username,
+        creator_display_name,
         cast_hash,
         description,
-        higher_balance,
+        total_higher_staked,
         usd_value,
         rank,
         cast_timestamp
       FROM leaderboard_entries
-      ORDER BY higher_balance DESC
+      ORDER BY total_higher_staked DESC
     `;
     
     return NextResponse.json({
