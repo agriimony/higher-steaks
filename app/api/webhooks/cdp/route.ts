@@ -39,11 +39,13 @@ function verifySignature(payload: string, signatureHeader: string | null, header
   }
   
   try {
-    // Parse the signature header: t=timestamp,h=headers,v1=signature
+    // Parse the signature header: t=timestamp,h=headers,v0=signature or v1=signature
     const elements = signatureHeader.split(',');
     const timestampMatch = elements.find((e: string) => e.startsWith('t='));
     const headerNamesMatch = elements.find((e: string) => e.startsWith('h='));
-    const providedSignatureMatch = elements.find((e: string) => e.startsWith('v1='));
+    const providedSignatureMatchV1 = elements.find((e: string) => e.startsWith('v1='));
+    const providedSignatureMatchV0 = elements.find((e: string) => e.startsWith('v0='));
+    const providedSignatureMatch = providedSignatureMatchV1 || providedSignatureMatchV0;
     
     if (!timestampMatch || !headerNamesMatch || !providedSignatureMatch) {
       console.error('[CDP Webhook] Malformed signature header');
@@ -64,13 +66,30 @@ function verifySignature(payload: string, signatureHeader: string | null, header
     console.log('[CDP Webhook Debug] Header names:', headerNames);
     console.log('[CDP Webhook Debug] Header values:', headerValues);
     console.log('[CDP Webhook Debug] Signed payload preview:', signedPayload.substring(0, 300));
+    console.log('[CDP Webhook Debug] Secret length:', secret.length);
+    console.log('[CDP Webhook Debug] Secret preview:', secret.substring(0, 20));
     
     // Compute the expected signature
+    // Try with secret as-is (UTF-8 string)
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(signedPayload, 'utf8');
     const expectedSignature = hmac.digest('hex');
     
-    console.log('[CDP Webhook Debug] Expected signature:', expectedSignature);
+    console.log('[CDP Webhook Debug] Expected signature (secret as string):', expectedSignature);
+    
+    // Also try with base64 decoded secret if it looks like base64
+    if (secret.includes('=') || secret.length % 4 === 0) {
+      try {
+        const decodedSecret = Buffer.from(secret, 'base64').toString('utf8');
+        const hmacBase64 = crypto.createHmac('sha256', decodedSecret);
+        hmacBase64.update(signedPayload, 'utf8');
+        const expectedSigBase64 = hmacBase64.digest('hex');
+        console.log('[CDP Webhook Debug] Expected signature (secret base64 decoded):', expectedSigBase64);
+      } catch (e) {
+        console.log('[CDP Webhook Debug] Failed to decode secret as base64:', e);
+      }
+    }
+    
     console.log('[CDP Webhook Debug] Provided signature:', providedSignature);
     
     // Compare signatures securely (timing-safe)
