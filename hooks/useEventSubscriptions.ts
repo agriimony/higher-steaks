@@ -4,17 +4,23 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 
 export interface EventSubscriptionState {
   newLockupEvent: {
-    lockUpId: string;
-    token: string;
-    receiver: string;
-    amount: string;
-    unlockTime: string;
-    title: string;
+    lockUpId?: string;
+    token?: string;
+    receiver?: string;
+    amount?: string;
+    unlockTime?: string;
+    title?: string;
+    from?: string;
+    to?: string;
+    value?: string;
   } | null;
   unlockEvent: {
-    lockUpId: string;
-    token: string;
-    receiver: string;
+    lockUpId?: string;
+    token?: string;
+    receiver?: string;
+    from?: string;
+    to?: string;
+    value?: string;
   } | null;
   transferEvent: {
     from: string;

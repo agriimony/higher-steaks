@@ -443,8 +443,13 @@ export default function HigherSteakMenu() {
 
   // Handle lockup events (via CDP webhooks)
   useEffect(() => {
-    if (ws.newLockupEvent && user?.fid) {
-      const eventId = `${ws.newLockupEvent.lockUpId}-${ws.newLockupEvent.receiver}`;
+    if (ws.newLockupEvent && user?.fid && wagmiAddress) {
+      // Generate event ID based on what data is available
+      // For Transfer-based events: use from/to/value
+      // For native LockUpCreated events: use lockUpId/receiver
+      const eventId = ws.newLockupEvent.from && ws.newLockupEvent.to 
+        ? `lockup-transfer-${ws.newLockupEvent.from}-${ws.newLockupEvent.to}-${ws.newLockupEvent.value}`
+        : `${ws.newLockupEvent.lockUpId}-${ws.newLockupEvent.receiver}`;
       
       // Avoid processing duplicate events
       if (eventId === lastEventRef.current) {
@@ -455,7 +460,13 @@ export default function HigherSteakMenu() {
       console.log('[Event] New lockup detected:', ws.newLockupEvent);
 
       // Check if this event is relevant to the current user
-      if (wagmiAddress && ws.newLockupEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()) {
+      // For Transfer-based: from should be user's wallet
+      // For native LockUpCreated: receiver should be user's wallet
+      const isRelevant = ws.newLockupEvent.from 
+        ? ws.newLockupEvent.from.toLowerCase() === wagmiAddress.toLowerCase()
+        : ws.newLockupEvent.receiver?.toLowerCase() === wagmiAddress.toLowerCase();
+      
+      if (isRelevant) {
         console.log('[Event] Lockup involves current user, refreshing balance and leaderboard');
         
         // Refresh balance
@@ -476,14 +487,21 @@ export default function HigherSteakMenu() {
 
   // Handle unlock events (via CDP webhooks)
   useEffect(() => {
-    if (ws.unlockEvent && user?.fid) {
-      const eventId = `unlock-${ws.unlockEvent.lockUpId}-${ws.unlockEvent.receiver}`;
+    if (ws.unlockEvent && user?.fid && wagmiAddress) {
+      // Generate event ID based on what data is available
+      // For Transfer-based events: use from/to/value
+      // For native Unlock events: use lockUpId/receiver
+      const eventId = ws.unlockEvent.from && ws.unlockEvent.to 
+        ? `unlock-transfer-${ws.unlockEvent.from}-${ws.unlockEvent.to}-${ws.unlockEvent.value}`
+        : `unlock-${ws.unlockEvent.lockUpId}-${ws.unlockEvent.receiver}`;
       
       console.log('[Unlock Event] Event received:', {
         eventId,
         currentLastEvent: lastEventRef.current,
         lockUpId: ws.unlockEvent.lockUpId,
         receiver: ws.unlockEvent.receiver,
+        from: ws.unlockEvent.from,
+        to: ws.unlockEvent.to,
         wagmiAddress
       });
       
@@ -497,16 +515,23 @@ export default function HigherSteakMenu() {
       console.log('[Event] Unlock detected:', ws.unlockEvent);
 
       // Check if this event is relevant to the current user
-      if (wagmiAddress && ws.unlockEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()) {
+      // For Transfer-based: to should be user's wallet (funds moving FROM lockup TO user)
+      // For native Unlock: receiver should be user's wallet
+      const isRelevant = ws.unlockEvent.to 
+        ? ws.unlockEvent.to.toLowerCase() === wagmiAddress.toLowerCase()
+        : ws.unlockEvent.receiver?.toLowerCase() === wagmiAddress.toLowerCase();
+      
+      if (isRelevant) {
         console.log('[Event] Unlock involves current user, refreshing balance');
         
         // Refresh balance (unlock doesn't affect leaderboard, only individual balance)
         fetchTokenBalance(user.fid);
       } else {
-        console.log('[Unlock Event] Event not relevant - receiver mismatch:', {
+        console.log('[Unlock Event] Event not relevant:', {
+          eventTo: ws.unlockEvent.to,
           eventReceiver: ws.unlockEvent.receiver,
           wagmiAddress,
-          match: wagmiAddress && ws.unlockEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()
+          isRelevant
         });
       }
     }

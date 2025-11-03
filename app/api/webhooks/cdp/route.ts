@@ -160,12 +160,31 @@ function parseCDPEvent(body: any): { type: string; data: any } | null {
     
     // Handle Transfer events (HIGHER token)
     if (contractAddress === HIGHER_TOKEN_ADDRESS.toLowerCase() && eventName === 'Transfer') {
+      const from = (parameters.from || '').toLowerCase();
+      const to = (parameters.to || '').toLowerCase();
+      const lockupContract = LOCKUP_CONTRACT.toLowerCase();
+      
+      // Determine if this is a lock or unlock event based on transfer direction
+      let eventType: 'lockup_created' | 'unlock' | 'transfer' = 'transfer';
+      
+      if (to === lockupContract) {
+        // Transfer TO lockup contract = lock (stake)
+        eventType = 'lockup_created';
+        console.log('[CDP Webhook] Detected lockup via Transfer event');
+      } else if (from === lockupContract) {
+        // Transfer FROM lockup contract = unlock (unstake)
+        eventType = 'unlock';
+        console.log('[CDP Webhook] Detected unlock via Transfer event');
+      }
+      
       return {
-        type: 'transfer',
+        type: eventType,
         data: {
           from: parameters.from,
           to: parameters.to,
           value: parameters.value,
+          // For lockup_created and unlock, we won't have lockUpId from Transfer events
+          // The frontend will need to refetch lockup details
         },
       };
     }
