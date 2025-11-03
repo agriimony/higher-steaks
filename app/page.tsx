@@ -536,7 +536,6 @@ export default function HigherSteakMenu() {
           onTransactionSuccess={async () => {
             // CDP webhook will automatically detect the transaction and refresh the balance
             // No manual refresh needed
-            console.log('[Transaction] Success - waiting for webhook event to refresh UI');
           }}
         />
       )}

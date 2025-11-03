@@ -190,7 +190,7 @@ export async function GET(request: NextRequest) {
 
     // Get current block number and timestamp once - use this same block for all contract calls to ensure consistency
     // Validate that the block is not stale (more than 5 minutes old)
-    const MAX_BLOCK_AGE_SECONDS = 5 * 60; // 5 minutes
+    const MAX_BLOCK_AGE_SECONDS = 15 * 60; // 15 minutes
     let currentBlock = await client.getBlockNumber();
     let block = await client.getBlock({ 
       blockNumber: currentBlock,
