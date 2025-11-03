@@ -1,4 +1,7 @@
-import { KEYPHRASE_REGEX } from './constants';
+import { KEYPHRASE_REGEX, KEYPHRASE_TEXT } from './constants';
+
+// Re-export constants for convenience
+export { KEYPHRASE_REGEX, KEYPHRASE_TEXT };
 
 /**
  * Validates if a string is a valid cast hash (42 chars, starts with 0x)
