@@ -252,6 +252,14 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
               const unlockTopicHash = unlockTopic();
               const transferTopicHash = transferTopic();
 
+              console.log('[WebSocket] Processing log event:', {
+                eventTopic,
+                subscription,
+                address: result.address,
+                blockNumber: result.blockNumber,
+                transactionHash: result.transactionHash
+              });
+
               // Handle LockUpCreated events
               if (createdTopicHash && eventTopic === createdTopicHash) {
                 console.log('[WebSocket] LockUpCreated event detected:', result);
@@ -281,12 +289,19 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
 
               // Handle Unlock events
               if (unlockTopicHash && eventTopic === unlockTopicHash) {
-                console.log('[WebSocket] Unlock event detected:', result);
+                console.log('[WebSocket] Unlock event detected (raw):', result);
 
                 // Decode event data (simplified - topics[0] is event signature, topics[1-3] are indexed params)
                 const lockUpId = result.topics[1] || '0x0';
                 const token = result.topics[2] ? `0x${result.topics[2].substring(26)}` : '0x0';
                 const receiver = result.topics[3] ? `0x${result.topics[3].substring(26)}` : '0x0';
+
+                console.log('[WebSocket] Unlock decoded:', { 
+                  lockUpId, 
+                  token, 
+                  receiver,
+                  rawTopics: result.topics 
+                });
 
                 setState(prev => ({
                   ...prev,
@@ -297,7 +312,7 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
                   },
                 }));
 
-                console.log('[WebSocket] Unlock:', { lockUpId, receiver });
+                console.log('[WebSocket] Unlock state updated:', { lockUpId, receiver });
               }
 
               // Handle Transfer events
