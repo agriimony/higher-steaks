@@ -102,13 +102,15 @@ cdpcurl -X POST \
 
 ## Set Environment Variables
 
-Add the webhook secret to your Vercel environment variables:
+Add the webhook secrets to your Vercel environment variables. **Each webhook subscription has its own unique secret** from `metadata.secret` in the creation response:
 
 ```env
-CDP_WEBHOOK_SECRET=your_webhook_secret_from_response
+CDP_WEBHOOK_SECRET_1=your_webhook_secret_from_subscription_1
+CDP_WEBHOOK_SECRET_2=your_webhook_secret_from_subscription_2
+CDP_WEBHOOK_SECRET_3=your_webhook_secret_from_subscription_3
 ```
 
-**Note:** If you create multiple webhooks, you may need multiple secrets or CDP may use a single secret. Check the webhook creation responses to confirm.
+**Important:** You need to get the secret for each subscription by viewing the subscription details in the CDP dashboard, or by saving the `metadata.secret` from each webhook creation response.
 
 ## Verify Webhook Setup
 

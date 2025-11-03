@@ -46,7 +46,10 @@ BASE_RPC_URL=https://mainnet.base.org
 # Required for Production: CDP (Coinbase Developer Platform) API keys for webhook event monitoring
 CDP_API_KEY_ID=your_cdp_api_key_id
 CDP_API_KEY_SECRET=your_cdp_api_key_secret
-CDP_WEBHOOK_SECRET=secret_from_webhook_creation_response
+# Each webhook subscription has its own secret from metadata.secret in the creation response
+CDP_WEBHOOK_SECRET_1=secret_from_webhook_subscription_1
+CDP_WEBHOOK_SECRET_2=secret_from_webhook_subscription_2
+CDP_WEBHOOK_SECRET_3=secret_from_webhook_subscription_3
 
 # Required for Production: Vercel Postgres (auto-added by Vercel)
 POSTGRES_URL=postgres://...
