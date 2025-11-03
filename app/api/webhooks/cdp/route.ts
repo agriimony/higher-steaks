@@ -120,38 +120,28 @@ function verifySignature(payload: string, signatureHeader: string | null, header
 // Parse and normalize event data from CDP
 function parseCDPEvent(body: any): { type: string; data: any } | null {
   try {
-    // CDP webhook payload structure (based on CDP docs)
-    const eventType = body.eventTypes?.[0];
-    const labels = body.labels || {};
-    const data = body.data || {};
-    
-    if (eventType !== 'onchain.activity.detected') {
-      console.log('[CDP Webhook] Ignoring non-onchain event:', eventType);
-      return null;
-    }
-    
-    const contractAddress = labels.contract_address?.toLowerCase();
-    const eventName = labels.event_name;
+    // CDP webhook payload is a flat structure with event details at the top level
+    const contractAddress = body.contract_address?.toLowerCase();
+    const eventName = body.event_name;
+    const parameters = body.parameters || {};
     
     console.log('[CDP Webhook] Received event:', {
       contractAddress,
       eventName,
-      labels,
+      transactionHash: body.transaction_hash,
     });
     
     // Handle LockUpCreated events
     if (contractAddress === LOCKUP_CONTRACT.toLowerCase() && eventName === 'LockUpCreated') {
-      // CDP should provide decoded event parameters in the payload
-      // Adjust field names based on actual CDP response structure
       return {
         type: 'lockup_created',
         data: {
-          lockUpId: data.lockUpId || data.lockup_id,
-          token: data.token,
-          receiver: data.receiver,
-          amount: data.amount,
-          unlockTime: data.unlockTime || data.unlock_time,
-          title: data.title,
+          lockUpId: parameters.lockUpId || parameters.lockup_id,
+          token: parameters.token,
+          receiver: parameters.receiver,
+          amount: parameters.amount,
+          unlockTime: parameters.unlockTime || parameters.unlock_time,
+          title: parameters.title,
         },
       };
     }
@@ -161,9 +151,9 @@ function parseCDPEvent(body: any): { type: string; data: any } | null {
       return {
         type: 'unlock',
         data: {
-          lockUpId: data.lockUpId || data.lockup_id,
-          token: data.token,
-          receiver: data.receiver,
+          lockUpId: parameters.lockUpId || parameters.lockup_id,
+          token: parameters.token,
+          receiver: parameters.receiver,
         },
       };
     }
@@ -173,9 +163,9 @@ function parseCDPEvent(body: any): { type: string; data: any } | null {
       return {
         type: 'transfer',
         data: {
-          from: data.from,
-          to: data.to,
-          value: data.value,
+          from: parameters.from,
+          to: parameters.to,
+          value: parameters.value,
         },
       };
     }
@@ -210,10 +200,9 @@ export async function POST(request: NextRequest) {
     console.log('[CDP Webhook] Payload length:', bodyText.length);
     
     // Determine which secret to use based on event type
-    // Parse labels early to determine event type
-    const labels = body.labels || {};
-    const eventName = labels.event_name;
-    const contractAddress = labels.contract_address?.toLowerCase();
+    // CDP payload has flat structure with event details at top level
+    const eventName = body.event_name;
+    const contractAddress = body.contract_address?.toLowerCase();
     
     console.log('[CDP Webhook] Event:', eventName, 'Contract:', contractAddress);
     
