@@ -22,6 +22,7 @@ interface OnboardingModalProps {
   castData: CastData | null;
   walletBalance?: number;
   onCastUpdated?: (newCastData: CastData) => void;
+  onStakeSuccess?: () => void;
 }
 
 // Format timestamp to readable date
@@ -52,7 +53,7 @@ function durationToSeconds(duration: number, unit: 'minute' | 'day' | 'week' | '
   }
 }
 
-export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0, onCastUpdated }: OnboardingModalProps) {
+export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0, onCastUpdated, onStakeSuccess }: OnboardingModalProps) {
   const [customMessage, setCustomMessage] = useState('');
   const [castUrl, setCastUrl] = useState('');
   const [showStakingForm, setShowStakingForm] = useState(false);
@@ -158,8 +159,11 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       // WebSocket will automatically detect the transaction and refresh the balance
       // Leaderboard refresh will be triggered by WebSocket in app/page.tsx
       console.log('[Onboarding] Stake transaction successful - WebSocket will refresh UI');
+      
+      // Call parent callback to adjust timers
+      onStakeSuccess?.();
     }
-  }, [isCreateLockUpSuccess]);
+  }, [isCreateLockUpSuccess, onStakeSuccess]);
 
   // Error handling
   useEffect(() => {

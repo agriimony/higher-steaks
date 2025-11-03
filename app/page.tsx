@@ -144,6 +144,27 @@ export default function HigherSteakMenu() {
       });
     }
   };
+  
+  // Handle stake success: adjust timers and reset elapsed seconds
+  const handleStakeSuccess = () => {
+    console.log('[Stake Success] Adjusting timers, elapsed:', elapsedSeconds);
+    
+    // Subtract elapsed time from all existing lockups
+    if (stakingDetails?.lockups) {
+      const updatedLockups = stakingDetails.lockups.map(lockup => ({
+        ...lockup,
+        timeRemaining: Math.max(0, lockup.timeRemaining - elapsedSeconds),
+      }));
+      
+      setStakingDetails({
+        lockups: updatedLockups,
+        wallets: stakingDetails.wallets,
+      });
+    }
+    
+    // Reset the elapsed counter
+    setElapsedSeconds(0);
+  };
 
   const fetchTokenBalance = async (fid: number) => {
     console.log('[fetchTokenBalance] Called for fid:', fid);
@@ -534,6 +555,7 @@ export default function HigherSteakMenu() {
             // Update cast data when user creates/validates a cast
             setCastData(newCastData);
           }}
+          onStakeSuccess={handleStakeSuccess}
         />
       )}
 
