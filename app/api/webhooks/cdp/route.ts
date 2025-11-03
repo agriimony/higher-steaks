@@ -212,41 +212,34 @@ export async function POST(request: NextRequest) {
     const eventName = labels.event_name;
     const contractAddress = labels.contract_address?.toLowerCase();
     
+    console.log('[CDP Webhook] Event:', eventName, 'Contract:', contractAddress);
+    
     let webhookSecret: string | undefined;
     
     if (contractAddress === LOCKUP_CONTRACT.toLowerCase()) {
       // LockUpCreated or Unlock event - use lockup secret
       webhookSecret = process.env.CDP_WEBHOOK_SECRET_LOCKUP;
-      console.log('[CDP Webhook] Using lockup secret for event:', eventName);
+      console.log('[CDP Webhook] Using lockup secret');
     } else if (contractAddress === HIGHER_TOKEN_ADDRESS.toLowerCase() && eventName === 'Transfer') {
       // Transfer event - use transfer secret
       webhookSecret = process.env.CDP_WEBHOOK_SECRET_TRANSFER;
       console.log('[CDP Webhook] Using transfer secret');
-    } else {
-      console.log('[CDP Webhook] Unknown event type, trying all secrets');
-      // Fallback: try all secrets
-      const webhookSecrets = [
-        process.env.CDP_WEBHOOK_SECRET_LOCKUP,
-        process.env.CDP_WEBHOOK_SECRET_TRANSFER,
-      ].filter(Boolean) as string[];
-      
-      if (webhookSecrets.length === 0) {
-        console.error('[CDP Webhook] No webhook secrets configured');
-        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-      }
-      
-      if (!verifySignature(bodyText, signatureHeader, allHeaders, webhookSecrets)) {
-        console.error('[CDP Webhook] Invalid signature');
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
-      }
     }
     
-    if (!webhookSecret) {
-      console.error('[CDP Webhook] No webhook secret configured for this event type');
+    // Collect all secrets for verification (we'll try the specific one first if known)
+    const allSecrets = [
+      process.env.CDP_WEBHOOK_SECRET_LOCKUP,
+      process.env.CDP_WEBHOOK_SECRET_TRANSFER,
+    ].filter(Boolean) as string[];
+    
+    if (allSecrets.length === 0) {
+      console.error('[CDP Webhook] No webhook secrets configured');
       return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
     }
     
-    if (!verifySignature(bodyText, signatureHeader, allHeaders, [webhookSecret])) {
+    // Verify signature - try specific secret first if we identified it, otherwise try all
+    const secretsToTry = webhookSecret ? [webhookSecret] : allSecrets;
+    if (!verifySignature(bodyText, signatureHeader, allHeaders, secretsToTry)) {
       console.error('[CDP Webhook] Invalid signature');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
