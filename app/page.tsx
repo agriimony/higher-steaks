@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { StakingModal } from '@/components/StakingModal';
@@ -145,8 +145,8 @@ export default function HigherSteakMenu() {
     }
   };
   
-  // Handle stake success: adjust timers and reset elapsed seconds
-  const handleStakeSuccess = () => {
+  // Handle stake success: adjust timers, reset elapsed seconds, and refresh balance
+  const handleStakeSuccess = useCallback(() => {
     console.log('[Stake Success] Adjusting timers, elapsed:', elapsedSeconds);
     
     // Subtract elapsed time from all existing lockups
@@ -164,7 +164,14 @@ export default function HigherSteakMenu() {
     
     // Reset the elapsed counter
     setElapsedSeconds(0);
-  };
+    
+    // Refresh balance and staking details from API to get the new lockup
+    if (user?.fid) {
+      console.log('[Stake Success] Refreshing balance and staking details');
+      fetchTokenBalance(user.fid);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsedSeconds, stakingDetails, user?.fid]);
 
   const fetchTokenBalance = async (fid: number) => {
     console.log('[fetchTokenBalance] Called for fid:', fid);

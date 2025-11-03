@@ -95,6 +95,8 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
   
   // Use ref to track if we've already scheduled the createLockUp call
   const hasScheduledCreateLockUp = useRef(false);
+  // Use ref to track if we've already processed this transaction success
+  const processedTxHash = useRef<string | null>(null);
   const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Handle escape key to close
@@ -156,7 +158,15 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
 
   // Handle transaction success
   useEffect(() => {
-    if (isCreateLockUpSuccess) {
+    if (isCreateLockUpSuccess && createLockUpHash) {
+      // Check if we've already processed this transaction
+      if (processedTxHash.current === createLockUpHash) {
+        return;
+      }
+      
+      // Mark this transaction as processed
+      processedTxHash.current = createLockUpHash;
+      
       setPendingCreateLockUp(false);
       setCreateLockUpParams(null);
       setShowStakingForm(false);
@@ -165,14 +175,14 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       setLockupDurationUnit('day');
       hasScheduledCreateLockUp.current = false;
       
-      // WebSocket will automatically detect the transaction and refresh the balance
-      // Leaderboard refresh will be triggered by WebSocket in app/page.tsx
-      console.log('[Onboarding] Stake transaction successful - WebSocket will refresh UI');
+      // Webhook will automatically detect the transaction and refresh the balance
+      // Leaderboard refresh will be triggered by Webhook in app/page.tsx
+      console.log('[Onboarding] Stake transaction successful - Webhook will refresh UI');
       
-      // Call parent callback to adjust timers
+      // Call parent callback to adjust timers and refresh balance
       onStakeSuccess?.();
     }
-  }, [isCreateLockUpSuccess, onStakeSuccess]);
+  }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess]);
 
   // Error handling
   useEffect(() => {
