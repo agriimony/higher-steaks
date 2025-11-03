@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { LOCKUP_CONTRACT, LOCKUP_ABI } from '@/lib/contracts';
 import { fetchValidCast, truncateCastText, isValidCastHash } from '@/lib/cast-helpers';
@@ -88,6 +88,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   // Transaction state
   const [unstakeLockupId, setUnstakeLockupId] = useState<string | null>(null);
   const [unstakeError, setUnstakeError] = useState<string | null>(null);
+  // Use ref to track if we've already processed this transaction success
+  const processedUnstakeTxHash = useRef<string | null>(null);
   
   // Cast text state
   const [castTexts, setCastTexts] = useState<Record<string, string | null>>({});
@@ -182,9 +184,19 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
 
   // Handle transaction success - refresh balance
   useEffect(() => {
-    if (isUnstakeSuccess) {
+    if (isUnstakeSuccess && unstakeHash) {
+      // Check if we've already processed this transaction
+      if (processedUnstakeTxHash.current === unstakeHash) {
+        return;
+      }
+      
+      // Mark this transaction as processed
+      processedUnstakeTxHash.current = unstakeHash;
+      
       // Reset state
       setUnstakeLockupId(null);
+      
+      console.log('[Staking Modal] Unstake transaction successful - Webhook will refresh UI');
       
       // Call refresh callback
       if (onTransactionSuccess) {
@@ -193,7 +205,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         }, 1000); // Wait a bit for blockchain to update
       }
     }
-  }, [isUnstakeSuccess, onTransactionSuccess]);
+  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess]);
 
   // Update error states
   useEffect(() => {
