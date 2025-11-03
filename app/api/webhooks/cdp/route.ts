@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     const body = JSON.parse(bodyText);
     
     // Verify signature
-    const signature = request.headers.get('x-cdp-signature');
+    const signature = request.headers.get('x-webhook-signature');
     if (!verifySignature(bodyText, signature)) {
       console.error('[CDP Webhook] Invalid signature');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });

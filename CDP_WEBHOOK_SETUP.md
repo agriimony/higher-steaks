@@ -35,7 +35,7 @@ cdpcurl -X POST \
   "description": "HIGHER Lockup Created Events",
   "eventTypes": ["onchain.activity.detected"],
   "target": {
-    "url": "https://your-app.vercel.app/api/webhooks/cdp",
+    "url": "https://higher-steaks.vercel.app/api/webhooks/cdp",
     "method": "POST"
   },
   "labels": {
@@ -61,7 +61,7 @@ cdpcurl -X POST \
   "description": "HIGHER Unlock Events",
   "eventTypes": ["onchain.activity.detected"],
   "target": {
-    "url": "https://your-app.vercel.app/api/webhooks/cdp",
+    "url": "https://higher-steaks.vercel.app/api/webhooks/cdp",
     "method": "POST"
   },
   "labels": {
@@ -87,7 +87,7 @@ cdpcurl -X POST \
   "description": "HIGHER Token Transfers",
   "eventTypes": ["onchain.activity.detected"],
   "target": {
-    "url": "https://your-app.vercel.app/api/webhooks/cdp",
+    "url": "https://higher-steaks.vercel.app/api/webhooks/cdp",
     "method": "POST"
   },
   "labels": {
