@@ -302,23 +302,34 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                                 {formatTokenAmount(lockup.amountFormatted)}
                               </span>
                             </div>
-                            {isConnected && lockup.timeRemaining <= 0 ? (
-                              <button
-                                className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                                onClick={() => handleUnstake(lockup.lockupId)}
-                                disabled={isUnstakePending || isUnstakeConfirming || (unstakeLockupId === lockup.lockupId && isUnstakeConfirming)}
-                              >
-                                {unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming) ? '📲...' : 'Unstake'}
-                              </button>
-                            ) : lockup.timeRemaining > 0 ? (
-                              <span className="text-gray-600 text-s flex-shrink-0">
-                                {formatTimeRemaining(Math.max(0, lockup.timeRemaining - elapsedSeconds))} left
-                              </span>
-                            ) : (
-                              <span className="text-gray-600 text-s flex-shrink-0">
-                                Expired
-                              </span>
-                            )}
+                            {(() => {
+                              const dynamicTimeRemaining = Math.max(0, lockup.timeRemaining - elapsedSeconds);
+                              const isExpired = dynamicTimeRemaining <= 0;
+                              
+                              if (isConnected && isExpired) {
+                                return (
+                                  <button
+                                    className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    onClick={() => handleUnstake(lockup.lockupId)}
+                                    disabled={isUnstakePending || isUnstakeConfirming || (unstakeLockupId === lockup.lockupId && isUnstakeConfirming)}
+                                  >
+                                    {unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming) ? '📲...' : 'Unstake'}
+                                  </button>
+                                );
+                              } else if (!isExpired) {
+                                return (
+                                  <span className="text-gray-600 text-s flex-shrink-0">
+                                    {formatTimeRemaining(dynamicTimeRemaining)} left
+                                  </span>
+                                );
+                              } else {
+                                return (
+                                  <span className="text-gray-600 text-s flex-shrink-0">
+                                    Expired
+                                  </span>
+                                );
+                              }
+                            })()}
                             <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                             <div className="flex items-center gap-1 flex-shrink-0">
                               {isConnected && <span className="text-purple-500 text-xs">•</span>}
