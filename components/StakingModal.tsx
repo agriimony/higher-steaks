@@ -121,7 +121,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         const castData = await fetchValidCast(lockup.title);
         setCastTexts(prev => ({
           ...prev,
-          [lockup.lockupId]: castData ? truncateCastText(castData.castText) : null,
+          [lockup.lockupId]: castData ? truncateCastText(castData.description) : null,
         }));
       }
     });
@@ -299,13 +299,19 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                               const isExpired = dynamicTimeRemaining <= 0;
                               
                               if (isConnected && isExpired) {
+                                const isThisUnstaking = unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming);
                                 return (
                                   <button
-                                    className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                                     onClick={() => handleUnstake(lockup.lockupId)}
-                                    disabled={isUnstakePending || isUnstakeConfirming || (unstakeLockupId === lockup.lockupId && isUnstakeConfirming)}
+                                    disabled={isUnstakePending || isUnstakeConfirming || isThisUnstaking}
                                   >
-                                    {unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming) ? '📲...' : 'Unstake'}
+                                    {isThisUnstaking ? (
+                                      <>
+                                        <div className="animate-spin h-3 w-3 border-2 border-white border-t-transparent rounded-full"></div>
+                                        Unstaking...
+                                      </>
+                                    ) : 'Unstake'}
                                   </button>
                                 );
                               } else if (!isExpired) {
