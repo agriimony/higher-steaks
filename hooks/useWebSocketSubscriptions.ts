@@ -259,8 +259,8 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
                 // Decode event data (simplified - topics[0] is event signature, topics[1-3] are indexed params)
                 // For now, just extract what we can from the log
                 const lockUpId = result.topics[1] || '0x0';
-                const token = result.topics[2] || '0x0';
-                const receiver = result.topics[3] || '0x0';
+                const token = result.topics[2] ? `0x${result.topics[2].substring(26)}` : '0x0';
+                const receiver = result.topics[3] ? `0x${result.topics[3].substring(26)}` : '0x0';
 
                 // Note: amount, unlockTime, and title are in result.data as a hex string
                 // Full decoding would require ABI decoding, but for detection purposes this is sufficient
@@ -285,8 +285,8 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
 
                 // Decode event data (simplified - topics[0] is event signature, topics[1-3] are indexed params)
                 const lockUpId = result.topics[1] || '0x0';
-                const token = result.topics[2] || '0x0';
-                const receiver = result.topics[3] || '0x0';
+                const token = result.topics[2] ? `0x${result.topics[2].substring(26)}` : '0x0';
+                const receiver = result.topics[3] ? `0x${result.topics[3].substring(26)}` : '0x0';
 
                 setState(prev => ({
                   ...prev,
