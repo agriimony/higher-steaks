@@ -61,10 +61,17 @@ function verifySignature(payload: string, signatureHeader: string | null, header
     // Construct the signed payload
     const signedPayload = `${timestamp}.${headerNames}.${headerValues}.${payload}`;
     
+    console.log('[CDP Webhook Debug] Header names:', headerNames);
+    console.log('[CDP Webhook Debug] Header values:', headerValues);
+    console.log('[CDP Webhook Debug] Signed payload preview:', signedPayload.substring(0, 300));
+    
     // Compute the expected signature
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(signedPayload, 'utf8');
     const expectedSignature = hmac.digest('hex');
+    
+    console.log('[CDP Webhook Debug] Expected signature:', expectedSignature);
+    console.log('[CDP Webhook Debug] Provided signature:', providedSignature);
     
     // Compare signatures securely (timing-safe)
     const expectedBuffer = Buffer.from(expectedSignature, 'hex');
