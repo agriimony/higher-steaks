@@ -105,12 +105,15 @@ cdpcurl -X POST \
 Add the webhook secrets to your Vercel environment variables. **Each webhook subscription has its own unique secret** from `metadata.secret` in the creation response:
 
 ```env
-CDP_WEBHOOK_SECRET_1=your_webhook_secret_from_subscription_1
-CDP_WEBHOOK_SECRET_2=your_webhook_secret_from_subscription_2
-CDP_WEBHOOK_SECRET_3=your_webhook_secret_from_subscription_3
+CDP_WEBHOOK_SECRET_LOCKUP=your_lockup_webhook_secret
+CDP_WEBHOOK_SECRET_TRANSFER=your_transfer_webhook_secret
 ```
 
-**Important:** You need to get the secret for each subscription by viewing the subscription details in the CDP dashboard, or by saving the `metadata.secret` from each webhook creation response.
+**Important:** 
+- `CDP_WEBHOOK_SECRET_LOCKUP` - Secret for LockUpCreated and Unlock events (lockup contract subscription)
+- `CDP_WEBHOOK_SECRET_TRANSFER` - Secret for Transfer events (HIGHER token subscription)
+
+Get the secrets by viewing the subscription details in the CDP dashboard, or by saving the `metadata.secret` from each webhook creation response.
 
 ## Verify Webhook Setup
 

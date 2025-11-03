@@ -47,9 +47,8 @@ BASE_RPC_URL=https://mainnet.base.org
 CDP_API_KEY_ID=your_cdp_api_key_id
 CDP_API_KEY_SECRET=your_cdp_api_key_secret
 # Each webhook subscription has its own secret from metadata.secret in the creation response
-CDP_WEBHOOK_SECRET_1=secret_from_webhook_subscription_1
-CDP_WEBHOOK_SECRET_2=secret_from_webhook_subscription_2
-CDP_WEBHOOK_SECRET_3=secret_from_webhook_subscription_3
+CDP_WEBHOOK_SECRET_LOCKUP=secret_from_lockup_webhook_subscription
+CDP_WEBHOOK_SECRET_TRANSFER=secret_from_transfer_webhook_subscription
 
 # Required for Production: Vercel Postgres (auto-added by Vercel)
 POSTGRES_URL=postgres://...
