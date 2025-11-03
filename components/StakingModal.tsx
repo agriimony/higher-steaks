@@ -34,6 +34,7 @@ interface StakingModalProps {
   lockups: LockupDetail[];
   wallets: WalletDetail[];
   loading?: boolean;
+  elapsedSeconds?: number;
   onTransactionSuccess?: () => void;
 }
 
@@ -83,7 +84,7 @@ function formatTokenAmount(amount: string): string {
   }
 }
 
-export function StakingModal({ onClose, balance, lockups, wallets, loading = false, onTransactionSuccess }: StakingModalProps) {
+export function StakingModal({ onClose, balance, lockups, wallets, loading = false, elapsedSeconds: externalElapsedSeconds = 0, onTransactionSuccess }: StakingModalProps) {
   // Transaction state
   const [unstakeLockupId, setUnstakeLockupId] = useState<string | null>(null);
   const [unstakeError, setUnstakeError] = useState<string | null>(null);
@@ -91,8 +92,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   // Cast text state
   const [castTexts, setCastTexts] = useState<Record<string, string | null>>({});
   
-  // Countdown timer state
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  // Use external elapsed seconds (from parent) for countdown timer
+  const elapsedSeconds = externalElapsedSeconds;
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -112,15 +113,6 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [onClose]);
-
-  // Countdown timer - increments every second
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, []);
 
   // Fetch cast text for all lockups when lockups change
   useEffect(() => {

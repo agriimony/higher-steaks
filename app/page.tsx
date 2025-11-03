@@ -93,11 +93,23 @@ export default function HigherSteakMenu() {
   const [pixelDensity, setPixelDensity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(0);
   
+  // Global countdown timer state - persists across modal opens/closes
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  
   // Event subscriptions for real-time updates (via SSE/CDP webhooks)
   const { address: wagmiAddress } = useAccount();
   const wsEnabled = user !== null && !isDevelopmentMode;
   const ws = useEventSubscriptions(wsEnabled);
   const lastEventRef = useRef<string | null>(null);
+  
+  // Global countdown timer - runs continuously
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   // Extract staking details and calculate staked balance from balance data (single source of truth)
   const updateStakingDetailsFromBalance = (balanceData: TokenBalance) => {
@@ -533,6 +545,7 @@ export default function HigherSteakMenu() {
           lockups={stakingDetails?.lockups || []}
           wallets={stakingDetails?.wallets || []}
           loading={loadingStakingDetails || !stakingDetails}
+          elapsedSeconds={elapsedSeconds}
           onTransactionSuccess={async () => {
             // CDP webhook will automatically detect the transaction and refresh the balance
             // No manual refresh needed
