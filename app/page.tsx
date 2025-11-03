@@ -408,7 +408,7 @@ export default function HigherSteakMenu() {
 
   const filteredLeaderboard = getFilteredLeaderboard();
 
-  // Handle WebSocket lockup events
+  // Handle lockup events (via CDP webhooks)
   useEffect(() => {
     if (ws.newLockupEvent && user?.fid) {
       const eventId = `${ws.newLockupEvent.lockUpId}-${ws.newLockupEvent.receiver}`;
@@ -419,11 +419,11 @@ export default function HigherSteakMenu() {
       }
       lastEventRef.current = eventId;
 
-      console.log('[WebSocket] New lockup event detected:', ws.newLockupEvent);
+      console.log('[Event] New lockup detected:', ws.newLockupEvent);
 
       // Check if this event is relevant to the current user
       if (wagmiAddress && ws.newLockupEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()) {
-        console.log('[WebSocket] Lockup involves current user, refreshing balance and leaderboard');
+        console.log('[Event] Lockup involves current user, refreshing balance and leaderboard');
         
         // Refresh balance
         fetchTokenBalance(user.fid);
@@ -441,12 +441,12 @@ export default function HigherSteakMenu() {
     }
   }, [ws.newLockupEvent, user?.fid, wagmiAddress]);
 
-  // Handle WebSocket unlock events
+  // Handle unlock events (via CDP webhooks)
   useEffect(() => {
     if (ws.unlockEvent && user?.fid) {
       const eventId = `unlock-${ws.unlockEvent.lockUpId}-${ws.unlockEvent.receiver}`;
       
-      console.log('[Unlock Event Debug] Event received:', {
+      console.log('[Unlock Event] Event received:', {
         eventId,
         currentLastEvent: lastEventRef.current,
         lockUpId: ws.unlockEvent.lockUpId,
@@ -456,21 +456,21 @@ export default function HigherSteakMenu() {
       
       // Avoid processing duplicate events
       if (eventId === lastEventRef.current) {
-        console.log('[Unlock Event Debug] Duplicate event, skipping');
+        console.log('[Unlock Event] Duplicate event, skipping');
         return;
       }
       lastEventRef.current = eventId;
 
-      console.log('[WebSocket] Unlock event detected:', ws.unlockEvent);
+      console.log('[Event] Unlock detected:', ws.unlockEvent);
 
       // Check if this event is relevant to the current user
       if (wagmiAddress && ws.unlockEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()) {
-        console.log('[WebSocket] Unlock involves current user, refreshing balance');
+        console.log('[Event] Unlock involves current user, refreshing balance');
         
         // Refresh balance (unlock doesn't affect leaderboard, only individual balance)
         fetchTokenBalance(user.fid);
       } else {
-        console.log('[Unlock Event Debug] Event not relevant - receiver mismatch:', {
+        console.log('[Unlock Event] Event not relevant - receiver mismatch:', {
           eventReceiver: ws.unlockEvent.receiver,
           wagmiAddress,
           match: wagmiAddress && ws.unlockEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()
@@ -479,7 +479,7 @@ export default function HigherSteakMenu() {
     }
   }, [ws.unlockEvent, user?.fid, wagmiAddress]);
 
-  // Handle WebSocket transfer events
+  // Handle transfer events (via CDP webhooks)
   useEffect(() => {
     if (ws.transferEvent && user?.fid && wagmiAddress) {
       const eventId = `transfer-${ws.transferEvent.from}-${ws.transferEvent.to}`;
@@ -490,7 +490,7 @@ export default function HigherSteakMenu() {
       }
       lastEventRef.current = eventId;
 
-      console.log('[WebSocket] Transfer event detected:', ws.transferEvent);
+      console.log('[Event] Transfer detected:', ws.transferEvent);
 
       // Check if this transfer involves the current user's wallet
       const lowerWagmiAddr = wagmiAddress.toLowerCase();
@@ -499,7 +499,7 @@ export default function HigherSteakMenu() {
         ws.transferEvent.to.toLowerCase() === lowerWagmiAddr;
 
       if (isRelevant) {
-        console.log('[WebSocket] Transfer involves current user, refreshing balance');
+        console.log('[Event] Transfer involves current user, refreshing balance');
         
         // Refresh wallet balance
         fetchTokenBalance(user.fid);
@@ -534,9 +534,9 @@ export default function HigherSteakMenu() {
           wallets={stakingDetails?.wallets || []}
           loading={loadingStakingDetails || !stakingDetails}
           onTransactionSuccess={async () => {
-            // WebSocket will automatically detect the transaction and refresh the balance
+            // CDP webhook will automatically detect the transaction and refresh the balance
             // No manual refresh needed
-            console.log('[Transaction] Success - waiting for WebSocket event to refresh UI');
+            console.log('[Transaction] Success - waiting for webhook event to refresh UI');
           }}
         />
       )}
