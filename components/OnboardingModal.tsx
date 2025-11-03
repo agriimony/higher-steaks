@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
+import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount } from 'wagmi';
 import { parseUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
@@ -73,6 +73,15 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
+  
+  // Read current allowance to avoid unnecessary approvals
+  const { data: currentAllowance } = useReadContract({
+    address: HIGHER_TOKEN_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: 'allowance',
+    args: wagmiAddress ? [wagmiAddress, LOCKUP_CONTRACT] : undefined,
+  });
+  
   const { writeContract: writeContractApprove, data: approveHash, isPending: isApprovePending, error: approveError } = useWriteContract();
   const { isLoading: isApproveConfirming, isSuccess: isApproveSuccess, data: approveReceipt } = useWaitForTransactionReceipt({
     hash: approveHash,
@@ -363,16 +372,61 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
         return;
       }
 
-      // Store params for createLockUp (will be called after approve succeeds)
+      // Store params for createLockUp (will be called after approve succeeds or if already approved)
       setCreateLockUpParams({ amountWei, unlockTime });
 
-      // Step 1: Approve the lockup contract to spend tokens
-      writeContractApprove({
-        address: HIGHER_TOKEN_ADDRESS,
-        abi: ERC20_ABI,
-        functionName: 'approve',
-        args: [LOCKUP_CONTRACT, amountWei],
-      });
+      // Step 1: Check if we need to approve (only approve if current allowance is insufficient)
+      const allowance = currentAllowance || BigInt(0);
+      
+      if (allowance >= amountWei) {
+        console.log('[Onboarding] Sufficient allowance exists, skipping approve');
+        // Sufficient allowance - simulate approve success to trigger createLockUp
+        hasScheduledCreateLockUp.current = true;
+        setPendingCreateLockUp(true);
+        
+        // Call createLockUp directly after a short delay
+        const delay = setTimeout(() => {
+          try {
+            if (!castData) {
+              setStakeError('No cast data available');
+              setPendingCreateLockUp(false);
+              hasScheduledCreateLockUp.current = false;
+              return;
+            }
+            
+            writeContractCreateLockUp({
+              address: LOCKUP_CONTRACT,
+              abi: LOCKUP_ABI,
+              functionName: 'createLockUp',
+              args: [
+                HIGHER_TOKEN_ADDRESS,
+                true, // isERC20
+                amountWei,
+                unlockTime,
+                wagmiAddress,
+                castData.hash || 'Higher Steaks!' // Use cast hash as title
+              ],
+            });
+          } catch (error: any) {
+            console.error('[Onboarding] CreateLockUp error:', error);
+            setStakeError(error?.message || 'Failed to create lockup');
+            setPendingCreateLockUp(false);
+            hasScheduledCreateLockUp.current = false;
+          }
+        }, 100);
+        
+        createLockUpTimeoutRef.current = delay;
+        setCreateLockUpParams(null);
+      } else {
+        console.log('[Onboarding] Insufficient allowance, calling approve');
+        // Step 1: Approve the lockup contract to spend tokens
+        writeContractApprove({
+          address: HIGHER_TOKEN_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [LOCKUP_CONTRACT, amountWei],
+        });
+      }
     } catch (error: any) {
       setStakeError(error?.message || 'Failed to initiate stake');
       console.error('Stake error:', error);
