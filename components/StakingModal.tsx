@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { LOCKUP_CONTRACT, LOCKUP_ABI } from '@/lib/contracts';
+import { fetchValidCast, truncateCastText, isValidCastHash } from '@/lib/cast-helpers';
 
 interface LockupDetail {
   lockupId: string;
@@ -87,6 +88,12 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   const [unstakeLockupId, setUnstakeLockupId] = useState<string | null>(null);
   const [unstakeError, setUnstakeError] = useState<string | null>(null);
   
+  // Cast text state
+  const [castTexts, setCastTexts] = useState<Record<string, string | null>>({});
+  
+  // Countdown timer state
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
   const { writeContract: writeContractUnstake, data: unstakeHash, isPending: isUnstakePending, error: unstakeWriteError } = useWriteContract();
@@ -105,6 +112,28 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [onClose]);
+
+  // Countdown timer - increments every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setElapsedSeconds(prev => prev + 1);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch cast text for all lockups when lockups change
+  useEffect(() => {
+    lockups.forEach(async (lockup) => {
+      if (isValidCastHash(lockup.title)) {
+        const castData = await fetchValidCast(lockup.title);
+        setCastTexts(prev => ({
+          ...prev,
+          [lockup.lockupId]: castData ? truncateCastText(castData.castText) : null,
+        }));
+      }
+    });
+  }, [lockups]);
 
   // Sort wallets: connected first, then by balance descending
   const sortedWallets = [...wallets].sort((a, b) => {
@@ -283,7 +312,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                               </button>
                             ) : lockup.timeRemaining > 0 ? (
                               <span className="text-gray-600 text-s flex-shrink-0">
-                                {formatTimeRemaining(lockup.timeRemaining)} left
+                                {formatTimeRemaining(Math.max(0, lockup.timeRemaining - elapsedSeconds))} left
                               </span>
                             ) : (
                               <span className="text-gray-600 text-s flex-shrink-0">
@@ -307,18 +336,14 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                               </a>
                             </div>
                           </div>
-                          {/* Cast link */}
-                          {lockup.title && lockup.title.startsWith('0x') && lockup.title.length === 66 && (
-                            <a
-                              href={`https://farcaster.xyz/~/channel/higher/${lockup.title}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block mt-1 text-[0.6rem] text-gray-500 hover:text-gray-900 transition-colors italic truncate"
-                              title={lockup.title}
-                            >
-                              {lockup.title.substring(2, 10)}...
-                            </a>
-                          )}
+                          {/* Cast text or link */}
+                          {isValidCastHash(lockup.title) && castTexts[lockup.lockupId] ? (
+                            <p className="text-xs text-gray-400 truncate mt-1">
+                              {castTexts[lockup.lockupId]}
+                            </p>
+                          ) : isValidCastHash(lockup.title) ? (
+                            <p className="text-xs text-gray-400 italic mt-1">No valid cast found</p>
+                          ) : null}
                         </div>
                       </li>
                     );

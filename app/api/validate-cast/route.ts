@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { KEYPHRASE_REGEX, containsKeyphrase, extractDescription } from '@/lib/cast-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-// Keyphrase to filter casts
-const KEYPHRASE_REGEX = /started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i;
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,7 +84,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Validate keyphrase
-    const hasKeyphrase = KEYPHRASE_REGEX.test(cast.text);
+    const hasKeyphrase = containsKeyphrase(cast.text);
     console.log('[Validate Cast] Keyphrase validation:', {
       hasKeyphrase,
       textPreview: cast.text.substring(0, 100)
@@ -115,10 +113,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Extract description from cast text
-    const descriptionMatch = cast.text.match(KEYPHRASE_REGEX);
-    const description = descriptionMatch && descriptionMatch[1] 
-      ? descriptionMatch[1].trim() 
-      : null;
+    const description = extractDescription(cast.text);
 
     console.log('[Validate Cast] Validation successful:', {
       hash: cast.hash,
@@ -129,9 +124,10 @@ export async function GET(request: NextRequest) {
       valid: true,
       hash: cast.hash,
       fid: cast.author.fid,
-      text: cast.text,
+      castText: cast.text,
       description: description,
-      timestamp: cast.timestamp
+      timestamp: cast.timestamp,
+      author: cast.author
     });
 
   } catch (error: any) {

@@ -3,6 +3,7 @@ import { sql } from '@vercel/postgres';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { createPublicClient, http, formatUnits } from 'viem';
 import { base } from 'viem/chains';
+import { KEYPHRASE_REGEX, extractDescription, isValidCastHash } from '@/lib/cast-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,30 +48,6 @@ const LOCKUP_ABI = [
     type: 'function',
   },
 ] as const;
-
-// Keyphrase to filter casts
-const KEYPHRASE_REGEX = /started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i;
-
-// Helper to extract description after keyphrase
-function extractDescription(castText: string): string | null {
-  const match = castText.match(KEYPHRASE_REGEX);
-  if (!match || !match[1]) return null;
-  
-  // Extract text after "!" and truncate to 120 characters
-  const description = match[1].trim();
-  return description.length > 120 
-    ? description.substring(0, 120) + '...' 
-    : description;
-}
-
-// Helper to check if a string is a valid cast hash (starts with 0x, is 42 chars)
-function isValidCastHash(hash: string): boolean {
-  const isValid = typeof hash === 'string' && hash.startsWith('0x') && hash.length === 42;
-  if (!isValid && hash && hash.length > 0) {
-    console.log(`Invalid cast hash: "${hash}" (length=${hash.length}, startsWith0x=${hash.startsWith('0x')})`);
-  }
-  return isValid;
-}
 
 // Get HIGHER token price from CoinGecko
 async function getTokenPrice(): Promise<number> {

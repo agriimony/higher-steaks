@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { keccak256, toHex } from 'viem';
-import { LOCKUP_CONTRACT, LOCKUP_ABI } from '@/lib/contracts';
+import { LOCKUP_CONTRACT, LOCKUP_ABI, HIGHER_TOKEN_ADDRESS, ERC20_ABI } from '@/lib/contracts';
 
 interface WebSocketSubscriptionState {
   latestBlock: { number: bigint; timestamp: bigint } | null;
@@ -20,6 +20,11 @@ interface WebSocketSubscriptionState {
     token: string;
     receiver: string;
   } | null;
+  transferEvent: {
+    from: string;
+    to: string;
+    value: string;
+  } | null;
   isConnected: boolean;
   error: string | null;
 }
@@ -29,6 +34,7 @@ interface WebSocketSubscriptionState {
  * - Subscribes to new block headers (newHeads) for freshness monitoring
  * - Subscribes to LockUpCreated events from the lockup contract
  * - Subscribes to Unlock events from the lockup contract
+ * - Subscribes to Transfer events from the HIGHER token contract
  */
 export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSubscriptionState {
   const [state, setState] = useState<WebSocketSubscriptionState>({
@@ -36,6 +42,7 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
     latestBlockAge: null,
     newLockupEvent: null,
     unlockEvent: null,
+    transferEvent: null,
     isConnected: false,
     error: null,
   });
@@ -85,6 +92,28 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
       return hash;
     } catch (error) {
       console.error('[WebSocket] Error generating Unlock event topic:', error);
+      return null;
+    }
+  }, []);
+
+  // Get Transfer event topic from ERC20 ABI
+  const transferTopic = useCallback(() => {
+    try {
+      // Find Transfer event in ABI
+      const eventAbi = ERC20_ABI.find((item: any) => item.type === 'event' && item.name === 'Transfer');
+      if (!eventAbi || eventAbi.type !== 'event') {
+        console.error('Transfer event not found in ABI');
+        return null;
+      }
+
+      // Generate keccak256 hash of event signature: Transfer(address,address,uint256)
+      const signature = `${eventAbi.name}(${eventAbi.inputs.map((inp: any) => inp.internalType || inp.type).join(',')})`;
+      const hash = keccak256(toHex(signature));
+      console.log('[WebSocket] Transfer event signature:', signature);
+      console.log('[WebSocket] Transfer topic:', hash);
+      return hash;
+    } catch (error) {
+      console.error('[WebSocket] Error generating Transfer event topic:', error);
       return null;
     }
   }, []);
@@ -168,6 +197,27 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
         } else {
           console.error('[WebSocket] Failed to subscribe to Unlock events');
         }
+
+        // Subscribe to logs for Transfer events
+        const transferEventTopic = transferTopic();
+        if (transferEventTopic) {
+          const transferLogsSub = {
+            jsonrpc: '2.0',
+            id: 4,
+            method: 'eth_subscribe',
+            params: [
+              'logs',
+              {
+                address: HIGHER_TOKEN_ADDRESS,
+                topics: [transferEventTopic],
+              },
+            ],
+          };
+          ws.send(JSON.stringify(transferLogsSub));
+          console.log('[WebSocket] Subscribed to Transfer events');
+        } else {
+          console.error('[WebSocket] Failed to subscribe to Transfer events');
+        }
       };
 
       ws.onmessage = (event) => {
@@ -200,6 +250,7 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
               const eventTopic = result.topics[0];
               const createdTopicHash = lockUpCreatedTopic();
               const unlockTopicHash = unlockTopic();
+              const transferTopicHash = transferTopic();
 
               // Handle LockUpCreated events
               if (createdTopicHash && eventTopic === createdTopicHash) {
@@ -248,6 +299,27 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
 
                 console.log('[WebSocket] Unlock:', { lockUpId, receiver });
               }
+
+              // Handle Transfer events
+              if (transferTopicHash && eventTopic === transferTopicHash) {
+                console.log('[WebSocket] Transfer event detected:', result);
+
+                // Decode event data: Transfer(address indexed from, address indexed to, uint256 value)
+                const from = result.topics[1] ? `0x${result.topics[1].substring(26)}` : '0x0';
+                const to = result.topics[2] ? `0x${result.topics[2].substring(26)}` : '0x0';
+                const value = result.data || '0x0';
+
+                setState(prev => ({
+                  ...prev,
+                  transferEvent: {
+                    from,
+                    to,
+                    value,
+                  },
+                }));
+
+                console.log('[WebSocket] Transfer:', { from, to });
+              }
             }
           }
 
@@ -288,7 +360,7 @@ export function useWebSocketSubscriptions(enabled: boolean = true): WebSocketSub
       console.error('[WebSocket] Failed to create connection:', error);
       setState(prev => ({ ...prev, error: 'Failed to create WebSocket connection' }));
     }
-  }, [enabled, lockUpCreatedTopic, unlockTopic]);
+  }, [enabled, lockUpCreatedTopic, unlockTopic, transferTopic]);
 
   // Cleanup on unmount
   useEffect(() => {

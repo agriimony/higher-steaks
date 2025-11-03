@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
+import { extractDescription } from '@/lib/cast-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-// Keyphrase to filter casts
-const KEYPHRASE_REGEX = /started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i;
-
-// Helper to extract description after keyphrase
-function extractDescription(castText: string): string | null {
-  const match = castText.match(KEYPHRASE_REGEX);
-  if (!match || !match[1]) return null;
-  
-  // Extract text after "!" and truncate to 120 characters
-  const description = match[1].trim();
-  return description.length > 120 
-    ? description.substring(0, 120) + '...' 
-    : description;
-}
 
 export async function GET(request: NextRequest) {
   try {

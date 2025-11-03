@@ -454,6 +454,34 @@ export default function HigherSteakMenu() {
     }
   }, [ws.unlockEvent, user?.fid, wagmiAddress]);
 
+  // Handle WebSocket transfer events
+  useEffect(() => {
+    if (ws.transferEvent && user?.fid && wagmiAddress) {
+      const eventId = `transfer-${ws.transferEvent.from}-${ws.transferEvent.to}`;
+      
+      // Avoid processing duplicate events
+      if (eventId === lastEventRef.current) {
+        return;
+      }
+      lastEventRef.current = eventId;
+
+      console.log('[WebSocket] Transfer event detected:', ws.transferEvent);
+
+      // Check if this transfer involves the current user's wallet
+      const lowerWagmiAddr = wagmiAddress.toLowerCase();
+      const isRelevant = 
+        ws.transferEvent.from.toLowerCase() === lowerWagmiAddr ||
+        ws.transferEvent.to.toLowerCase() === lowerWagmiAddr;
+
+      if (isRelevant) {
+        console.log('[WebSocket] Transfer involves current user, refreshing balance');
+        
+        // Refresh wallet balance
+        fetchTokenBalance(user.fid);
+      }
+    }
+  }, [ws.transferEvent, user?.fid, wagmiAddress]);
+
   // Get block freshness indicator color
   const getBlockFreshnessColor = (): string => {
     if (!ws.latestBlockAge) return '#9ca3af'; // gray

@@ -1,0 +1,67 @@
+import { KEYPHRASE_REGEX } from './constants';
+
+/**
+ * Validates if a string is a valid cast hash (42 chars, starts with 0x)
+ */
+export function isValidCastHash(hash: string): boolean {
+  return typeof hash === 'string' && hash.length === 42 && hash.startsWith('0x');
+}
+
+/**
+ * Validates if cast text contains the required keyphrase
+ */
+export function containsKeyphrase(castText: string): boolean {
+  return KEYPHRASE_REGEX.test(castText);
+}
+
+/**
+ * Extracts description from cast text after keyphrase
+ */
+export function extractDescription(castText: string): string | null {
+  const match = castText.match(KEYPHRASE_REGEX);
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Fetches cast data from Neynar via validate-cast API
+ * Returns null if cast not found, doesn't contain keyphrase, or other error
+ */
+export async function fetchValidCast(castHash: string): Promise<{
+  castText: string;
+  description: string;
+  author: { fid: number; username: string };
+} | null> {
+  if (!isValidCastHash(castHash)) {
+    return null;
+  }
+
+  try {
+    const response = await fetch(`/api/validate-cast?hash=${castHash}`);
+    if (!response.ok) {
+      return null;
+    }
+    
+    const data = await response.json();
+    if (!data.valid || !data.castText || !containsKeyphrase(data.castText)) {
+      return null;
+    }
+
+    return {
+      castText: data.castText,
+      description: data.description || extractDescription(data.castText) || '',
+      author: data.author || { fid: 0, username: 'unknown' },
+    };
+  } catch (error) {
+    console.error('Error fetching cast:', error);
+    return null;
+  }
+}
+
+/**
+ * Truncates text to fit within one line (max chars)
+ */
+export function truncateCastText(text: string, maxLength: number = 80): string {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+}
+
