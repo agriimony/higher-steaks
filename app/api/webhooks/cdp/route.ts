@@ -26,15 +26,14 @@ function broadcastEvent(type: string, data: any) {
 
 // Verify webhook signature from CDP
 // CDP uses X-Hook0-Signature header with format: t=timestamp,h=headers,v1=signature
-function verifySignature(payload: string, signatureHeader: string | null, headers: Record<string, string>): boolean {
+function verifySignature(payload: string, signatureHeader: string | null, headers: Record<string, string>, secrets: string[]): boolean {
   if (!signatureHeader) {
     console.error('[CDP Webhook] No signature header provided');
     return false;
   }
   
-  const secret = process.env.CDP_WEBHOOK_SECRET;
-  if (!secret) {
-    console.error('[CDP Webhook] CDP_WEBHOOK_SECRET not configured');
+  if (secrets.length === 0) {
+    console.error('[CDP Webhook] No webhook secrets configured');
     return false;
   }
   
@@ -66,59 +65,52 @@ function verifySignature(payload: string, signatureHeader: string | null, header
     console.log('[CDP Webhook Debug] Header names:', headerNames);
     console.log('[CDP Webhook Debug] Header values:', headerValues);
     console.log('[CDP Webhook Debug] Signed payload preview:', signedPayload.substring(0, 300));
-    console.log('[CDP Webhook Debug] Secret length:', secret.length);
-    console.log('[CDP Webhook Debug] Secret preview:', secret.substring(0, 20));
+    console.log('[CDP Webhook Debug] Trying', secrets.length, 'secrets...');
     
-    // Compute the expected signature
-    // Try with secret as-is (UTF-8 string)
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(signedPayload, 'utf8');
-    const expectedSignature = hmac.digest('hex');
+    // Try each secret until one matches
+    const providedBuffer = Buffer.from(providedSignature, 'hex');
     
-    console.log('[CDP Webhook Debug] Expected signature (secret as string):', expectedSignature);
-    
-    // Also try with base64 decoded secret if it looks like base64
-    if (secret.includes('=') || secret.length % 4 === 0) {
+    for (let i = 0; i < secrets.length; i++) {
+      const secret = secrets[i];
+      console.log(`[CDP Webhook Debug] Trying secret ${i + 1}/${secrets.length}, length: ${secret.length}`);
+      
       try {
-        const decodedSecret = Buffer.from(secret, 'base64').toString('utf8');
-        const hmacBase64 = crypto.createHmac('sha256', decodedSecret);
-        hmacBase64.update(signedPayload, 'utf8');
-        const expectedSigBase64 = hmacBase64.digest('hex');
-        console.log('[CDP Webhook Debug] Expected signature (secret base64 decoded):', expectedSigBase64);
-      } catch (e) {
-        console.log('[CDP Webhook Debug] Failed to decode secret as base64:', e);
+        // Compute the expected signature
+        const hmac = crypto.createHmac('sha256', secret);
+        hmac.update(signedPayload, 'utf8');
+        const expectedSignature = hmac.digest('hex');
+        
+        const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+        
+        if (expectedBuffer.length !== providedBuffer.length) {
+          console.log(`[CDP Webhook Debug] Secret ${i + 1}: length mismatch`);
+          continue;
+        }
+        
+        const signaturesMatch = crypto.timingSafeEqual(expectedBuffer, providedBuffer);
+        
+        if (signaturesMatch) {
+          console.log(`[CDP Webhook Debug] Secret ${i + 1} matched!`);
+          
+          // Verify the timestamp to prevent replay attacks (within 5 minutes)
+          const webhookTime = parseInt(timestamp) * 1000;
+          const currentTime = Date.now();
+          const ageMinutes = (currentTime - webhookTime) / (1000 * 60);
+          
+          if (ageMinutes > 5) {
+            console.error(`[CDP Webhook] Webhook timestamp too old: ${ageMinutes.toFixed(1)} minutes`);
+            return false;
+          }
+          
+          return true;
+        }
+      } catch (error) {
+        console.log(`[CDP Webhook Debug] Secret ${i + 1}: error:`, error);
       }
     }
     
-    console.log('[CDP Webhook Debug] Provided signature:', providedSignature);
-    
-    // Compare signatures securely (timing-safe)
-    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
-    const providedBuffer = Buffer.from(providedSignature, 'hex');
-    
-    if (expectedBuffer.length !== providedBuffer.length) {
-      console.error('[CDP Webhook] Signature length mismatch');
-      return false;
-    }
-    
-    const signaturesMatch = crypto.timingSafeEqual(expectedBuffer, providedBuffer);
-    
-    if (!signaturesMatch) {
-      console.error('[CDP Webhook] Signature mismatch');
-      return false;
-    }
-    
-    // Verify the timestamp to prevent replay attacks (within 5 minutes)
-    const webhookTime = parseInt(timestamp) * 1000;
-    const currentTime = Date.now();
-    const ageMinutes = (currentTime - webhookTime) / (1000 * 60);
-    
-    if (ageMinutes > 5) {
-      console.error(`[CDP Webhook] Webhook timestamp too old: ${ageMinutes.toFixed(1)} minutes`);
-      return false;
-    }
-    
-    return true;
+    console.error('[CDP Webhook] No matching secret found');
+    return false;
   } catch (error) {
     console.error('[CDP Webhook] Signature verification error:', error);
     return false;
@@ -214,7 +206,19 @@ export async function POST(request: NextRequest) {
     console.log('[CDP Webhook] Signature header:', signatureHeader);
     console.log('[CDP Webhook] Payload length:', bodyText.length);
     
-    if (!verifySignature(bodyText, signatureHeader, allHeaders)) {
+    // Collect all webhook secrets (one per subscription)
+    const webhookSecrets = [
+      process.env.CDP_WEBHOOK_SECRET_1,
+      process.env.CDP_WEBHOOK_SECRET_2,
+      process.env.CDP_WEBHOOK_SECRET_3,
+    ].filter(Boolean) as string[];
+    
+    if (webhookSecrets.length === 0) {
+      console.error('[CDP Webhook] No webhook secrets configured');
+      return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+    
+    if (!verifySignature(bodyText, signatureHeader, allHeaders, webhookSecrets)) {
       console.error('[CDP Webhook] Invalid signature');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
