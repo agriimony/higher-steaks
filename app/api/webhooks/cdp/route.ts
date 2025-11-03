@@ -194,6 +194,9 @@ export async function POST(request: NextRequest) {
     const bodyText = await request.text();
     const body = JSON.parse(bodyText);
     
+    // Log the full payload structure to understand CDP's format
+    console.log('[CDP Webhook] Full payload:', JSON.stringify(body, null, 2));
+    
     // Log all headers for debugging
     const allHeaders: Record<string, string> = {};
     request.headers.forEach((value, key) => {
