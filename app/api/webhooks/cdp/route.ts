@@ -176,8 +176,18 @@ export async function POST(request: NextRequest) {
     const bodyText = await request.text();
     const body = JSON.parse(bodyText);
     
+    // Log all headers for debugging
+    const allHeaders: Record<string, string> = {};
+    request.headers.forEach((value, key) => {
+      allHeaders[key] = value;
+    });
+    console.log('[CDP Webhook] All headers:', JSON.stringify(allHeaders, null, 2));
+    
     // Verify signature using X-Hook0-Signature header
     const signatureHeader = request.headers.get('x-hook0-signature') || request.headers.get('X-Hook0-Signature');
+    console.log('[CDP Webhook] Signature header:', signatureHeader);
+    console.log('[CDP Webhook] Payload length:', bodyText.length);
+    
     if (!verifySignature(bodyText, signatureHeader, request.headers)) {
       console.error('[CDP Webhook] Invalid signature');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
