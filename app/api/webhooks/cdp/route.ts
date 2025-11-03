@@ -26,7 +26,7 @@ function broadcastEvent(type: string, data: any) {
 
 // Verify webhook signature from CDP
 // CDP uses X-Hook0-Signature header with format: t=timestamp,h=headers,v1=signature
-function verifySignature(payload: string, signatureHeader: string | null, headers: Headers): boolean {
+function verifySignature(payload: string, signatureHeader: string | null, headers: Record<string, string>): boolean {
   if (!signatureHeader) {
     console.error('[CDP Webhook] No signature header provided');
     return false;
@@ -56,7 +56,7 @@ function verifySignature(payload: string, signatureHeader: string | null, header
     
     // Build the header values string
     const headerNameList = headerNames.split(' ');
-    const headerValues = headerNameList.map((name: string) => headers.get(name) || '').join('.');
+    const headerValues = headerNameList.map((name: string) => headers[name.toLowerCase()] || '').join('.');
     
     // Construct the signed payload
     const signedPayload = `${timestamp}.${headerNames}.${headerValues}.${payload}`;
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
     console.log('[CDP Webhook] Signature header:', signatureHeader);
     console.log('[CDP Webhook] Payload length:', bodyText.length);
     
-    if (!verifySignature(bodyText, signatureHeader, request.headers)) {
+    if (!verifySignature(bodyText, signatureHeader, allHeaders)) {
       console.error('[CDP Webhook] Invalid signature');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
