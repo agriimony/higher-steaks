@@ -102,6 +102,12 @@ export default function HigherSteakMenu() {
   // Extract staking details and calculate staked balance from balance data (single source of truth)
   const updateStakingDetailsFromBalance = (balanceData: TokenBalance) => {
     if (balanceData.lockups && balanceData.wallets) {
+      console.log('[Staking Details Update] Updating with lockups:', {
+        lockupCount: balanceData.lockups.length,
+        lockupIds: balanceData.lockups.map(l => l.lockupId),
+        walletCount: balanceData.wallets.length
+      });
+      
       setStakingDetails({
         lockups: balanceData.lockups,
         wallets: balanceData.wallets,
@@ -128,6 +134,7 @@ export default function HigherSteakMenu() {
   };
 
   const fetchTokenBalance = async (fid: number) => {
+    console.log('[fetchTokenBalance] Called for fid:', fid);
     setLoadingBalance(true);
     setLoadingStakingDetails(true);
     setBalanceError(null);
@@ -135,13 +142,16 @@ export default function HigherSteakMenu() {
       const response = await fetch(`/api/user/balance?fid=${fid}`);
       if (response.ok) {
         const balanceData = await response.json();
-        console.log('Balance data:', balanceData);
-        console.log('Higher logo URL:', balanceData.higherLogoUrl);
+        console.log('[fetchTokenBalance] Balance data received:', {
+          hasLockups: !!balanceData.lockups,
+          lockupCount: balanceData.lockups?.length,
+          higherLogoUrl: balanceData.higherLogoUrl
+        });
         setBalance(balanceData);
         // Extract staking details from the same response (single source of truth)
         updateStakingDetailsFromBalance(balanceData);
       } else {
-        console.error('Failed to fetch balance');
+        console.error('[fetchTokenBalance] Failed to fetch balance, status:', response.status);
         const errorData = await response.json().catch(() => ({}));
         
         // Check if it's a stale block error (503)
@@ -157,7 +167,7 @@ export default function HigherSteakMenu() {
         setLoadingStakingDetails(false);
       }
     } catch (error) {
-      console.error('Error fetching balance:', error);
+      console.error('[fetchTokenBalance] Error:', error);
       setBalanceError(null);
       setBalance(null);
       setStakingDetails({ lockups: [], wallets: [] });
@@ -436,8 +446,17 @@ export default function HigherSteakMenu() {
     if (ws.unlockEvent && user?.fid) {
       const eventId = `unlock-${ws.unlockEvent.lockUpId}-${ws.unlockEvent.receiver}`;
       
+      console.log('[Unlock Event Debug] Event received:', {
+        eventId,
+        currentLastEvent: lastEventRef.current,
+        lockUpId: ws.unlockEvent.lockUpId,
+        receiver: ws.unlockEvent.receiver,
+        wagmiAddress
+      });
+      
       // Avoid processing duplicate events
       if (eventId === lastEventRef.current) {
+        console.log('[Unlock Event Debug] Duplicate event, skipping');
         return;
       }
       lastEventRef.current = eventId;
@@ -450,6 +469,12 @@ export default function HigherSteakMenu() {
         
         // Refresh balance (unlock doesn't affect leaderboard, only individual balance)
         fetchTokenBalance(user.fid);
+      } else {
+        console.log('[Unlock Event Debug] Event not relevant - receiver mismatch:', {
+          eventReceiver: ws.unlockEvent.receiver,
+          wagmiAddress,
+          match: wagmiAddress && ws.unlockEvent.receiver.toLowerCase() === wagmiAddress.toLowerCase()
+        });
       }
     }
   }, [ws.unlockEvent, user?.fid, wagmiAddress]);
