@@ -5,7 +5,7 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { StakingModal } from '@/components/StakingModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
-import { useWebSocketSubscriptions } from '@/hooks/useWebSocketSubscriptions';
+import { useEventSubscriptions } from '@/hooks/useEventSubscriptions';
 import { useAccount } from 'wagmi';
 
 interface User {
@@ -93,10 +93,10 @@ export default function HigherSteakMenu() {
   const [pixelDensity, setPixelDensity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(0);
   
-  // WebSocket subscriptions for real-time updates
+  // Event subscriptions for real-time updates (via SSE/CDP webhooks)
   const { address: wagmiAddress } = useAccount();
   const wsEnabled = user !== null && !isDevelopmentMode;
-  const ws = useWebSocketSubscriptions(wsEnabled);
+  const ws = useEventSubscriptions(wsEnabled);
   const lastEventRef = useRef<string | null>(null);
   
   // Extract staking details and calculate staked balance from balance data (single source of truth)
@@ -507,13 +507,7 @@ export default function HigherSteakMenu() {
     }
   }, [ws.transferEvent, user?.fid, wagmiAddress]);
 
-  // Get block freshness indicator color
-  const getBlockFreshnessColor = (): string => {
-    if (!ws.latestBlockAge) return '#9ca3af'; // gray
-    if (ws.latestBlockAge < 30) return '#10b981'; // green
-    if (ws.latestBlockAge < 300) return '#eab308'; // yellow (5 minutes)
-    return '#ef4444'; // red
-  };
+  // Block freshness indicator removed - no longer needed with webhooks
 
   return (
     <>
@@ -579,17 +573,6 @@ export default function HigherSteakMenu() {
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue}
                 </span>
-                {/* Block freshness indicator */}
-                {ws.latestBlockAge !== null && (
-                  <div className="flex items-center gap-0.5">
-                    <span className="text-gray-400">•</span>
-                    <div 
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ backgroundColor: getBlockFreshnessColor() }}
-                      title={`Block age: ${ws.latestBlockAge}s (${ws.isConnected ? 'synced' : 'disconnected'})`}
-                    />
-                  </div>
-                )}
               </div>
             ) : balanceError === 'stale' ? (
               <div className="flex items-center gap-1.5">

@@ -14,9 +14,8 @@ A Farcaster Mini App for the higher network discovery. This Mini App can be embe
 - 🗄️ Vercel Postgres database integration
 - 🎨 Modern, responsive design optimized for 424px modal
 - 📐 3:2 aspect ratio embed images
-- 🔴 Real-time blockchain event monitoring via WebSocket
+- 🔴 Real-time blockchain event monitoring via CDP Webhooks
 - ⚡ Instant UI updates when users stake tokens
-- 🟢 Block freshness indicator for data synchronization
 
 ## Setup
 
@@ -38,13 +37,16 @@ Create a `.env.local` file in the root directory:
 # Required: Neynar API Key
 NEYNAR_API_KEY=your_neynar_api_key_here
 
-# Optional: Alchemy API Key (recommended for production, provides robust RPC with higher rate limits and WebSocket support)
-# For frontend WebSocket features, also expose as NEXT_PUBLIC_ALCHEMY_API_KEY
+# Optional: Alchemy API Key (recommended for production, provides robust RPC with higher rate limits)
 ALCHEMY_API_KEY=your_alchemy_api_key_here
-NEXT_PUBLIC_ALCHEMY_API_KEY=your_alchemy_api_key_here
 
 # Optional: Base RPC URL (fallback if ALCHEMY_API_KEY not set, defaults to public RPC)
 BASE_RPC_URL=https://mainnet.base.org
+
+# Required for Production: CDP (Coinbase Developer Platform) API keys for webhook event monitoring
+CDP_API_KEY_ID=your_cdp_api_key_id
+CDP_API_KEY_SECRET=your_cdp_api_key_secret
+CDP_WEBHOOK_SECRET=secret_from_webhook_creation_response
 
 # Required for Production: Vercel Postgres (auto-added by Vercel)
 POSTGRES_URL=postgres://...
@@ -67,7 +69,14 @@ CRON_SECRET=your_random_secret_here
 4. Copy your API key from the app dashboard
 5. The endpoint format is: `https://base-mainnet.g.alchemy.com/v2/{YOUR_API_KEY}`
 6. Alchemy provides better rate limits, reliability, and supports optimized batch requests
-7. **Important**: Set `NEXT_PUBLIC_ALCHEMY_API_KEY` to the same value as `ALCHEMY_API_KEY` to enable frontend WebSocket features (real-time updates). WebSocket features gracefully degrade if not set.
+
+**Get your CDP (Coinbase Developer Platform) API keys:**
+1. Visit [https://portal.cdp.coinbase.com](https://portal.cdp.coinbase.com)
+2. Sign up or log in
+3. Create a Secret API Key from the API Keys dashboard
+4. Save the API Key ID and Secret securely
+5. Configure webhook subscriptions (see [CDP Webhooks documentation](https://docs.cdp.coinbase.com/data/webhooks/quickstart))
+6. Set `CDP_WEBHOOK_SECRET` to the secret value provided when creating each webhook subscription
 
 **Vercel Postgres Setup:**
 See [DATABASE_SETUP.md](./DATABASE_SETUP.md) for detailed database configuration instructions.
