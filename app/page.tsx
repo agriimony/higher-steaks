@@ -466,6 +466,14 @@ export default function HigherSteakMenu() {
         ? ws.newLockupEvent.from.toLowerCase() === wagmiAddress.toLowerCase()
         : ws.newLockupEvent.receiver?.toLowerCase() === wagmiAddress.toLowerCase();
       
+      console.log('[Event] Relevance check:', {
+        isRelevant,
+        eventFrom: ws.newLockupEvent.from,
+        eventReceiver: ws.newLockupEvent.receiver,
+        wagmiAddress,
+        isFromBased: !!ws.newLockupEvent.from
+      });
+      
       if (isRelevant) {
         console.log('[Event] Lockup involves current user, refreshing balance and leaderboard');
         
@@ -481,6 +489,8 @@ export default function HigherSteakMenu() {
         }).catch(err => {
           console.error('Failed to refresh leaderboard:', err);
         });
+      } else {
+        console.log('[Event] Lockup not relevant to current user');
       }
     }
   }, [ws.newLockupEvent, user?.fid, wagmiAddress]);

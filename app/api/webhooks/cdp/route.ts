@@ -203,19 +203,13 @@ export async function POST(request: NextRequest) {
     const bodyText = await request.text();
     const body = JSON.parse(bodyText);
     
-    // Log the full payload structure to understand CDP's format
-    console.log('[CDP Webhook] Full payload:', JSON.stringify(body, null, 2));
-    
-    // Log all headers for debugging
+    // Verify signature using X-Hook0-Signature header
     const allHeaders: Record<string, string> = {};
     request.headers.forEach((value, key) => {
       allHeaders[key] = value;
     });
-    console.log('[CDP Webhook] All headers:', JSON.stringify(allHeaders, null, 2));
     
-    // Verify signature using X-Hook0-Signature header
     const signatureHeader = request.headers.get('x-hook0-signature') || request.headers.get('X-Hook0-Signature');
-    console.log('[CDP Webhook] Signature header:', signatureHeader);
     console.log('[CDP Webhook] Payload length:', bodyText.length);
     
     // Determine which secret to use based on event type
@@ -255,12 +249,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
     
-    console.log('[CDP Webhook] Received verified webhook:', JSON.stringify(body, null, 2));
-    
     // Parse and broadcast event
     const parsedEvent = parseCDPEvent(body);
     if (parsedEvent) {
-      console.log('[CDP Webhook] Broadcasting event:', parsedEvent.type);
+      console.log('[CDP Webhook] Broadcasting event:', parsedEvent.type, parsedEvent.data);
       broadcastEvent(parsedEvent.type, parsedEvent.data);
     }
     
