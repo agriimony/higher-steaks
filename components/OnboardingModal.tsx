@@ -35,8 +35,10 @@ function formatTimestamp(timestamp: string): string {
 }
 
 // Convert duration and unit to seconds
-function durationToSeconds(duration: number, unit: 'day' | 'week' | 'month' | 'year'): number {
+function durationToSeconds(duration: number, unit: 'minute' | 'day' | 'week' | 'month' | 'year'): number {
   switch (unit) {
+    case 'minute':
+      return duration * 60;
     case 'day':
       return duration * 86400;
     case 'week':
@@ -58,7 +60,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
   const [validatingUrl, setValidatingUrl] = useState(false);
   const [stakeAmount, setStakeAmount] = useState('');
   const [lockupDuration, setLockupDuration] = useState<string>('');
-  const [lockupDurationUnit, setLockupDurationUnit] = useState<'day' | 'week' | 'month' | 'year'>('day');
+  const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   
   // Staking transaction state
   const [stakeError, setStakeError] = useState<string | null>(null);
@@ -597,9 +599,10 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
                 />
                 <select
                   value={lockupDurationUnit}
-                  onChange={(e) => setLockupDurationUnit(e.target.value as 'day' | 'week' | 'month' | 'year')}
+                  onChange={(e) => setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year')}
                   className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
                 >
+                  <option value="minute">Minute(s)</option>
                   <option value="day">Day(s)</option>
                   <option value="week">Week(s)</option>
                   <option value="month">Month(s)</option>
