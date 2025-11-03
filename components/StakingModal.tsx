@@ -275,7 +275,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                 <p className="text-sm text-gray-600 italic">No active lockups</p>
               ) : (
                 <ul className="space-y-3">
-                  {sortedLockups.slice(0, 5).map((lockup) => {
+                  {sortedLockups.slice(0, 3).map((lockup) => {
                     const isConnected = wagmiAddress?.toLowerCase() === lockup.receiver.toLowerCase();
                     return (
                       <li key={lockup.lockupId} className="text-sm">
