@@ -25,8 +25,10 @@ function broadcastEvent(type: string, data: any) {
 }
 
 // Verify webhook signature from CDP
-function verifySignature(payload: string, signature: string | null): boolean {
-  if (!signature) {
+// CDP uses X-Hook0-Signature header with format: t=timestamp,h=headers,v1=signature
+function verifySignature(payload: string, signatureHeader: string | null, headers: Headers): boolean {
+  if (!signatureHeader) {
+    console.error('[CDP Webhook] No signature header provided');
     return false;
   }
   
@@ -36,11 +38,65 @@ function verifySignature(payload: string, signature: string | null): boolean {
     return false;
   }
   
-  const hmac = crypto.createHmac('sha256', secret);
-  hmac.update(payload);
-  const digest = hmac.digest('hex');
-  
-  return signature === digest;
+  try {
+    // Parse the signature header: t=timestamp,h=headers,v1=signature
+    const elements = signatureHeader.split(',');
+    const timestampMatch = elements.find((e: string) => e.startsWith('t='));
+    const headerNamesMatch = elements.find((e: string) => e.startsWith('h='));
+    const providedSignatureMatch = elements.find((e: string) => e.startsWith('v1='));
+    
+    if (!timestampMatch || !headerNamesMatch || !providedSignatureMatch) {
+      console.error('[CDP Webhook] Malformed signature header');
+      return false;
+    }
+    
+    const timestamp = timestampMatch.split('=')[1];
+    const headerNames = headerNamesMatch.split('=')[1];
+    const providedSignature = providedSignatureMatch.split('=')[1];
+    
+    // Build the header values string
+    const headerNameList = headerNames.split(' ');
+    const headerValues = headerNameList.map((name: string) => headers.get(name) || '').join('.');
+    
+    // Construct the signed payload
+    const signedPayload = `${timestamp}.${headerNames}.${headerValues}.${payload}`;
+    
+    // Compute the expected signature
+    const hmac = crypto.createHmac('sha256', secret);
+    hmac.update(signedPayload, 'utf8');
+    const expectedSignature = hmac.digest('hex');
+    
+    // Compare signatures securely (timing-safe)
+    const expectedBuffer = Buffer.from(expectedSignature, 'hex');
+    const providedBuffer = Buffer.from(providedSignature, 'hex');
+    
+    if (expectedBuffer.length !== providedBuffer.length) {
+      console.error('[CDP Webhook] Signature length mismatch');
+      return false;
+    }
+    
+    const signaturesMatch = crypto.timingSafeEqual(expectedBuffer, providedBuffer);
+    
+    if (!signaturesMatch) {
+      console.error('[CDP Webhook] Signature mismatch');
+      return false;
+    }
+    
+    // Verify the timestamp to prevent replay attacks (within 5 minutes)
+    const webhookTime = parseInt(timestamp) * 1000;
+    const currentTime = Date.now();
+    const ageMinutes = (currentTime - webhookTime) / (1000 * 60);
+    
+    if (ageMinutes > 5) {
+      console.error(`[CDP Webhook] Webhook timestamp too old: ${ageMinutes.toFixed(1)} minutes`);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('[CDP Webhook] Signature verification error:', error);
+    return false;
+  }
 }
 
 // Parse and normalize event data from CDP
@@ -120,9 +176,9 @@ export async function POST(request: NextRequest) {
     const bodyText = await request.text();
     const body = JSON.parse(bodyText);
     
-    // Verify signature
-    const signature = request.headers.get('x-webhook-signature');
-    if (!verifySignature(bodyText, signature)) {
+    // Verify signature using X-Hook0-Signature header
+    const signatureHeader = request.headers.get('x-hook0-signature') || request.headers.get('X-Hook0-Signature');
+    if (!verifySignature(bodyText, signatureHeader, request.headers)) {
       console.error('[CDP Webhook] Invalid signature');
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
