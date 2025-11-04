@@ -527,12 +527,12 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
               </div>
               {castData.maxCasterUnlockTime > 0 && (
                 <div className="text-xs text-black/60">
-                  Max: {formatTimeRemaining(castData.maxCasterUnlockTime)}
+                  for {formatTimeRemaining(castData.maxCasterUnlockTime)}
                 </div>
               )}
             </div>
             <div className="text-xs text-black/80 mt-1 flex items-center gap-1 justify-end">
-              <span className="font-bold flex items-center gap-1">
+              <span className="font-bold rounded-full flex items-center gap-1">
                 <img 
                   src="/higher-logo.png" 
                   alt="HIGHER" 
@@ -544,16 +544,8 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 {totalCasterStakedFormatted}
               </span>
               <span className="text-black/60">caster</span>
-              {' '}
+              {'+'}
               <span className="text-black/60 flex items-center gap-1">
-                <img 
-                  src="/higher-logo.png" 
-                  alt="HIGHER" 
-                  className="w-3 h-3"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
-                  }}
-                />
                 {totalSupporterStakedFormatted}
               </span>
               <span className="text-black/60">supporter</span>
