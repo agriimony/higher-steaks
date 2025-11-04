@@ -36,6 +36,7 @@ interface StakingModalProps {
   loading?: boolean;
   elapsedSeconds?: number;
   onTransactionSuccess?: () => void;
+  onRefresh?: () => void;
 }
 
 // Format time remaining to show only largest unit
@@ -84,7 +85,7 @@ function formatTokenAmount(amount: string): string {
   }
 }
 
-export function StakingModal({ onClose, balance, lockups, wallets, loading = false, elapsedSeconds: externalElapsedSeconds = 0, onTransactionSuccess }: StakingModalProps) {
+export function StakingModal({ onClose, balance, lockups, wallets, loading = false, elapsedSeconds: externalElapsedSeconds = 0, onTransactionSuccess, onRefresh }: StakingModalProps) {
   // Transaction state
   const [unstakeLockupId, setUnstakeLockupId] = useState<string | null>(null);
   const [unstakeError, setUnstakeError] = useState<string | null>(null);
@@ -226,26 +227,52 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)'
         }}
       >
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-black/40 hover:text-black transition"
-          aria-label="Close"
-        >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor"
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
+        <div className="absolute top-3 right-3 flex items-center gap-2">
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="text-black/40 hover:text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Refresh balance"
+              disabled={loading}
+              aria-label="Refresh balance"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="20" 
+                height="20" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor"
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className={loading ? 'animate-spin' : ''}
+              >
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
+              </svg>
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="text-black/40 hover:text-black transition"
+            aria-label="Close"
           >
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="20" 
+              height="20" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor"
+              strokeWidth="2" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+            >
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
 
         {/* Top Section: Balance Display */}
         <div className="mb-6 pb-4 border-b-2 border-black">

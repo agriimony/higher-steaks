@@ -5,6 +5,7 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { StakingModal } from '@/components/StakingModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
+import { BlockLivenessIndicator } from '@/components/BlockLivenessIndicator';
 import { useEventSubscriptions } from '@/hooks/useEventSubscriptions';
 import { useAccount } from 'wagmi';
 
@@ -192,17 +193,8 @@ export default function HigherSteakMenu() {
         updateStakingDetailsFromBalance(balanceData);
       } else {
         console.error('[fetchTokenBalance] Failed to fetch balance, status:', response.status);
-        const errorData = await response.json().catch(() => ({}));
-        
-        // Check if it's a stale block error (503)
-        if (response.status === 503 && errorData.message) {
-          setBalanceError('stale');
-          setBalance(null);
-        } else {
-          setBalanceError(null);
-          setBalance(null);
-        }
-        
+        setBalanceError(null);
+        setBalance(null);
         setStakingDetails({ lockups: [], wallets: [] });
         setLoadingStakingDetails(false);
       }
@@ -636,6 +628,11 @@ export default function HigherSteakMenu() {
             // CDP webhook will automatically detect the transaction and refresh the balance
             // No manual refresh needed
           }}
+          onRefresh={() => {
+            if (user?.fid) {
+              fetchTokenBalance(user.fid);
+            }
+          }}
         />
       )}
 
@@ -671,21 +668,6 @@ export default function HigherSteakMenu() {
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue}
                 </span>
-              </div>
-            ) : balanceError === 'stale' ? (
-              <div className="flex items-center gap-1.5">
-                <span className="text-[0.65rem] sm:text-xs text-orange-600">⚠️</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (user?.fid) {
-                      fetchTokenBalance(user.fid);
-                    }
-                  }}
-                  className="text-[0.65rem] sm:text-xs text-purple-600 hover:text-purple-700 underline font-bold"
-                >
-                  Retry
-                </button>
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
@@ -868,6 +850,7 @@ export default function HigherSteakMenu() {
         </svg>
       </button>
     </main>
+    <BlockLivenessIndicator />
     </>
   );
 }
