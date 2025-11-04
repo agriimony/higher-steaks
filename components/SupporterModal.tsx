@@ -510,10 +510,10 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 href={`https://farcaster.xyz/${castData.username}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-bold text-black hover:text-purple-700 transition-colors block truncate w-30"
+                className="font-bold text-black hover:text-purple-700 transition-colors block truncate w-32"
                 title={`@${castData.username}`}
               >
-                @{castData.username}sdjfkjhsdfkjhsdkjhfksdhf
+                @{castData.username}
               </a>
               {castData.displayName && castData.displayName !== castData.username && (
                 <div className="text-xs text-black/60 truncate">{castData.displayName}</div>
