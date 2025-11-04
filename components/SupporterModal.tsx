@@ -602,9 +602,6 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
             </div>
             <div className="mb-3">
               <label className="block text-xs font-bold text-black mb-1">
-                Unlock Time
-              </label>
-              <div className="text-sm text-black font-mono bg-gray-50 border border-black/20 p-2">
                 until {castData.maxCasterUnlockTime > 0 
                   ? new Date(castData.maxCasterUnlockTime * 1000).toLocaleString('en-US', {
                       month: 'short',
@@ -615,7 +612,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                       hour12: true
                     })
                   : 'N/A'}
-              </div>
+              </label>
               <div className="text-xs text-black/50 mt-1">
                 Your stake will unlock together with @{castData.username}
               </div>
