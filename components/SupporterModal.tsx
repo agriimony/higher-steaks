@@ -514,9 +514,15 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
               <div className="font-bold text-black">
                 ${castData.usdValue ? castData.usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
               </div>
-              <div className="text-xs text-black/60">
-                for {formatTimeRemaining(castData.maxCasterUnlockTime)}
-              </div>
+              {castData.maxCasterUnlockTime > 0 ? (
+                <div className="text-xs text-black/60">
+                  for {formatTimeRemaining(castData.maxCasterUnlockTime)}
+                </div>
+              ) : (
+                <div className="text-xs text-black/60">
+                  {formatTimeRemaining(castData.maxCasterUnlockTime)}
+                </div>
+              )}
             </div>
             <div className="text-xs text-black/80 mt-0 flex items-center gap-1 justify-end">
               <span className="font-bold flex items-center gap-1">
