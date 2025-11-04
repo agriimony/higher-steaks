@@ -513,7 +513,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 className="font-bold text-black hover:text-purple-700 transition-colors block truncate w-64"
                 title={`@${castData.username}`}
               >
-                @{castData.username}
+                @{castData.username}sdjfkjhsdfkjhsdkjhfksdhf
               </a>
               {castData.displayName && castData.displayName !== castData.username && (
                 <div className="text-xs text-black/60 truncate">{castData.displayName}</div>
@@ -532,11 +532,11 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
               )}
             </div>
             <div className="text-xs text-black/80 mt-1 flex items-center gap-1 justify-end">
-              <span className="font-bold rounded-full flex items-center gap-1">
+              <span className="font-bold flex items-center gap-1">
                 <img 
                   src="/higher-logo.png" 
                   alt="HIGHER" 
-                  className="w-3 h-3"
+                  className="w-3 h-3 rounded-full"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none';
                   }}
