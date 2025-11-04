@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS leaderboard_entries (
   supporter_stake_lockup_ids INTEGER[] DEFAULT '{}',
   supporter_stake_amounts NUMERIC[] DEFAULT '{}',
   supporter_stake_fids INTEGER[] DEFAULT '{}',
+  supporter_stake_pfps TEXT[] DEFAULT '{}',
   cast_state VARCHAR(20) DEFAULT 'higher' -- 'invalid', 'valid', or 'higher'
 );
 

@@ -368,7 +368,8 @@ export async function GET(request: NextRequest) {
     const addressToFid = await getFidsFromAddresses(Array.from(allReceiverAddresses));
     console.log(`  Mapped ${addressToFid.size} addresses to FIDs`);
     
-    // Classify stakes and build entries
+    // Step 4: Classify stakes and build entries
+    console.log('Step 4: Classifying stakes and building entries...');
     const validEntries: Array<{
       castHash: string;
       creatorFid: number;
@@ -384,6 +385,7 @@ export async function GET(request: NextRequest) {
       supporterStakeLockupIds: number[];
       supporterStakeAmounts: string[];
       supporterStakeFids: number[];
+      supporterStakePfps: string[]; // PFP URLs corresponding to supporter_stake_fids (same order)
       stakerFids: number[]; // For backward compatibility: [creator_fid, ...supporter_stake_fids]
       totalStaked: bigint;
     }> = [];
@@ -453,6 +455,7 @@ export async function GET(request: NextRequest) {
         supporterStakeLockupIds: validSupporterStakes.map(s => Number(s.lockupId)),
         supporterStakeAmounts: validSupporterStakes.map(s => s.amount.toString()),
         supporterStakeFids: validSupporterStakes.map(s => s.fid),
+        supporterStakePfps: validSupporterStakes.map(s => fidToPfp.get(s.fid) || ''), // Fetch PFP for each supporter FID
         stakerFids: Array.from(stakerFids), // For backward compatibility
         totalStaked,
       });
@@ -460,7 +463,7 @@ export async function GET(request: NextRequest) {
     
     console.log(`Built ${validEntries.length} higher casts with valid caster stakes`);
     
-    // Step 5: Calculate USD values and sort
+    // Step 6: Calculate USD values and sort
     const tokenPrice = await getTokenPrice();
     console.log(`HIGHER token price: $${tokenPrice}`);
     
@@ -513,6 +516,7 @@ export async function GET(request: NextRequest) {
           supporterStakeLockupIds: entry.supporterStakeLockupIds,
           supporterStakeAmounts: entry.supporterStakeAmounts,
           supporterStakeFids: entry.supporterStakeFids,
+          supporterStakePfps: entry.supporterStakePfps,
           stakerFids: entry.stakerFids, // For backward compatibility
           castState: 'higher',
         });

@@ -10,6 +10,7 @@ ALTER TABLE leaderboard_entries
   ADD COLUMN IF NOT EXISTS supporter_stake_lockup_ids INTEGER[] DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS supporter_stake_amounts NUMERIC[] DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS supporter_stake_fids INTEGER[] DEFAULT '{}',
+  ADD COLUMN IF NOT EXISTS supporter_stake_pfps TEXT[] DEFAULT '{}',
   ADD COLUMN IF NOT EXISTS cast_state VARCHAR(20) DEFAULT 'higher';
 
 -- Create index for cast_state for filtering
@@ -20,9 +21,12 @@ CREATE INDEX IF NOT EXISTS idx_cast_state ON leaderboard_entries(cast_state);
 --   (calculated and stored for quick queries/sorting)
 -- - staker_fids = [creator_fid, ...supporter_stake_fids] (for backward compatibility)
 --   (can be derived from creator_fid + supporter_stake_fids)
+-- - supporter_stake_pfps = array of profile picture URLs corresponding to supporter_stake_fids
+--   (same order as supporter_stake_fids array)
 --
 -- Existing data will need to be backfilled via the cron job which will:
 -- 1. Query onchain lockup data
 -- 2. Classify stakes as caster vs supporter
--- 3. Populate all columns including backward-compatible ones
+-- 3. Fetch supporter PFPs from Neynar
+-- 4. Populate all columns including backward-compatible ones
 

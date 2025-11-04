@@ -335,11 +335,18 @@ async function handleOptimisticLockupUpdate(data: {
         supporterStakeLockupIds: [],
         supporterStakeAmounts: [],
         supporterStakeFids: [],
+        supporterStakePfps: [],
         castState: 'valid',
       };
     }
 
-    // Get receiver FID
+    if (!cast) {
+      console.log('[CDP Webhook] Cast is null, skipping optimistic update');
+      return;
+    }
+
+    // Get current DB entry for merging existing data
+    const currentDbEntry = await getHigherCast(castHash);
     const receiverAddress = data.receiver;
     if (!receiverAddress) {
       console.log('[CDP Webhook] No receiver address, skipping optimistic update');
@@ -374,6 +381,7 @@ async function handleOptimisticLockupUpdate(data: {
     let supporterStakeLockupIds = [...cast.supporterStakeLockupIds];
     let supporterStakeAmounts = [...cast.supporterStakeAmounts];
     let supporterStakeFids = [...cast.supporterStakeFids];
+    let supporterStakePfps = [...cast.supporterStakePfps];
 
     if (isCasterStake) {
       // Add to caster stakes
@@ -385,12 +393,50 @@ async function handleOptimisticLockupUpdate(data: {
       supporterStakeLockupIds.push(lockupId);
       supporterStakeAmounts.push(amount);
       supporterStakeFids.push(receiverFid);
+      // PFP will be fetched below
     }
 
     // Calculate new total
     const totalCasterStaked = casterStakeAmounts.reduce((sum, amt) => sum + BigInt(amt), BigInt(0));
     const totalSupporterStaked = supporterStakeAmounts.reduce((sum, amt) => sum + BigInt(amt), BigInt(0));
     const totalStaked = Number(totalCasterStaked + totalSupporterStaked) / 1e18; // Convert from wei
+
+    // Fetch PFPs for supporter FIDs that we don't have yet
+    if (supporterStakeFids.length > 0) {
+      try {
+        const { NeynarAPIClient } = await import('@neynar/nodejs-sdk');
+        const neynarApiKey = process.env.NEYNAR_API_KEY;
+        if (neynarApiKey && neynarApiKey !== 'your_neynar_api_key_here') {
+          const neynarClient = new NeynarAPIClient({ apiKey: neynarApiKey });
+          // Get existing PFPs from database if available
+          const currentDbEntry = await getHigherCast(castHash);
+          const existingPfps = currentDbEntry?.supporterStakePfps || [];
+          const existingFids = currentDbEntry?.supporterStakeFids || [];
+          
+          // Create a map of existing FID -> PFP
+          const existingFidToPfp = new Map<number, string>();
+          existingFids.forEach((fid: number, index: number) => {
+            existingFidToPfp.set(fid, existingPfps[index] || '');
+          });
+          
+          // Fetch PFPs for new supporter FIDs
+          const newFids = supporterStakeFids.filter(fid => !existingFidToPfp.has(fid));
+          if (newFids.length > 0) {
+            const usersResponse = await neynarClient.fetchBulkUsers({ fids: newFids });
+            for (const user of usersResponse.users) {
+              existingFidToPfp.set(user.fid, user.pfp_url || '');
+            }
+          }
+          
+          // Build PFP array in the same order as supporterStakeFids
+          supporterStakePfps = supporterStakeFids.map(fid => existingFidToPfp.get(fid) || '');
+        }
+      } catch (error) {
+        console.error('[CDP Webhook] Error fetching supporter PFPs:', error);
+        // Fallback to empty array if fetch fails
+        supporterStakePfps = supporterStakeFids.map(() => '');
+      }
+    }
 
     // Build staker_fids array: [creator_fid, ...unique supporter_fids] (for backward compatibility)
     const stakerFids = new Set<number>([cast.creatorFid]);
@@ -418,6 +464,7 @@ async function handleOptimisticLockupUpdate(data: {
       supporterStakeLockupIds,
       supporterStakeAmounts,
       supporterStakeFids,
+      supporterStakePfps, // Array of PFP URLs corresponding to supporter_stake_fids
       stakerFids: Array.from(stakerFids), // For backward compatibility
       castState: castState as 'invalid' | 'valid' | 'higher',
     });
