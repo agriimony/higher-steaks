@@ -504,6 +504,14 @@ export default function HigherSteakMenu() {
 
   // Handle unlock events (via CDP webhooks)
   useEffect(() => {
+    console.log('[Unlock Event Handler] Effect triggered:', {
+      hasUnlockEvent: !!ws.unlockEvent,
+      unlockEvent: ws.unlockEvent,
+      hasUser: !!user?.fid,
+      hasWagmiAddress: !!wagmiAddress,
+      wagmiAddress
+    });
+    
     if (ws.unlockEvent && user?.fid && wagmiAddress) {
       // Generate event ID based on what data is available
       // For Transfer-based events: use from/to/value
@@ -519,6 +527,7 @@ export default function HigherSteakMenu() {
         receiver: ws.unlockEvent.receiver,
         from: ws.unlockEvent.from,
         to: ws.unlockEvent.to,
+        value: ws.unlockEvent.value,
         wagmiAddress
       });
       
@@ -534,9 +543,21 @@ export default function HigherSteakMenu() {
       // Check if this event is relevant to the current user
       // For Transfer-based: to should be user's wallet (funds moving FROM lockup TO user)
       // For native Unlock: receiver should be user's wallet
-      const isRelevant = ws.unlockEvent.to 
-        ? ws.unlockEvent.to.toLowerCase() === wagmiAddress.toLowerCase()
-        : ws.unlockEvent.receiver?.toLowerCase() === wagmiAddress.toLowerCase();
+      const eventTo = ws.unlockEvent.to?.toLowerCase();
+      const eventReceiver = ws.unlockEvent.receiver?.toLowerCase();
+      const userAddress = wagmiAddress.toLowerCase();
+      
+      const isRelevant = eventTo 
+        ? eventTo === userAddress
+        : eventReceiver === userAddress;
+      
+      console.log('[Unlock Event] Relevance check:', {
+        eventTo,
+        eventReceiver,
+        userAddress,
+        isRelevant,
+        eventType: eventTo ? 'Transfer-based' : 'Native Unlock'
+      });
       
       if (isRelevant) {
         console.log('[Event] Unlock involves current user, refreshing balance');
@@ -544,13 +565,14 @@ export default function HigherSteakMenu() {
         // Refresh balance (unlock doesn't affect leaderboard, only individual balance)
         fetchTokenBalance(user.fid);
       } else {
-        console.log('[Unlock Event] Event not relevant:', {
-          eventTo: ws.unlockEvent.to,
-          eventReceiver: ws.unlockEvent.receiver,
-          wagmiAddress,
-          isRelevant
-        });
+        console.log('[Unlock Event] Event not relevant to current user');
       }
+    } else if (ws.unlockEvent) {
+      console.log('[Unlock Event] Missing required data:', {
+        hasUser: !!user?.fid,
+        hasWagmiAddress: !!wagmiAddress,
+        unlockEvent: ws.unlockEvent
+      });
     }
   }, [ws.unlockEvent, user?.fid, wagmiAddress]);
 

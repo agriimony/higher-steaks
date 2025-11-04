@@ -11,7 +11,18 @@ let clients: Map<string, ReadableStreamDefaultController> = new Map();
 
 // Broadcast updates when new events arrive
 eventStore.subscriptions.set('SSE_BROADCASTER', () => {
-  const data = JSON.stringify(eventStore.events.slice(-1)); // Send only latest event
+  const latestEvents = eventStore.events.slice(-1); // Send only latest event
+  const latestEvent = latestEvents[0];
+  
+  if (latestEvent) {
+    console.log('[SSE] Broadcasting event to clients:', {
+      type: latestEvent.type,
+      clientCount: clients.size,
+      eventData: latestEvent.data
+    });
+  }
+  
+  const data = JSON.stringify(latestEvents);
   clients.forEach((controller) => {
     try {
       controller.enqueue(`data: ${data}\n\n`);

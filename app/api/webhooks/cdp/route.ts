@@ -252,8 +252,15 @@ export async function POST(request: NextRequest) {
     // Parse and broadcast event
     const parsedEvent = parseCDPEvent(body);
     if (parsedEvent) {
-      console.log('[CDP Webhook] Broadcasting event:', parsedEvent.type, parsedEvent.data);
+      console.log('[CDP Webhook] Broadcasting event:', {
+        type: parsedEvent.type,
+        data: parsedEvent.data,
+        eventName: body.event_name,
+        contractAddress: body.contract_address
+      });
       broadcastEvent(parsedEvent.type, parsedEvent.data);
+    } else {
+      console.log('[CDP Webhook] Event parsed but returned null - not broadcasting');
     }
     
     return NextResponse.json({ success: true, message: 'Event received' });

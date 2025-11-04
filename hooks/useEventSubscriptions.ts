@@ -99,6 +99,7 @@ export function useEventSubscriptions(enabled: boolean = true): EventSubscriptio
                 break;
               
               case 'unlock':
+                console.log('[Event Subscription] Received unlock event:', latestEvent.data);
                 setState(prev => ({
                   ...prev,
                   unlockEvent: latestEvent.data,
@@ -175,9 +176,11 @@ export function useEventSubscriptions(enabled: boolean = true): EventSubscriptio
 
   useEffect(() => {
     if (state.unlockEvent) {
+      console.log('[Event Subscription] unlockEvent set, will clear in 5 seconds:', state.unlockEvent);
       const timer = setTimeout(() => {
+        console.log('[Event Subscription] Clearing unlockEvent after timeout');
         setState(prev => ({ ...prev, unlockEvent: null }));
-      }, 1000);
+      }, 5000); // Increased from 1 second to 5 seconds to give page.tsx more time to process
       return () => clearTimeout(timer);
     }
   }, [state.unlockEvent]);
