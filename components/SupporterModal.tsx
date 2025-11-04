@@ -6,7 +6,7 @@ import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
 import { useEventSubscriptions } from '@/hooks/useEventSubscriptions';
-import { formatTimeRemaining, calculateDurationToMatch } from '@/lib/supporter-helpers';
+import { formatTimeRemaining } from '@/lib/supporter-helpers';
 
 interface SupporterModalProps {
   castHash: string;
@@ -54,8 +54,6 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
   const [error, setError] = useState<string | null>(null);
   const [showStakingForm, setShowStakingForm] = useState(false);
   const [stakeAmount, setStakeAmount] = useState('');
-  const [lockupDuration, setLockupDuration] = useState<string>('');
-  const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   
   // Staking transaction state
   const [stakeError, setStakeError] = useState<string | null>(null);
@@ -136,14 +134,6 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
     }
   }, [castHash, userFid]);
 
-  // Pre-fill duration when cast data is loaded and staking form is shown
-  useEffect(() => {
-    if (castData && showStakingForm && castData.maxCasterUnlockTime > 0) {
-      const duration = calculateDurationToMatch(castData.maxCasterUnlockTime);
-      setLockupDuration(duration.value.toString());
-      setLockupDurationUnit(duration.unit);
-    }
-  }, [castData, showStakingForm]);
 
   // Chain createLockUp after approve succeeds
   useEffect(() => {
@@ -205,7 +195,6 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
       setCreateLockUpParams(null);
       setShowStakingForm(false);
       setStakeAmount('');
-      setLockupDuration('');
       
       // Call success callback
       onStakeSuccess?.();
@@ -609,29 +598,22 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
             </div>
             <div className="mb-3">
               <label className="block text-xs font-bold text-black mb-1">
-                Duration (matches max caster stake unlock time)
+                Unlock Time
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={lockupDuration}
-                  readOnly
-                  className="flex-1 text-sm font-mono bg-gray-100 border border-black/20 p-2 text-black/60 cursor-not-allowed"
-                />
-                <select
-                  value={lockupDurationUnit}
-                  disabled
-                  className="text-sm font-mono bg-gray-100 border border-black/20 p-2 text-black/60 cursor-not-allowed"
-                >
-                  <option value="minute">minute</option>
-                  <option value="day">day</option>
-                  <option value="week">week</option>
-                  <option value="month">month</option>
-                  <option value="year">year</option>
-                </select>
+              <div className="text-sm text-black font-mono bg-gray-50 border border-black/20 p-2">
+                until {castData.maxCasterUnlockTime > 0 
+                  ? new Date(castData.maxCasterUnlockTime * 1000).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true
+                    })
+                  : 'N/A'}
               </div>
               <div className="text-xs text-black/50 mt-1">
-                Your stake will unlock at the same time as the longest caster stake
+                Your stake will unlock together with @{castData.username}
               </div>
             </div>
             {stakeError && (
