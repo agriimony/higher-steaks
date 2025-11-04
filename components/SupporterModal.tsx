@@ -489,35 +489,73 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
         </button>
 
         {/* Top Section: Caster Info + Total USD */}
-        <div className="flex items-start justify-between mb-4 pb-4 border-b-2 border-black">
+        <div className="flex items-center justify-between mb-4 pb-4 border-b-2 border-black">
           <div className="flex items-center gap-3">
             {castData.pfpUrl && (
-              <img 
-                src={castData.pfpUrl} 
-                alt={castData.username}
-                className="w-12 h-12 rounded-full border border-black/20"
-              />
+              <a 
+                href={`https://farcaster.xyz/${castData.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:opacity-80 transition-opacity"
+              >
+                <img 
+                  src={castData.pfpUrl} 
+                  alt={castData.username}
+                  className="w-12 h-12 rounded-full border border-black/20"
+                />
+              </a>
             )}
             <div>
-              <div className="font-bold text-black">@{castData.username}</div>
+              <a 
+                href={`https://farcaster.xyz/${castData.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-black hover:text-purple-700 transition-colors"
+              >
+                @{castData.username}
+              </a>
               {castData.displayName && castData.displayName !== castData.username && (
                 <div className="text-xs text-black/60">{castData.displayName}</div>
               )}
             </div>
           </div>
           <div className="text-right">
-            <div className="font-bold text-black">
-              ${castData.usdValue ? castData.usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
-            </div>
-            {castData.maxCasterUnlockTime > 0 && (
-              <div className="text-xs text-black/60 mt-1">
-                Max: {formatTimeRemaining(castData.maxCasterUnlockTime)}
+            <div className="flex items-center gap-2 justify-end">
+              <div className="font-bold text-black">
+                ${castData.usdValue ? castData.usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
               </div>
-            )}
-            <div className="text-xs text-black/80 mt-1">
-              <span className="font-bold">{totalCasterStakedFormatted}</span> caster
+              {castData.maxCasterUnlockTime > 0 && (
+                <div className="text-xs text-black/60">
+                  Max: {formatTimeRemaining(castData.maxCasterUnlockTime)}
+                </div>
+              )}
+            </div>
+            <div className="text-xs text-black/80 mt-1 flex items-center gap-1 justify-end">
+              <span className="font-bold flex items-center gap-1">
+                <img 
+                  src="/higher-logo.png" 
+                  alt="HIGHER" 
+                  className="w-3 h-3"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                {totalCasterStakedFormatted}
+              </span>
+              <span className="text-black/60">caster</span>
               {' '}
-              <span className="text-black/60">{totalSupporterStakedFormatted}</span> supporter
+              <span className="text-black/60 flex items-center gap-1">
+                <img 
+                  src="/higher-logo.png" 
+                  alt="HIGHER" 
+                  className="w-3 h-3"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                {totalSupporterStakedFormatted}
+              </span>
+              <span className="text-black/60">supporter</span>
             </div>
           </div>
         </div>
