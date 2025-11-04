@@ -62,23 +62,38 @@ export function BlockLivenessIndicator() {
   };
 
   return (
-    <div
-      className={`w-2 h-2 rounded-full ${getColor()} transition-colors duration-300 ${
-        liveness?.status === 'fresh' 
-          ? 'animate-pulse shadow-lg shadow-green-500/50' 
-          : liveness?.status === 'stale'
-          ? 'animate-pulse shadow-lg shadow-yellow-500/50'
-          : liveness?.status === 'very_stale'
-          ? 'animate-pulse shadow-lg shadow-red-500/50'
-          : ''
-      }`}
-      title={
-        error
-          ? 'Error fetching block status'
-          : liveness
-          ? `Block #${liveness.blockNumber} (${formatAge(liveness.ageSeconds)} old)`
-          : 'Loading...'
-      }
-    />
+    <>
+      <style>{`
+        @keyframes slow-pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+        .slow-pulse {
+          animation: slow-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+      `}</style>
+      <div
+        className={`w-2 h-2 rounded-full ${getColor()} transition-colors duration-300 ${
+          liveness?.status === 'fresh' 
+            ? 'slow-pulse shadow-lg shadow-green-500/50' 
+            : liveness?.status === 'stale'
+            ? 'slow-pulse shadow-lg shadow-yellow-500/50'
+            : liveness?.status === 'very_stale'
+            ? 'slow-pulse shadow-lg shadow-red-500/50'
+            : ''
+        }`}
+        title={
+          error
+            ? 'Error fetching block status'
+            : liveness
+            ? `Block #${liveness.blockNumber} (${formatAge(liveness.ageSeconds)} old)`
+            : 'Loading...'
+        }
+      />
+    </>
   );
 }
