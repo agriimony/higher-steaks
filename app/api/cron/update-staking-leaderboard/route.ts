@@ -459,9 +459,9 @@ export async function GET(request: NextRequest) {
         continue;
       }
       
-      // Filter supporter stakes: only include if unlockTime > max caster stake unlockTime
-      const maxCasterUnlockTime = Math.max(...casterStakes.map(s => s.unlockTime));
-      const validSupporterStakes = supporterStakes.filter(s => s.unlockTime > maxCasterUnlockTime);
+      // Filter supporter stakes: only include if unlockTime > min caster stake unlockTime
+      const minCasterUnlockTime = Math.min(...casterStakes.map(s => s.unlockTime));
+      const validSupporterStakes = supporterStakes.filter(s => s.unlockTime > minCasterUnlockTime);
       
       // Calculate total staked (caster + supporter)
       const totalCasterStaked = casterStakes.reduce((sum, s) => sum + s.amount, BigInt(0));

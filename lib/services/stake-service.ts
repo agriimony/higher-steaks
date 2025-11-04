@@ -182,9 +182,9 @@ export async function getStakesForCast(castHash: string): Promise<{
     }))
     .filter(stake => stake.unlockTime > currentTime);
 
-  // Filter valid supporter stakes (unlockTime > max caster stake unlockTime)
-  const maxCasterUnlockTime = cast.casterStakeUnlockTimes.length > 0
-    ? Math.max(...cast.casterStakeUnlockTimes.filter(t => t > currentTime))
+  // Filter valid supporter stakes (unlockTime > min caster stake unlockTime)
+  const minCasterUnlockTime = cast.casterStakeUnlockTimes.length > 0
+    ? Math.min(...cast.casterStakeUnlockTimes.filter(t => t > currentTime))
     : 0;
 
   const supporterStakes = cast.supporterStakeLockupIds
@@ -194,9 +194,10 @@ export async function getStakesForCast(castHash: string): Promise<{
       fid: cast.supporterStakeFids[index] || 0,
     }))
     .filter((_, index) => {
-      // Note: We'd need to store unlock times for supporter stakes too
-      // For now, we'll include all supporter stakes
-      // This should be enhanced when we have unlock times for supporter stakes
+      // Note: We'd need to store unlock times for supporter stakes to properly filter
+      // Supporter stakes are only valid if unlockTime > min caster stake unlockTime
+      // For now, we'll include all supporter stakes since unlock times aren't stored
+      // This should be enhanced when we add supporter_stake_unlock_times column
       return true;
     });
 
@@ -204,9 +205,9 @@ export async function getStakesForCast(castHash: string): Promise<{
 }
 
 /**
- * Get max caster stake unlock time for a cast
+ * Get min caster stake unlock time for a cast
  */
-export async function getMaxCasterStakeUnlockTime(castHash: string): Promise<number> {
+export async function getMinCasterStakeUnlockTime(castHash: string): Promise<number> {
   const cast = await getHigherCast(castHash);
   if (!cast || cast.casterStakeUnlockTimes.length === 0) {
     return 0;
@@ -219,6 +220,6 @@ export async function getMaxCasterStakeUnlockTime(castHash: string): Promise<num
     return 0;
   }
 
-  return Math.max(...validUnlockTimes);
+  return Math.min(...validUnlockTimes);
 }
 

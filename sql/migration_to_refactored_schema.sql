@@ -23,10 +23,12 @@ CREATE INDEX IF NOT EXISTS idx_cast_state ON leaderboard_entries(cast_state);
 --   (can be derived from creator_fid + supporter_stake_fids)
 -- - supporter_stake_pfps = array of profile picture URLs corresponding to supporter_stake_fids
 --   (same order as supporter_stake_fids array)
+-- - supporter stakes are only valid if unlockTime > min caster stake unlockTime
 --
 -- Existing data will need to be backfilled via the cron job which will:
 -- 1. Query onchain lockup data
 -- 2. Classify stakes as caster vs supporter
 -- 3. Fetch supporter PFPs from Neynar
--- 4. Populate all columns including backward-compatible ones
+-- 4. Filter supporter stakes (unlockTime > min caster stake unlockTime)
+-- 5. Populate all columns including backward-compatible ones
 
