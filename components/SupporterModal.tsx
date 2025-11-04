@@ -646,12 +646,21 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
         ) : (
           /* Action Buttons */
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowStakingForm(true)}
-              className="flex-1 px-4 py-2 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
-            >
-              Add Support
-            </button>
+            {castData.maxCasterUnlockTime > 0 ? (
+              <button
+                onClick={() => setShowStakingForm(true)}
+                className="flex-1 px-4 py-2 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
+              >
+                Add Support
+              </button>
+            ) : (
+              <button
+                disabled
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-500 font-bold border-2 border-gray-300 cursor-not-allowed transition text-sm"
+              >
+                Expired
+              </button>
+            )}
             <button
               onClick={handleSwapToHigher}
               className="flex-1 px-4 py-2 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm"
