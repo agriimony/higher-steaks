@@ -630,6 +630,8 @@ export default function HigherSteakMenu() {
           }}
           onRefresh={() => {
             if (user?.fid) {
+              // Reset elapsed time counter when manually refreshing
+              setElapsedSeconds(0);
               fetchTokenBalance(user.fid);
             }
           }}
