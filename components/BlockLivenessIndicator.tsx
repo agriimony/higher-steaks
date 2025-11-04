@@ -62,17 +62,23 @@ export function BlockLivenessIndicator() {
   };
 
   return (
-    <div className="fixed bottom-4 left-4 z-50">
-      <div
-        className={`w-3 h-3 rounded-full ${getColor()} transition-colors duration-300`}
-        title={
-          error
-            ? 'Error fetching block status'
-            : liveness
-            ? `Block #${liveness.blockNumber} (${formatAge(liveness.ageSeconds)} old)`
-            : 'Loading...'
-        }
-      />
-    </div>
+    <div
+      className={`w-2 h-2 rounded-full ${getColor()} transition-colors duration-300 ${
+        liveness?.status === 'fresh' 
+          ? 'animate-pulse shadow-lg shadow-green-500/50' 
+          : liveness?.status === 'stale'
+          ? 'animate-pulse shadow-lg shadow-yellow-500/50'
+          : liveness?.status === 'very_stale'
+          ? 'animate-pulse shadow-lg shadow-red-500/50'
+          : ''
+      }`}
+      title={
+        error
+          ? 'Error fetching block status'
+          : liveness
+          ? `Block #${liveness.blockNumber} (${formatAge(liveness.ageSeconds)} old)`
+          : 'Loading...'
+      }
+    />
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { StakingModal } from '@/components/StakingModal';
@@ -440,6 +440,15 @@ export default function HigherSteakMenu() {
 
   const filteredLeaderboard = getFilteredLeaderboard();
 
+  // Check if there are any unstakeable positions (timeRemaining <= 0)
+  const hasUnstakeablePositions = useMemo(() => {
+    if (!stakingDetails?.lockups) return false;
+    return stakingDetails.lockups.some(lockup => {
+      const dynamicTimeRemaining = Math.max(0, lockup.timeRemaining - elapsedSeconds);
+      return dynamicTimeRemaining <= 0;
+    });
+  }, [stakingDetails?.lockups, elapsedSeconds]);
+
   // Handle lockup events (via CDP webhooks)
   useEffect(() => {
     if (ws.newLockupEvent && user?.fid && wagmiAddress) {
@@ -644,9 +653,13 @@ export default function HigherSteakMenu() {
         <div className="flex justify-between items-center gap-2 mb-3 sm:mb-4">
           {/* Token Balance Pill - Left */}
           <div 
-            className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+            className="relative bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
             onClick={handleBalancePillClick}
           >
+            {/* Unstake notification indicator */}
+            {hasUnstakeablePositions && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse border-2 border-white shadow-lg shadow-red-500/50" title="You have positions ready to unstake" />
+            )}
             {loadingBalance ? (
               <div className="flex items-center gap-2">
                 <div className="animate-spin h-3 w-3 border-2 border-purple-600 border-t-transparent rounded-full"></div>
@@ -701,9 +714,10 @@ export default function HigherSteakMenu() {
                     alt={user.username}
                     className="w-6 h-6 sm:w-7 sm:h-7 rounded-full border border-black/10"
                   />
-                  <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800 pr-1.5">
+                  <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800">
                     @{user.username}
                   </span>
+                  <BlockLivenessIndicator />
                 </>
               ) : (
                 <>
@@ -850,9 +864,8 @@ export default function HigherSteakMenu() {
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
-      </button>
-    </main>
-    <BlockLivenessIndicator />
-    </>
-  );
-}
+             </button>
+     </main>
+     </>
+   );
+ }
