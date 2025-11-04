@@ -368,8 +368,41 @@ export async function GET(request: NextRequest) {
     const addressToFid = await getFidsFromAddresses(Array.from(allReceiverAddresses));
     console.log(`  Mapped ${addressToFid.size} addresses to FIDs`);
     
-    // Step 4: Classify stakes and build entries
-    console.log('Step 4: Classifying stakes and building entries...');
+    // Step 4.5: Fetch supporter PFPs from Neynar
+    console.log('Step 4.5: Fetching supporter PFPs from Neynar...');
+    const supporterFids = new Set<number>();
+    for (const lockups of castLockups.values()) {
+      for (const lockup of lockups) {
+        const receiverFid = addressToFid.get(lockup.receiver);
+        if (receiverFid) {
+          // We'll determine if it's a supporter later, but collect all FIDs first
+          supporterFids.add(receiverFid);
+        }
+      }
+    }
+    
+    // Fetch PFPs for all supporter FIDs in batches
+    const fidToPfp = new Map<number, string>();
+    const supporterFidsArray = Array.from(supporterFids);
+    const batchSize = 100; // Neynar allows up to 100 FIDs per fetchBulkUsers call
+    
+    for (let i = 0; i < supporterFidsArray.length; i += batchSize) {
+      const batch = supporterFidsArray.slice(i, i + batchSize);
+      try {
+        const usersResponse = await neynarClient.fetchBulkUsers({ fids: batch });
+        for (const user of usersResponse.users) {
+          fidToPfp.set(user.fid, user.pfp_url || '');
+        }
+        console.log(`  Fetched PFPs for batch ${Math.floor(i / batchSize) + 1} (${batch.length} users)`);
+      } catch (error) {
+        console.error(`  Error fetching PFPs for batch ${Math.floor(i / batchSize) + 1}:`, error);
+        // Continue with other batches even if one fails
+      }
+    }
+    
+    console.log(`  Fetched ${fidToPfp.size} PFPs from Neynar`);
+    
+    // Classify stakes and build entries
     const validEntries: Array<{
       castHash: string;
       creatorFid: number;
@@ -463,7 +496,7 @@ export async function GET(request: NextRequest) {
     
     console.log(`Built ${validEntries.length} higher casts with valid caster stakes`);
     
-    // Step 6: Calculate USD values and sort
+    // Step 5: Calculate USD values and sort
     const tokenPrice = await getTokenPrice();
     console.log(`HIGHER token price: $${tokenPrice}`);
     
