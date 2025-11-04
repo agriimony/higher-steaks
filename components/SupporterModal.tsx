@@ -66,7 +66,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
   } | null>(null);
   
   // Wagmi hooks
-  const { address: wagmiAddress } = useAccount();
+  const { address: wagmiAddress, isConnected } = useAccount();
   
   // Read current allowance to avoid unnecessary approvals
   const { data: currentAllowance } = useReadContract({
@@ -147,7 +147,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
 
   // Chain createLockUp after approve succeeds
   useEffect(() => {
-    if (!isApproveSuccess || !approveReceipt || !createLockUpParams || !wagmiAddress || !castHash || hasScheduledCreateLockUp.current) {
+    if (!isApproveSuccess || !approveReceipt || !createLockUpParams || !wagmiAddress || !castHash || hasScheduledCreateLockUp.current || !isConnected) {
       return;
     }
 
@@ -188,7 +188,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
         createLockUpTimeoutRef.current = null;
       }
     };
-  }, [isApproveSuccess, approveReceipt, wagmiAddress, castHash, writeContractCreateLockUp]);
+  }, [isApproveSuccess, approveReceipt, wagmiAddress, castHash, isConnected, writeContractCreateLockUp]);
 
   // Handle transaction success
   useEffect(() => {
@@ -268,7 +268,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
   }, [ws.newLockupEvent, wagmiAddress, castHash, userFid, onStakeSuccess]);
 
   const handleStake = async () => {
-    if (!wagmiAddress) {
+    if (!wagmiAddress || !isConnected) {
       setStakeError('No wallet connected');
       return;
     }
