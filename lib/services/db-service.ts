@@ -169,12 +169,12 @@ export async function upsertHigherCast(data: {
         ${data.usdValue || null},
         ${data.rank || null},
         ${stakerFids as any},
-        ${data.casterStakeLockupIds || []},
-        ${data.casterStakeAmounts || []},
-        ${data.casterStakeUnlockTimes || []},
-        ${data.supporterStakeLockupIds || []},
-        ${data.supporterStakeAmounts || []},
-        ${data.supporterStakeFids || []},
+        ${(data.casterStakeLockupIds || []) as any},
+        ${(data.casterStakeAmounts || []) as any},
+        ${(data.casterStakeUnlockTimes || []) as any},
+        ${(data.supporterStakeLockupIds || []) as any},
+        ${(data.supporterStakeAmounts || []) as any},
+        ${(data.supporterStakeFids || []) as any},
         ${data.castState || 'higher'},
         NOW()
       )
