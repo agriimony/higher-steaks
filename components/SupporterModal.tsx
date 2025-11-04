@@ -505,12 +505,12 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 />
               </a>
             )}
-            <div className="min-w-0 flex-1 pb-1">
+            <div className="min-w-0 flex-1">
               <a 
                 href={`https://farcaster.xyz/${castData.username}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-bold text-black hover:text-purple-700 transition-colors block truncate w-64"
+                className="font-bold text-black hover:text-purple-700 transition-colors block truncate w-20"
                 title={`@${castData.username}`}
               >
                 @{castData.username}sdjfkjhsdfkjhsdkjhfksdhf
@@ -547,6 +547,8 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
               <span className="text-black/60 flex items-center gap-1">
                 {totalSupporterStakedFormatted}
               </span>
+              {' '}
+              <span className="text-black/60">supporting</span>
             </div>
           </div>
         </div>
