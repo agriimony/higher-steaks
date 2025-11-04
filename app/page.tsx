@@ -8,6 +8,7 @@ import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/compone
 import { BlockLivenessIndicator } from '@/components/BlockLivenessIndicator';
 import { useEventSubscriptions } from '@/hooks/useEventSubscriptions';
 import { useAccount } from 'wagmi';
+import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
 
 interface User {
   fid: number;
@@ -839,10 +840,46 @@ export default function HigherSteakMenu() {
           </div>
         </div>
 
-        <div className="text-center mt-3 md:mt-4">
-          <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60">Menu Changes Daily · 12PM UTC</p>
-        </div>
-      </div>
+                          <div className="text-center mt-3 md:mt-4">
+           <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60">Menu Changes Daily · 12PM UTC</p>
+         </div>
+
+                  {/* Footer */}
+         <div className="text-center mt-6 md:mt-8 pt-4 border-t border-black/10">
+           <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs text-gray-600 mb-2">
+             Built by{' '}
+             <a
+               href="https://farcaster.xyz/agrimony.eth"
+               target="_blank"
+               rel="noopener noreferrer"
+               className="text-purple-600 hover:text-purple-700 underline transition-colors"
+             >
+               @agrimony.eth
+             </a>
+             {' '}with love
+           </p>
+           <button
+             onClick={async () => {
+               try {
+                 // Base chain ID is 8453, format as CAIP-19
+                 const higherTokenCAIP = `eip155:8453/erc20:${HIGHER_TOKEN_ADDRESS}`;
+                 const result = await sdk.actions.sendToken({
+                   token: higherTokenCAIP,
+                   recipientFid: 191780,
+                 });
+                 if (!result.success) {
+                   console.error('Send token failed:', result);
+                 }
+               } catch (error) {
+                 console.error('Error sending token:', error);
+               }
+             }}
+             className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs text-gray-600 hover:text-purple-600 transition-colors underline"
+           >
+             Donate a ☕
+           </button>
+         </div>
+       </div>
 
       {/* Floating Action Button */}
       <button
