@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { StakingModal } from '@/components/StakingModal';
+import { SupporterModal } from '@/components/SupporterModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 import { BlockLivenessIndicator } from '@/components/BlockLivenessIndicator';
 import { useEventSubscriptions } from '@/hooks/useEventSubscriptions';
@@ -85,6 +86,8 @@ export default function HigherSteakMenu() {
     rank: number | null;
   } | null>(null);
   const [showStakingModal, setShowStakingModal] = useState(false);
+  const [showSupporterModal, setShowSupporterModal] = useState(false);
+  const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
   const [stakingDetails, setStakingDetails] = useState<{
     lockups: LockupDetail[];
     wallets: WalletDetail[];
@@ -648,6 +651,34 @@ export default function HigherSteakMenu() {
         />
       )}
 
+      {/* Supporter Modal */}
+      {showSupporterModal && selectedCastHash && (
+        <SupporterModal
+          castHash={selectedCastHash}
+          onClose={() => {
+            setShowSupporterModal(false);
+            setSelectedCastHash(null);
+          }}
+          userFid={user?.fid || null}
+          walletBalance={getWalletBalance()}
+          onStakeSuccess={() => {
+            // Refresh balance and leaderboard
+            if (user?.fid) {
+              fetchTokenBalance(user.fid);
+            }
+            // Refresh leaderboard
+            fetch('/api/leaderboard/refresh', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            }).catch(err => {
+              console.error('[SupporterModal] Error refreshing leaderboard:', err);
+            });
+          }}
+        />
+      )}
+
       <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
         <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
         {/* Header Row - Balance left, Profile right */}
@@ -815,14 +846,15 @@ export default function HigherSteakMenu() {
                       <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                       <span className="flex-shrink-0 font-bold tracking-wider">{entry.usdValue}</span>
                     </div>
-                    <a
-                      href={`https://farcaster.xyz/${entry.username}/${entry.castHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block mt-1 text-[0.65rem] sm:text-xs text-gray-600 hover:text-gray-900 transition-colors italic"
+                    <button
+                      onClick={() => {
+                        setSelectedCastHash(entry.castHash);
+                        setShowSupporterModal(true);
+                      }}
+                      className="block mt-1 text-[0.65rem] sm:text-xs text-gray-600 hover:text-gray-900 transition-colors italic text-left w-full"
                     >
                       {entry.description}
-                    </a>
+                    </button>
                   </div>
                 ))
               ) : (
