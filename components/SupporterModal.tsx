@@ -510,7 +510,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 href={`https://farcaster.xyz/${castData.username}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-bold text-black hover:text-purple-700 transition-colors block truncate w-20"
+                className="font-bold text-black hover:text-purple-700 transition-colors block truncate w-30"
                 title={`@${castData.username}`}
               >
                 @{castData.username}sdjfkjhsdfkjhsdkjhfksdhf
@@ -531,7 +531,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 </div>
               )}
             </div>
-            <div className="text-xs text-black/80 mt-1 flex items-center gap-1 justify-end">
+            <div className="text-xs text-black/80 mt-0 flex items-center gap-1 justify-end">
               <span className="font-bold flex items-center gap-1">
                 <img 
                   src="/higher-logo.png" 
