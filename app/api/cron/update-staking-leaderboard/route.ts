@@ -539,7 +539,7 @@ export async function GET(request: NextRequest) {
       success: true,
       totalLockups: Number(totalLockups),
       higherLockups: higherLockupIds.length,
-      uniqueCasts: castBalances.size,
+      uniqueCasts: castLockups.size,
       validCasts: validEntries.length,
       stored: top100.length,
       timestamp: new Date().toISOString(),
