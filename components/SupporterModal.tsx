@@ -489,14 +489,14 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
         </button>
 
         {/* Top Section: Caster Info + Total USD */}
-        <div className="flex items-center justify-between mb-4 pb-4 border-b-2 border-black">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between mb-4 pb-4 border-b-2 border-black gap-4">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             {castData.pfpUrl && (
               <a 
                 href={`https://farcaster.xyz/${castData.username}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:opacity-80 transition-opacity"
+                className="hover:opacity-80 transition-opacity flex-shrink-0"
               >
                 <img 
                   src={castData.pfpUrl} 
@@ -505,21 +505,22 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 />
               </a>
             )}
-            <div>
+            <div className="min-w-0 flex-1">
               <a 
                 href={`https://farcaster.xyz/${castData.username}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-bold text-black hover:text-purple-700 transition-colors"
+                className="font-bold text-black hover:text-purple-700 transition-colors block truncate"
+                title={`@${castData.username}`}
               >
                 @{castData.username}
               </a>
               {castData.displayName && castData.displayName !== castData.username && (
-                <div className="text-xs text-black/60">{castData.displayName}</div>
+                <div className="text-xs text-black/60 truncate">{castData.displayName}</div>
               )}
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right flex-shrink-0">
             <div className="flex items-center gap-2 justify-end">
               <div className="font-bold text-black">
                 ${castData.usdValue ? castData.usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}

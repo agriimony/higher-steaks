@@ -3,7 +3,7 @@
  */
 
 /**
- * Format max caster unlock time to readable format (e.g., "30 days", "2 weeks")
+ * Format max caster unlock time to readable format (e.g., "30d", "2w", "5h")
  */
 export function formatTimeRemaining(maxUnlockTime: number): string {
   const currentTime = Math.floor(Date.now() / 1000);
@@ -19,16 +19,16 @@ export function formatTimeRemaining(maxUnlockTime: number): string {
   const years = Math.floor(days / 365);
   
   if (years > 0) {
-    return `${years} ${years === 1 ? 'year' : 'years'}`;
+    return `${years}y`;
   } else if (months > 0) {
-    return `${months} ${months === 1 ? 'month' : 'months'}`;
+    return `${months}mo`;
   } else if (weeks > 0) {
-    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`;
+    return `${weeks}w`;
   } else if (days > 0) {
-    return `${days} ${days === 1 ? 'day' : 'days'}`;
+    return `${days}d`;
   } else {
     const hours = Math.floor(secondsRemaining / 3600);
-    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+    return `${hours}h`;
   }
 }
 
