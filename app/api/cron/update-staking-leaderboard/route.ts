@@ -3,7 +3,9 @@ import { sql } from '@vercel/postgres';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { createPublicClient, http, formatUnits } from 'viem';
 import { base } from 'viem/chains';
-import { KEYPHRASE_REGEX, extractDescription, isValidCastHash } from '@/lib/cast-helpers';
+import { extractDescription, isValidCastHash, containsKeyphrase } from '@/lib/cast-helpers';
+import { isValidStake, getFidsFromAddresses, type LockupData } from '@/lib/services/stake-service';
+import { upsertHigherCast } from '@/lib/services/db-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -205,12 +207,18 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Step 3: Get lockup details and aggregate by cast_hash
-    console.log('Step 3: Fetching lockup details and aggregating by cast hash...');
-    const castBalances = new Map<string, {
-      totalAmount: bigint;
-      receivers: Set<string>; // Track unique receiver addresses per cast
-    }>();
+    // Step 2: Fetch lockup details and classify as caster or supporter stakes
+    console.log('Step 2: Fetching lockup details and classifying stakes...');
+    const currentTime = Math.floor(Date.now() / 1000);
+    
+    // Map to store lockups by cast hash
+    const castLockups = new Map<string, Array<{
+      lockupId: bigint;
+      receiver: string;
+      amount: bigint;
+      unlockTime: number;
+      type: 'caster' | 'supporter' | 'pending';
+    }>>();
     
     let lockupsProcessed = 0;
     let lockupsUnlocked = 0;
@@ -228,32 +236,47 @@ export async function GET(request: NextRequest) {
         
         lockupsProcessed++;
         
-        // Destructure for clarity: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
+        // Destructure: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
         const [token, isERC20, unlockTime, unlocked, amount, receiver, title] = lockup;
         
-        // Log for debugging
-        if (lockupsProcessed <= 5 || title.length > 0) {
-          console.log(`  Lockup ${lockupId}: unlocked=${unlocked}, title="${title.substring(0, 50)}...", isValidHash=${isValidCastHash(title)}`);
+        // Create lockup data object
+        const lockupData: LockupData = {
+          lockupId: lockupId.toString(),
+          token,
+          isERC20,
+          unlockTime: Number(unlockTime),
+          unlocked: unlocked as boolean,
+          amount: amount as bigint,
+          receiver,
+          title,
+        };
+        
+        // Validate stake
+        if (!isValidStake(lockupData, currentTime)) {
+          if (unlocked) {
+            lockupsUnlocked++;
+          } else if (!isValidCastHash(title)) {
+            lockupsInvalidHash++;
+          }
+          continue;
         }
         
-        // Only include active (not unlocked) lockups with valid cast hashes
-        if (unlocked) {
-          lockupsUnlocked++;
-        } else if (!isValidCastHash(title)) {
-          lockupsInvalidHash++;
-        } else {
-          lockupsWithValidHash++;
-          const existing = castBalances.get(title);
-          if (existing) {
-            existing.totalAmount += amount;
-            existing.receivers.add(receiver.toLowerCase());
-          } else {
-            castBalances.set(title, {
-              totalAmount: amount,
-              receivers: new Set([receiver.toLowerCase()]),
-            });
-          }
+        lockupsWithValidHash++;
+        const castHash = title;
+        
+        // Initialize array for this cast if needed
+        if (!castLockups.has(castHash)) {
+          castLockups.set(castHash, []);
         }
+        
+        // Classify as pending for now (will be classified after getting creator FIDs)
+        castLockups.get(castHash)!.push({
+          lockupId,
+          receiver: receiver.toLowerCase(),
+          amount,
+          unlockTime: Number(unlockTime),
+          type: 'pending',
+        });
       } catch (error) {
         console.error(`Error fetching lockup ${lockupId}:`, error);
         // Continue with other lockups
@@ -264,11 +287,88 @@ export async function GET(request: NextRequest) {
     console.log(`  Total lockups processed: ${lockupsProcessed}`);
     console.log(`  Unlocked (skipped): ${lockupsUnlocked}`);
     console.log(`  Invalid cast hash (skipped): ${lockupsInvalidHash}`);
-    console.log(`  Valid cast hash (included): ${lockupsWithValidHash}`);
-    console.log(`Found ${castBalances.size} unique cast hashes with active lockups`);
+    console.log(`  Valid lockups (included): ${lockupsWithValidHash}`);
+    console.log(`Found ${castLockups.size} unique cast hashes with active lockups`);
     
-    // Step 4: Fetch cast details and validate keyphrase
-    console.log('Step 4: Fetching cast details and validating keyphrase...');
+    // Step 3: Validate casts and get creator FIDs
+    console.log('Step 3: Validating casts and fetching creator info...');
+    const castInfo = new Map<string, {
+      creatorFid: number;
+      creatorUsername: string;
+      creatorDisplayName: string;
+      creatorPfpUrl: string;
+      castText: string;
+      description: string;
+      timestamp: string;
+      isValid: boolean;
+    }>();
+    
+    for (const castHash of castLockups.keys()) {
+      try {
+        console.log(`  Validating cast ${castHash}...`);
+        const castResponse = await neynarClient.lookupCastByHashOrUrl({
+          identifier: castHash,
+          type: 'hash'
+        });
+        
+        const cast = castResponse.cast;
+        if (!cast) {
+          console.log(`  ✗ Cast not found: ${castHash}`);
+          continue;
+        }
+        
+        // Validate keyphrase
+        if (!containsKeyphrase(cast.text)) {
+          console.log(`  ✗ Cast missing keyphrase: ${castHash}`);
+          continue;
+        }
+        
+        // Validate /higher channel
+        const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
+        if (!isHigherChannel) {
+          console.log(`  ✗ Cast not in /higher channel: ${castHash}`);
+          continue;
+        }
+        
+        const description = extractDescription(cast.text) || '';
+        
+        castInfo.set(castHash, {
+          creatorFid: cast.author.fid,
+          creatorUsername: cast.author.username,
+          creatorDisplayName: cast.author.display_name || cast.author.username,
+          creatorPfpUrl: cast.author.pfp_url || '',
+          castText: cast.text,
+          description,
+          timestamp: cast.timestamp,
+          isValid: true,
+        });
+        
+        console.log(`  ✓ Valid cast: ${castHash}, creator FID: ${cast.author.fid}`);
+      } catch (error: any) {
+        console.error(`Error validating cast ${castHash}:`, error);
+        // Continue with other casts
+      }
+    }
+    
+    console.log(`Validated ${castInfo.size} casts`);
+    
+    // Step 4: Classify stakes and build higher casts list
+    console.log('Step 4: Classifying stakes and building higher casts list...');
+    
+    // Collect all receiver addresses for batch FID lookup
+    const allReceiverAddresses = new Set<string>();
+    for (const lockups of castLockups.values()) {
+      for (const lockup of lockups) {
+        allReceiverAddresses.add(lockup.receiver);
+      }
+    }
+    
+    // Batch get FIDs for all receiver addresses
+    console.log(`  Mapping ${allReceiverAddresses.size} addresses to FIDs...`);
+    const addressToFid = await getFidsFromAddresses(Array.from(allReceiverAddresses));
+    console.log(`  Mapped ${addressToFid.size} addresses to FIDs`);
+    
+    // Classify stakes and build entries
     const validEntries: Array<{
       castHash: string;
       creatorFid: number;
@@ -278,107 +378,94 @@ export async function GET(request: NextRequest) {
       castText: string;
       description: string;
       timestamp: string;
-      stakedBalance: bigint;
-      stakerAddresses: string[];
-      stakerFids: number[];
+      casterStakeLockupIds: number[];
+      casterStakeAmounts: string[];
+      casterStakeUnlockTimes: number[];
+      supporterStakeLockupIds: number[];
+      supporterStakeAmounts: string[];
+      supporterStakeFids: number[];
+      stakerFids: number[]; // For backward compatibility: [creator_fid, ...supporter_stake_fids]
+      totalStaked: bigint;
     }> = [];
     
-    for (const [castHash, { totalAmount, receivers }] of castBalances.entries()) {
-      try {
-        console.log(`Checking cast ${castHash} with ${formatUnits(totalAmount, 18)} HIGHER staked from ${receivers.size} staker(s)`);
-        
-        // Fetch cast details from Neynar
-        console.log(`  Calling Neynar lookupCastByHashOrUrl with identifier=${castHash}, type=hash`);
-        const castResponse = await neynarClient.lookupCastByHashOrUrl({ 
-          identifier: castHash,
-          type: 'hash'
-        });
-        const cast = castResponse.cast;
-        
-        if (!cast) {
-          console.log(`  ✗ Cast not found: ${castHash}`);
-          continue;
+    for (const [castHash, info] of castInfo.entries()) {
+      if (!info.isValid) continue;
+      
+      const lockups = castLockups.get(castHash) || [];
+      const creatorFid = info.creatorFid;
+      
+      // Classify stakes
+      const casterStakes: Array<{ lockupId: bigint; amount: bigint; unlockTime: number }> = [];
+      const supporterStakes: Array<{ lockupId: bigint; amount: bigint; unlockTime: number; fid: number }> = [];
+      
+      for (const lockup of lockups) {
+        const receiverFid = addressToFid.get(lockup.receiver);
+        if (receiverFid === creatorFid) {
+          // Caster stake
+          casterStakes.push({
+            lockupId: lockup.lockupId,
+            amount: lockup.amount,
+            unlockTime: lockup.unlockTime,
+          });
+        } else if (receiverFid) {
+          // Supporter stake
+          supporterStakes.push({
+            lockupId: lockup.lockupId,
+            amount: lockup.amount,
+            unlockTime: lockup.unlockTime,
+            fid: receiverFid,
+          });
         }
-        
-        console.log(`  Cast found: author=@${cast.author.username}, text="${cast.text.substring(0, 100)}..."`);
-        
-        // Validate keyphrase
-        const description = extractDescription(cast.text);
-        if (!description) {
-          console.log(`  ✗ Cast missing keyphrase: ${castHash}`);
-          continue;
-        }
-        
-        console.log(`  Keyphrase validated, description="${description.substring(0, 50)}..."`);
-        
-        // Validate /higher channel
-        const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
-        if (!isHigherChannel) {
-          console.log(`  ✗ Cast not in /higher channel: ${castHash}, channel=${cast.channel?.id || 'none'}, parent_url=${cast.parent_url || 'none'}`);
-          continue;
-        }
-        
-        console.log(`  ✓ Valid cast found for ${castHash}`);
-        validEntries.push({
-          castHash,
-          creatorFid: cast.author.fid,
-          creatorUsername: cast.author.username,
-          creatorDisplayName: cast.author.display_name || cast.author.username,
-          creatorPfpUrl: cast.author.pfp_url || '',
-          castText: cast.text,
-          description,
-          timestamp: cast.timestamp,
-          stakedBalance: totalAmount,
-          stakerAddresses: Array.from(receivers),
-          stakerFids: [], // Will be populated in Step 4b
-        });
-      } catch (error: any) {
-        console.error(`Error fetching cast ${castHash}:`, error);
-        console.error(`Error message: ${error.message}`);
-        console.error(`Error stack: ${error.stack}`);
-        // Continue with other casts
       }
+      
+      // Only include casts with at least one valid caster stake
+      if (casterStakes.length === 0) {
+        console.log(`  ✗ Cast ${castHash} has no valid caster stake, skipping`);
+        continue;
+      }
+      
+      // Filter supporter stakes: only include if unlockTime > max caster stake unlockTime
+      const maxCasterUnlockTime = Math.max(...casterStakes.map(s => s.unlockTime));
+      const validSupporterStakes = supporterStakes.filter(s => s.unlockTime > maxCasterUnlockTime);
+      
+      // Calculate total staked (caster + supporter)
+      const totalCasterStaked = casterStakes.reduce((sum, s) => sum + s.amount, BigInt(0));
+      const totalSupporterStaked = validSupporterStakes.reduce((sum, s) => sum + s.amount, BigInt(0));
+      const totalStaked = totalCasterStaked + totalSupporterStaked;
+      
+      // Build staker_fids array: [creator_fid, ...unique supporter_fids]
+      // (for backward compatibility - can be derived from creator_fid + supporter_stake_fids)
+      const stakerFids = new Set<number>([creatorFid]);
+      validSupporterStakes.forEach(s => stakerFids.add(s.fid));
+      
+      validEntries.push({
+        castHash,
+        creatorFid: info.creatorFid,
+        creatorUsername: info.creatorUsername,
+        creatorDisplayName: info.creatorDisplayName,
+        creatorPfpUrl: info.creatorPfpUrl,
+        castText: info.castText,
+        description: info.description,
+        timestamp: info.timestamp,
+        casterStakeLockupIds: casterStakes.map(s => Number(s.lockupId)),
+        casterStakeAmounts: casterStakes.map(s => s.amount.toString()),
+        casterStakeUnlockTimes: casterStakes.map(s => s.unlockTime),
+        supporterStakeLockupIds: validSupporterStakes.map(s => Number(s.lockupId)),
+        supporterStakeAmounts: validSupporterStakes.map(s => s.amount.toString()),
+        supporterStakeFids: validSupporterStakes.map(s => s.fid),
+        stakerFids: Array.from(stakerFids), // For backward compatibility
+        totalStaked,
+      });
     }
     
-    console.log(`Found ${validEntries.length} valid casts with keyphrase`);
+    console.log(`Built ${validEntries.length} higher casts with valid caster stakes`);
     
-    // Step 4b: Map staker addresses to FIDs
-    console.log('Step 4b: Mapping staker addresses to FIDs...');
-    const addressToFid = new Map<string, number>();
-    const allStakerAddresses = new Set<string>();
-    validEntries.forEach(entry => entry.stakerAddresses.forEach(addr => allStakerAddresses.add(addr)));
-    
-    const batchSize = 350;
-    const addresses = Array.from(allStakerAddresses);
-    for (let i = 0; i < addresses.length; i += batchSize) {
-      const batch = addresses.slice(i, i + batchSize);
-      try {
-        const users = await neynarClient.fetchBulkUsersByEthOrSolAddress({
-          addresses: batch as `0x${string}`[],
-        });
-        for (const [address, userArray] of Object.entries(users)) {
-          if (userArray && userArray.length > 0) {
-            addressToFid.set(address.toLowerCase(), userArray[0].fid);
-          }
-        }
-      } catch (error) {
-        console.error(`Error fetching users for batch ${i / batchSize}:`, error);
-      }
-    }
-    
-    // Add staker FIDs to each entry
-    validEntries.forEach(entry => {
-      entry.stakerFids = entry.stakerAddresses
-        .map(addr => addressToFid.get(addr))
-        .filter(fid => fid !== undefined) as number[];
-    });
-    
-    // Step 6: Calculate USD values and sort
+    // Step 5: Calculate USD values and sort
     const tokenPrice = await getTokenPrice();
     console.log(`HIGHER token price: $${tokenPrice}`);
     
     const entriesWithUsd = validEntries.map(entry => {
-      const balanceFormatted = parseFloat(formatUnits(entry.stakedBalance, 18));
+      const balanceFormatted = parseFloat(formatUnits(entry.totalStaked, 18));
       const usdValue = balanceFormatted * tokenPrice;
       
       return {
@@ -388,62 +475,48 @@ export async function GET(request: NextRequest) {
       };
     });
     
-    // Sort by staked balance descending and take top 100
+    // Sort by total staked balance descending and take top 100
     entriesWithUsd.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
     
     const top100 = entriesWithUsd.slice(0, 100);
     
     console.log(`Sorted by balance, storing top ${top100.length} entries`);
     
-    console.log(`Storing top ${top100.length} entries in database...`);
+    // Step 6: Update database using new schema
+    console.log('Step 6: Updating database with new schema...');
     
-    // Step 7: Update database using UPSERT (INSERT ... ON CONFLICT)
-    console.log('Clearing old entries and inserting new ones...');
-    
-    // First, delete all entries
+    // First, delete all entries (we'll only keep casts with valid caster stakes)
     const deleteResult = await sql`DELETE FROM leaderboard_entries`;
     console.log(`Deleted ${deleteResult.rowCount} old entries`);
     
-    console.log('Inserting new entries...');
+    console.log('Inserting new entries with caster/supporter stake separation...');
     for (let i = 0; i < top100.length; i++) {
       const entry = top100[i];
       console.log(`Inserting entry ${i + 1}: Cast ${entry.castHash}, Creator FID ${entry.creatorFid}, balance ${entry.balanceFormatted}`);
       
       try {
-        const insertResult = await sql`
-          INSERT INTO leaderboard_entries (
-            cast_hash, creator_fid, creator_username, creator_display_name, creator_pfp_url,
-            cast_text, description, cast_timestamp, total_higher_staked, staker_fids,
-            usd_value, rank
-          ) VALUES (
-            ${entry.castHash},
-            ${entry.creatorFid},
-            ${entry.creatorUsername},
-            ${entry.creatorDisplayName},
-            ${entry.creatorPfpUrl},
-            ${entry.castText},
-            ${entry.description},
-            ${entry.timestamp},
-            ${entry.balanceFormatted},
-            ${entry.stakerFids as any},
-            ${entry.usdValue},
-            ${i + 1}
-          )
-          ON CONFLICT (cast_hash) DO UPDATE SET
-            creator_fid = EXCLUDED.creator_fid,
-            creator_username = EXCLUDED.creator_username,
-            creator_display_name = EXCLUDED.creator_display_name,
-            creator_pfp_url = EXCLUDED.creator_pfp_url,
-            cast_text = EXCLUDED.cast_text,
-            description = EXCLUDED.description,
-            cast_timestamp = EXCLUDED.cast_timestamp,
-            total_higher_staked = EXCLUDED.total_higher_staked,
-            staker_fids = EXCLUDED.staker_fids,
-            usd_value = EXCLUDED.usd_value,
-            rank = EXCLUDED.rank,
-            updated_at = NOW()
-        `;
-        console.log(`Inserted/Updated entry ${i + 1}, rowCount: ${insertResult.rowCount}`);
+        await upsertHigherCast({
+          castHash: entry.castHash,
+          creatorFid: entry.creatorFid,
+          creatorUsername: entry.creatorUsername,
+          creatorDisplayName: entry.creatorDisplayName,
+          creatorPfpUrl: entry.creatorPfpUrl,
+          castText: entry.castText,
+          description: entry.description,
+          castTimestamp: entry.timestamp,
+          totalHigherStaked: entry.balanceFormatted, // Sum of caster_stake_amounts + supporter_stake_amounts
+          usdValue: entry.usdValue,
+          rank: i + 1,
+          casterStakeLockupIds: entry.casterStakeLockupIds,
+          casterStakeAmounts: entry.casterStakeAmounts,
+          casterStakeUnlockTimes: entry.casterStakeUnlockTimes,
+          supporterStakeLockupIds: entry.supporterStakeLockupIds,
+          supporterStakeAmounts: entry.supporterStakeAmounts,
+          supporterStakeFids: entry.supporterStakeFids,
+          stakerFids: entry.stakerFids, // For backward compatibility
+          castState: 'higher',
+        });
+        console.log(`Inserted/Updated entry ${i + 1}`);
       } catch (insertError: any) {
         console.error(`Error inserting cast ${entry.castHash}:`, insertError.message);
         throw insertError;

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
-import { extractDescription } from '@/lib/cast-helpers';
+import { extractDescription, containsKeyphrase } from '@/lib/cast-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`[User Casts API] Fetching casts for FID ${fid}`);
 
-    // Step 1: Query database for cast by creator FID (with error handling for schema issues)
+    // Step 1: Query database for cast by creator FID
     try {
       const dbResult = await sql`
         SELECT * FROM leaderboard_entries 
@@ -47,16 +47,17 @@ export async function GET(request: NextRequest) {
           text: castData.cast_text,
           description: castData.description,
           timestamp: castData.cast_timestamp,
-          totalStaked: parseFloat(castData.total_higher_staked),
+          totalStaked: parseFloat(castData.total_higher_staked || '0'),
           rank: castData.rank,
+          state: castData.cast_state || 'higher',
         });
       }
     } catch (dbError: any) {
-      console.log(`[User Casts API] Database query failed (likely schema issue):`, dbError.message);
+      console.log(`[User Casts API] Database query failed:`, dbError.message);
       // Continue to Neynar fallback
     }
 
-    // Step 2: Fallback to Neynar if not found in database
+    // Step 2: Fallback to Neynar if not found in database (minimal - mostly for new casts)
     console.log(`[User Casts API] No cast found in database, checking Neynar...`);
     
     const neynarApiKey = process.env.NEYNAR_API_KEY;
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
         hasCast: false,
         totalStaked: 0,
         rank: null,
+        state: 'invalid',
       });
     }
 
@@ -82,7 +84,7 @@ export async function GET(request: NextRequest) {
     // Filter for /higher channel casts with keyphrase
     const higherCasts = (userCasts.casts || []).filter((cast: any) => {
       const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
-      const hasKeyphrase = extractDescription(cast.text);
+      const hasKeyphrase = containsKeyphrase(cast.text);
       return isHigherChannel && hasKeyphrase;
     });
 
@@ -102,6 +104,7 @@ export async function GET(request: NextRequest) {
           timestamp: latestCast.timestamp,
           totalStaked: 0,
           rank: null,
+          state: 'valid', // Not "higher" yet since not in DB
         });
       }
     }
@@ -111,6 +114,7 @@ export async function GET(request: NextRequest) {
       hasCast: false,
       totalStaked: 0,
       rank: null,
+      state: 'invalid',
     });
 
   } catch (error: any) {

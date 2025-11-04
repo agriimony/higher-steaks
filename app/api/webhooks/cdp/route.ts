@@ -4,6 +4,10 @@ import crypto from 'crypto';
 // Import contract addresses to filter events
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
 import { eventStore } from '@/lib/event-store';
+import { isValidCastHash } from '@/lib/cast-helpers';
+import { getHigherCast, castExistsInDB, upsertHigherCast } from '@/lib/services/db-service';
+import { getFidsFromAddresses } from '@/lib/services/stake-service';
+import { getCastByHash } from '@/lib/services/cast-service';
 
 // Broadcast event to all connected SSE clients
 function broadcastEvent(type: string, data: any) {
@@ -259,6 +263,14 @@ export async function POST(request: NextRequest) {
         contractAddress: body.contract_address
       });
       broadcastEvent(parsedEvent.type, parsedEvent.data);
+      
+      // Optimistic update for lockup_created events
+      if (parsedEvent.type === 'lockup_created' && parsedEvent.data.title) {
+        handleOptimisticLockupUpdate(parsedEvent.data).catch(error => {
+          console.error('[CDP Webhook] Error in optimistic update:', error);
+          // Don't fail the webhook if optimistic update fails
+        });
+      }
     } else {
       console.log('[CDP Webhook] Event parsed but returned null - not broadcasting');
     }
@@ -270,4 +282,150 @@ export async function POST(request: NextRequest) {
   }
 }
 
+/**
+ * Handle optimistic update for lockup creation
+ * Updates leaderboard_entries immediately when a new lockup is created
+ */
+async function handleOptimisticLockupUpdate(data: {
+  lockUpId?: string | number;
+  token?: string;
+  receiver?: string;
+  amount?: string | bigint;
+  unlockTime?: number | string;
+  title?: string;
+}) {
+  try {
+    const castHash = data.title;
+    if (!castHash || !isValidCastHash(castHash)) {
+      console.log('[CDP Webhook] Invalid cast hash in lockup title, skipping optimistic update');
+      return;
+    }
+
+    console.log('[CDP Webhook] Attempting optimistic update for cast:', castHash);
+
+    // Check if cast exists in database
+    let cast = await getHigherCast(castHash);
+    
+    // If not found, try to validate via Neynar and create entry
+    if (!cast) {
+      console.log('[CDP Webhook] Cast not in DB, validating via Neynar...');
+      const castData = await getCastByHash(castHash);
+      
+      if (!castData || !castData.valid) {
+        console.log('[CDP Webhook] Cast validation failed, skipping optimistic update');
+        return;
+      }
+
+      // Create new entry with just this lockup
+      cast = {
+        castHash: castData.hash,
+        creatorFid: castData.fid,
+        creatorUsername: castData.username,
+        creatorDisplayName: castData.displayName,
+        creatorPfpUrl: castData.pfpUrl,
+        castText: castData.castText,
+        description: castData.description,
+        castTimestamp: castData.timestamp,
+        totalHigherStaked: '0',
+        usdValue: null,
+        rank: null,
+        casterStakeLockupIds: [],
+        casterStakeAmounts: [],
+        casterStakeUnlockTimes: [],
+        supporterStakeLockupIds: [],
+        supporterStakeAmounts: [],
+        supporterStakeFids: [],
+        castState: 'valid',
+      };
+    }
+
+    // Get receiver FID
+    const receiverAddress = data.receiver;
+    if (!receiverAddress) {
+      console.log('[CDP Webhook] No receiver address, skipping optimistic update');
+      return;
+    }
+
+    const addressToFidMap = await getFidsFromAddresses([receiverAddress.toLowerCase()]);
+    const receiverFid = addressToFidMap.get(receiverAddress.toLowerCase());
+    
+    if (!receiverFid) {
+      console.log('[CDP Webhook] Could not map receiver address to FID, skipping optimistic update');
+      return;
+    }
+
+    // Classify stake
+    const isCasterStake = receiverFid === cast.creatorFid;
+    const lockupId = typeof data.lockUpId === 'string' ? parseInt(data.lockUpId) : Number(data.lockUpId);
+    const amount = typeof data.amount === 'string' ? data.amount : data.amount?.toString() || '0';
+    const unlockTime = typeof data.unlockTime === 'string' ? parseInt(data.unlockTime) : Number(data.unlockTime || 0);
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    // Only add if unlockTime hasn't passed
+    if (unlockTime <= currentTime) {
+      console.log('[CDP Webhook] Lockup already expired, skipping optimistic update');
+      return;
+    }
+
+    // Update arrays
+    let casterStakeLockupIds = [...cast.casterStakeLockupIds];
+    let casterStakeAmounts = [...cast.casterStakeAmounts];
+    let casterStakeUnlockTimes = [...cast.casterStakeUnlockTimes];
+    let supporterStakeLockupIds = [...cast.supporterStakeLockupIds];
+    let supporterStakeAmounts = [...cast.supporterStakeAmounts];
+    let supporterStakeFids = [...cast.supporterStakeFids];
+
+    if (isCasterStake) {
+      // Add to caster stakes
+      casterStakeLockupIds.push(lockupId);
+      casterStakeAmounts.push(amount);
+      casterStakeUnlockTimes.push(unlockTime);
+    } else {
+      // Add to supporter stakes
+      supporterStakeLockupIds.push(lockupId);
+      supporterStakeAmounts.push(amount);
+      supporterStakeFids.push(receiverFid);
+    }
+
+    // Calculate new total
+    const totalCasterStaked = casterStakeAmounts.reduce((sum, amt) => sum + BigInt(amt), BigInt(0));
+    const totalSupporterStaked = supporterStakeAmounts.reduce((sum, amt) => sum + BigInt(amt), BigInt(0));
+    const totalStaked = Number(totalCasterStaked + totalSupporterStaked) / 1e18; // Convert from wei
+
+    // Build staker_fids array: [creator_fid, ...unique supporter_fids] (for backward compatibility)
+    const stakerFids = new Set<number>([cast.creatorFid]);
+    supporterStakeFids.forEach(fid => stakerFids.add(fid));
+
+    // Update cast state to 'higher' if it has caster stakes
+    const castState = casterStakeLockupIds.length > 0 ? 'higher' : cast.castState;
+
+    // Update database
+    await upsertHigherCast({
+      castHash: cast.castHash,
+      creatorFid: cast.creatorFid,
+      creatorUsername: cast.creatorUsername,
+      creatorDisplayName: cast.creatorDisplayName,
+      creatorPfpUrl: cast.creatorPfpUrl,
+      castText: cast.castText,
+      description: cast.description,
+      castTimestamp: cast.castTimestamp,
+      totalHigherStaked: totalStaked, // Sum of caster_stake_amounts + supporter_stake_amounts
+      usdValue: cast.usdValue ? parseFloat(cast.usdValue) : undefined,
+      rank: cast.rank || undefined,
+      casterStakeLockupIds,
+      casterStakeAmounts,
+      casterStakeUnlockTimes,
+      supporterStakeLockupIds,
+      supporterStakeAmounts,
+      supporterStakeFids,
+      stakerFids: Array.from(stakerFids), // For backward compatibility
+      castState: castState as 'invalid' | 'valid' | 'higher',
+    });
+
+    console.log('[CDP Webhook] Optimistic update completed for cast:', castHash);
+  } catch (error) {
+    console.error('[CDP Webhook] Error in optimistic update:', error);
+    // Don't throw - let cron job handle reconciliation
+  }
+}
 

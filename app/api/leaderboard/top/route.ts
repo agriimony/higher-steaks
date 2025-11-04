@@ -17,8 +17,10 @@ export async function GET() {
     console.log('Database connection test:', testQuery.rows[0]);
     
     // Query top casts by HIGHER staked amount
+    // Filter out casts where no valid caster stake exists (cast_state != 'higher')
     const result = await sql`
       SELECT * FROM leaderboard_entries 
+      WHERE cast_state = 'higher'
       ORDER BY total_higher_staked DESC
       LIMIT 10
     `;

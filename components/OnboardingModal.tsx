@@ -346,6 +346,36 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       return;
     }
 
+    // Validate that cast exists and belongs to user (caster-only staking)
+    if (!castData || !castData.hash) {
+      setStakeError('No cast found. Please create or validate a cast first.');
+      return;
+    }
+
+    // Double-check that the cast belongs to this user (should already be validated, but be safe)
+    try {
+      const castResponse = await fetch(`/api/cast/${castData.hash}`);
+      if (castResponse.ok) {
+        const castInfo = await castResponse.json();
+        if (castInfo.fid !== userFid) {
+          setStakeError('Only the caster can stake on their own cast');
+          return;
+        }
+        // Check cast state - must be 'valid' or 'higher'
+        if (castInfo.state && castInfo.state !== 'valid' && castInfo.state !== 'higher') {
+          setStakeError('Cast is not valid for staking');
+          return;
+        }
+      } else if (castResponse.status === 404) {
+        setStakeError('Higher cast not found. Please create a valid cast first.');
+        return;
+      }
+    } catch (error) {
+      console.error('[Onboarding] Error validating cast ownership:', error);
+      setStakeError('Failed to validate cast ownership');
+      return;
+    }
+
     // Validation
     const amountNum = parseFloat(stakeAmount.replace(/,/g, ''));
     const durationNum = parseFloat(lockupDuration);

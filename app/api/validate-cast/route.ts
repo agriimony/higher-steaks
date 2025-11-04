@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { KEYPHRASE_REGEX, containsKeyphrase, extractDescription } from '@/lib/cast-helpers';
+import { validateCast } from '@/lib/services/cast-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,114 +20,63 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const neynarApiKey = process.env.NEYNAR_API_KEY;
-
-    if (!neynarApiKey || neynarApiKey === 'your_neynar_api_key_here') {
-      console.log('[Validate Cast] Neynar API key not configured');
-      return NextResponse.json(
-        { error: 'Neynar API key not configured' },
-        { status: 500 }
-      );
-    }
-
-    // Lazy import Neynar SDK
-    const { NeynarAPIClient } = await import('@neynar/nodejs-sdk');
-    const neynarClient = new NeynarAPIClient({ apiKey: neynarApiKey });
-
-    // Determine the type based on whether it's a URL
-    // Try 'url' type for full URLs, otherwise try 'hash'
-    let lookupType: 'hash' | 'url' = isUrlParam === 'true' ? 'url' : 'hash';
-    
-    console.log('[Validate Cast] Calling Neynar lookupCastByHashOrUrl with:', {
-      identifier: hashParam,
-      type: lookupType
-    });
-
-    // Fetch cast by hash or URL - try both if first attempt fails
-    let castResponse;
-    try {
-      castResponse = await neynarClient.lookupCastByHashOrUrl({ 
-        identifier: hashParam,
-        type: lookupType
-      });
-    } catch (firstError: any) {
-      // If URL type failed, try hash type as fallback
-      if (lookupType === 'url' && firstError.message?.includes('400')) {
-        console.log('[Validate Cast] URL type failed, trying hash type instead');
-        lookupType = 'hash';
-        castResponse = await neynarClient.lookupCastByHashOrUrl({ 
-          identifier: hashParam,
-          type: lookupType
-        });
-      } else {
-        throw firstError;
+    // Handle URL format - extract hash if needed
+    let castHash = hashParam;
+    if (isUrlParam === 'true' || hashParam.includes('farcaster.xyz')) {
+      // Extract hash from URL if needed
+      if (hashParam.includes('warpcast.com')) {
+        const match = hashParam.match(/warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)$/);
+        if (match && match[1]) {
+          castHash = match[1].startsWith('0x') ? match[1] : '0x' + match[1];
+        }
+      } else if (hashParam.includes('farcaster.xyz')) {
+        // For farcaster.xyz URLs, use as-is (will be handled by Neynar)
+        castHash = hashParam;
+      }
+    } else {
+      // Assume it's a hash - add 0x prefix if missing
+      if (!castHash.startsWith('0x') && /^[a-fA-F0-9]+$/.test(castHash)) {
+        castHash = '0x' + castHash;
       }
     }
 
-    console.log('[Validate Cast] Neynar response:', {
-      hasCast: !!castResponse.cast,
-      castHash: castResponse.cast?.hash,
-      castAuthorFid: castResponse.cast?.author?.fid,
-      castText: castResponse.cast?.text?.substring(0, 100),
-      channelId: castResponse.cast?.channel?.id,
-      parentUrl: castResponse.cast?.parent_url
-    });
+    // Use cast service - checks database first, falls back to Neynar
+    const result = await validateCast(castHash);
 
-    const cast = castResponse.cast;
-
-    if (!cast) {
-      console.log('[Validate Cast] Cast not found in response');
+    if (!result.valid) {
       return NextResponse.json({
         valid: false,
-        reason: 'Cast not found'
+        reason: result.reason || 'Cast not found or invalid'
       });
     }
 
-    // Validate keyphrase
-    const hasKeyphrase = containsKeyphrase(cast.text);
-    console.log('[Validate Cast] Keyphrase validation:', {
-      hasKeyphrase,
-      textPreview: cast.text.substring(0, 100)
-    });
-    
-    if (!hasKeyphrase) {
+    if (!result.castData) {
       return NextResponse.json({
         valid: false,
-        reason: 'Cast missing required keyphrase'
+        reason: 'Cast data not available'
       });
     }
-
-    // Validate /higher channel
-    const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
-    console.log('[Validate Cast] Channel validation:', {
-      isHigherChannel,
-      channelId: cast.channel?.id,
-      parentUrl: cast.parent_url
-    });
-    
-    if (!isHigherChannel) {
-      return NextResponse.json({
-        valid: false,
-        reason: 'Cast not in /higher channel'
-      });
-    }
-
-    // Extract description from cast text
-    const description = extractDescription(cast.text);
 
     console.log('[Validate Cast] Validation successful:', {
-      hash: cast.hash,
-      fid: cast.author.fid
+      hash: result.castData.hash,
+      fid: result.castData.fid,
+      state: result.castData.state
     });
 
     return NextResponse.json({
       valid: true,
-      hash: cast.hash,
-      fid: cast.author.fid,
-      castText: cast.text,
-      description: description,
-      timestamp: cast.timestamp,
-      author: cast.author
+      hash: result.castData.hash,
+      fid: result.castData.fid,
+      castText: result.castData.castText,
+      description: result.castData.description,
+      timestamp: result.castData.timestamp,
+      author: {
+        fid: result.castData.fid,
+        username: result.castData.username,
+        display_name: result.castData.displayName,
+        pfp_url: result.castData.pfpUrl,
+      },
+      state: result.castData.state
     });
 
   } catch (error: any) {

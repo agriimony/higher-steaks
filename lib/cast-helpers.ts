@@ -26,8 +26,8 @@ export function extractDescription(castText: string): string | null {
 }
 
 /**
- * Fetches cast data from Neynar via validate-cast API
- * Returns null if cast not found, doesn't contain keyphrase, or other error
+ * Fetches cast data from the new /api/cast/[hash] endpoint
+ * Returns null if cast not found or invalid
  */
 export async function fetchValidCast(castHash: string): Promise<{
   castText: string;
@@ -39,8 +39,12 @@ export async function fetchValidCast(castHash: string): Promise<{
   }
 
   try {
-    const response = await fetch(`/api/validate-cast?hash=${castHash}`);
+    const response = await fetch(`/api/cast/${castHash}`);
     if (!response.ok) {
+      if (response.status === 404) {
+        // Cast not found in database or via Neynar
+        return null;
+      }
       return null;
     }
     
@@ -52,7 +56,10 @@ export async function fetchValidCast(castHash: string): Promise<{
     return {
       castText: data.castText,
       description: data.description || extractDescription(data.castText) || '',
-      author: data.author || { fid: 0, username: 'unknown' },
+      author: {
+        fid: data.fid,
+        username: data.username || 'unknown',
+      },
     };
   } catch (error) {
     console.error('Error fetching cast:', error);

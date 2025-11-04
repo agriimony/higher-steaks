@@ -390,7 +390,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                               {castTexts[lockup.lockupId]}
                             </p>
                           ) : isValidCastHash(lockup.title) ? (
-                            <p className="text-xs text-gray-400 italic mt-1">No valid cast found</p>
+                            <p className="text-xs text-gray-400 italic mt-1">Higher cast not found</p>
                           ) : null}
                         </div>
                       </li>
