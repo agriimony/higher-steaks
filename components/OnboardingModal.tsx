@@ -243,36 +243,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
   };
 
-  // Scroll to first card when new cast is added
-  useEffect(() => {
-    if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0]?.hash === temporaryNewCast.hash) {
-      const container = scrollContainerRef.current;
-      const cardElements = container.querySelectorAll('[data-card-index]');
-      const firstCard = cardElements[0] as HTMLElement;
-      
-      if (firstCard) {
-        // Temporarily disable scroll snap for smooth programmatic scroll
-        const originalSnap = container.style.scrollSnapType;
-        container.style.scrollSnapType = 'none';
-        
-        firstCard.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'nearest',
-          inline: 'start' 
-        });
-        
-        setActiveCardIndex(0);
-        setTemporaryNewCast(null);
-        
-        // Re-enable scroll snap after scroll completes
-        setTimeout(() => {
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.style.scrollSnapType = originalSnap;
-          }
-        }, 500);
-      }
-    }
-  }, [casts, temporaryNewCast]);
 
   // Simple scroll listener to update active dot indicator
   useEffect(() => {
