@@ -466,51 +466,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setTemporaryNewCast(newCast);
         setShowCreateCast(false);
         setCustomMessage('');
-        
-        // Refresh casts list after a delay (cast may not be in DB yet)
-        setTimeout(() => {
-          const fetchCasts = async () => {
-            try {
-              const response = await fetch(`/api/user/casts/all?fid=${userFid}`);
-              if (response.ok) {
-                const data = await response.json();
-                const castsWithTotals = data.casts.map((cast: any) => {
-                  const { totalCasterStaked, totalSupporterStaked } = calculateStakeTotals(
-                    cast.casterStakeAmounts || [],
-                    cast.casterStakeUnlockTimes || [],
-                    cast.supporterStakeAmounts || [],
-                    cast.totalHigherStaked
-                  );
-                  
-                  return {
-                    hash: cast.hash,
-                    text: cast.text,
-                    description: cast.description,
-                    timestamp: cast.timestamp,
-                    castState: cast.castState,
-                    rank: cast.rank,
-                    totalHigherStaked: cast.totalHigherStaked,
-                    totalCasterStaked,
-                    totalSupporterStaked,
-                    casterStakeLockupIds: cast.casterStakeLockupIds || [],
-                    casterStakeAmounts: cast.casterStakeAmounts || [],
-                    casterStakeUnlockTimes: cast.casterStakeUnlockTimes || [],
-                    supporterStakeLockupIds: cast.supporterStakeLockupIds || [],
-                    supporterStakeAmounts: cast.supporterStakeAmounts || [],
-                    supporterStakeFids: cast.supporterStakeFids || [],
-                  };
-                });
-                // Replace temporary cast with real data if found
-                setCasts(castsWithTotals);
-                setTemporaryNewCast(null);
-              }
-            } catch (error) {
-              console.error('Error refreshing casts:', error);
-            }
-          };
-          
-          fetchCasts();
-        }, 2000);
       }
     } catch (error) {
       console.error("Failed to open cast composer:", error);
