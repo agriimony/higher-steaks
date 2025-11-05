@@ -22,12 +22,16 @@ export async function GET(request: NextRequest) {
 
     // Handle URL format - extract hash if needed
     let castHash = hashParam;
-    if (isUrlParam === 'true' || hashParam.includes('farcaster.xyz')) {
+    
+    if (isUrlParam === 'true' || hashParam.includes('farcaster.xyz') || hashParam.includes('warpcast.com')) {
       // Extract hash from URL if needed
       if (hashParam.includes('warpcast.com')) {
         const match = hashParam.match(/warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)$/);
         if (match && match[1]) {
           castHash = match[1].startsWith('0x') ? match[1] : '0x' + match[1];
+        } else {
+          // Keep as URL if extraction fails
+          castHash = hashParam;
         }
       } else if (hashParam.includes('farcaster.xyz')) {
         // For farcaster.xyz URLs, use as-is (will be handled by Neynar)
@@ -40,7 +44,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Use cast service - checks database first, falls back to Neynar
+    // Use cast service - validateCast now handles URLs properly
     const result = await validateCast(castHash);
 
     if (!result.valid) {

@@ -49,14 +49,32 @@ export async function getCastByHash(hash: string): Promise<CastData | null> {
  * Validate cast - checks database first, falls back to Neynar
  */
 export async function validateCast(hash: string): Promise<ValidateCastResult> {
-  if (!isValidCastHash(hash)) {
+  // Skip hash validation for URLs (they'll be handled by Neynar)
+  const isUrl = hash.includes('farcaster.xyz') || hash.includes('warpcast.com');
+  
+  if (!isUrl && !isValidCastHash(hash)) {
     return {
       valid: false,
       reason: 'Invalid cast hash format',
     };
   }
 
-  // Check database first
+  // If it's a URL, skip database check and go straight to Neynar
+  if (isUrl) {
+    const neynarCast = await validateCastFromNeynar(hash);
+    if (neynarCast) {
+      return {
+        valid: true,
+        castData: neynarCast,
+      };
+    }
+    return {
+      valid: false,
+      reason: 'Cast not found or invalid',
+    };
+  }
+
+  // Check database first (for hash-based lookups)
   const dbCast = await getHigherCast(hash);
   if (dbCast) {
     return {
@@ -131,7 +149,7 @@ export async function isCastHigher(hash: string): Promise<boolean> {
 /**
  * Validate cast from Neynar API (fallback when not in DB)
  */
-async function validateCastFromNeynar(hash: string): Promise<CastData | null> {
+export async function validateCastFromNeynar(hash: string): Promise<CastData | null> {
   try {
     const neynarApiKey = process.env.NEYNAR_API_KEY;
     if (!neynarApiKey || neynarApiKey === 'your_neynar_api_key_here') {
