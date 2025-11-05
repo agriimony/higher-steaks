@@ -232,10 +232,10 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       }, 0);
     }
     
-    // Reset flag when temporary cast is cleared
-    if (!temporaryNewCast) {
-      hasAutoScrolled.current = false;
-    }
+    // // Reset flag when temporary cast is cleared
+    // if (!temporaryNewCast) {
+    //   hasAutoScrolled.current = false;
+    // }
   }, [temporaryNewCast, casts.length]); // Include casts.length to detect when casts array changes
 
   // Handle dot click to scroll to specific card
