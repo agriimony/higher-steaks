@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
@@ -125,6 +125,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   
   // Scroll state for cards
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const castUrlInputRef = useRef<HTMLInputElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [cardWidth, setCardWidth] = useState<number>(320);
@@ -134,11 +135,15 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const { address: wagmiAddress } = useAccount();
   
   // Read current allowance to avoid unnecessary approvals
+  // Only read when we're in staking mode (not create cast flow)
   const { data: currentAllowance } = useReadContract({
     address: HIGHER_TOKEN_ADDRESS,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: wagmiAddress ? [wagmiAddress, LOCKUP_CONTRACT] : undefined,
+    args: wagmiAddress && !showCreateCast && casts.length > 0 ? [wagmiAddress, LOCKUP_CONTRACT] : undefined,
+    query: {
+      enabled: !!wagmiAddress && !showCreateCast && casts.length > 0,
+    },
   });
   
   const { writeContract: writeContractApprove, data: approveHash, isPending: isApprovePending, error: approveError } = useWriteContract();
@@ -400,7 +405,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
   }, [approveError, createLockUpError]);
 
-  const handleQuickCast = async () => {
+  const handleQuickCast = useCallback(async () => {
     try {
       console.log('Opening cast composer...');
       const fullMessage = "started aiming higher and it worked out! " + customMessage;
@@ -462,9 +467,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     } catch (error) {
       console.error("Failed to open cast composer:", error);
     }
-  };
+  }, [customMessage, userFid]);
 
-  const handleValidateAndUseCastUrl = async () => {
+  const handleValidateAndUseCastUrl = useCallback(async () => {
     setUrlValidationError(null);
     setValidatingUrl(true);
     
@@ -573,7 +578,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     } finally {
       setValidatingUrl(false);
     }
-  };
+  }, [castUrl, userFid]);
 
   const handleSwapToHigher = async () => {
     try {
@@ -723,8 +728,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   const isLoadingTransaction = isApprovePending || isApproveConfirming || isCreateLockUpPending || isCreateLockUpConfirming || pendingCreateLockUp;
 
-  // Create Cast Flow Component
-  const CreateCastFlow = () => (
+  // Create Cast Flow Component - memoized to prevent re-renders that cause focus loss
+  const CreateCastFlow = useMemo(() => (
     <>
       <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
         Are you aiming higher today?
@@ -739,6 +744,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           <strong>started aiming higher and it worked out!</strong>
         </div>
         <textarea
+          key="custom-message-textarea"
           value={customMessage}
           onChange={(e) => setCustomMessage(e.target.value)}
           placeholder="[your message here]"
@@ -758,6 +764,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
       <div className="mb-4">
         <input
+          ref={castUrlInputRef}
+          key="cast-url-input"
           type="text"
           value={castUrl}
           onChange={(e) => {
@@ -766,6 +774,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           }}
           placeholder="Paste your cast URL here..."
           className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
+          autoFocus={showCreateCast}
         />
         {urlValidationError && (
           <div className="mt-2 text-xs text-red-600">
@@ -810,7 +819,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         </button>
       </div>
     </>
-  );
+  ), [customMessage, castUrl, urlValidationError, validatingUrl, showCreateCast, handleQuickCast, handleValidateAndUseCastUrl]);
 
   // Cast Cards View Component
   const CastCardsView = () => {
@@ -1042,24 +1051,24 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         </button>
         
         <div className="overflow-y-auto flex-1 min-h-0">
-          {loadingCasts ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="text-base font-bold text-black">
-                  Loading
-                  <span className="inline-block ml-1">
-                    <span className="loading-dot-1">.</span>
-                    <span className="loading-dot-2">.</span>
-                    <span className="loading-dot-3">.</span>
-                  </span>
-                </div>
+        {loadingCasts ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="text-base font-bold text-black">
+                Loading
+                <span className="inline-block ml-1">
+                  <span className="loading-dot-1">.</span>
+                  <span className="loading-dot-2">.</span>
+                  <span className="loading-dot-3">.</span>
+                </span>
               </div>
             </div>
-          ) : showCreateCast || casts.length === 0 ? (
-            <CreateCastFlow />
-          ) : (
-            <CastCardsView />
-          )}
+          </div>
+        ) : showCreateCast || casts.length === 0 ? (
+          CreateCastFlow
+        ) : (
+          <CastCardsView />
+        )}
         </div>
       </div>
     </div>
