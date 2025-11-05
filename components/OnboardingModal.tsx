@@ -785,7 +785,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         <div className="mb-4">
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
+            className="flex gap-2 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
             style={{ scrollbarWidth: 'thin' }}
           >
             {casts.map((cast) => (
