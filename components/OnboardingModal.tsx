@@ -128,6 +128,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [cardWidth, setCardWidth] = useState<number>(320);
+  const previousCardWidthRef = useRef<number>(320);
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -208,7 +209,13 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   }, [userFid]);
 
   // Check scroll position for dots indicator and calculate card width
+  // Only run when showing cards view (not create cast flow)
   useEffect(() => {
+    // Don't run if we're in create cast flow or loading
+    if (showCreateCast || casts.length === 0 || loadingCasts) {
+      return;
+    }
+
     const checkScroll = () => {
       if (!scrollContainerRef.current) return;
       const container = scrollContainerRef.current;
@@ -222,9 +229,16 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       if (!scrollContainerRef.current) return;
       const container = scrollContainerRef.current;
       const containerWidth = container.clientWidth;
+      if (containerWidth === 0) return; // Skip if container not rendered yet
+      
       // Calculate card width: 90% of container minus gap, with min/max constraints
       const calculatedWidth = Math.max(280, Math.min(380, containerWidth));
-      setCardWidth(calculatedWidth);
+      
+      // Only update state if width actually changed (prevents unnecessary re-renders)
+      if (Math.abs(calculatedWidth - previousCardWidthRef.current) > 1) {
+        setCardWidth(calculatedWidth);
+        previousCardWidthRef.current = calculatedWidth;
+      }
     };
     
     const container = scrollContainerRef.current;
@@ -233,19 +247,24 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       checkScroll();
       calculateCardWidth();
       
-      // Recalculate on resize
+      // Recalculate on resize with debouncing
+      let resizeTimeout: NodeJS.Timeout;
       const resizeObserver = new ResizeObserver(() => {
-        calculateCardWidth();
-        checkScroll();
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+          calculateCardWidth();
+          checkScroll();
+        }, 100); // Debounce resize events
       });
       resizeObserver.observe(container);
       
       return () => {
+        clearTimeout(resizeTimeout);
         container.removeEventListener('scroll', checkScroll);
         resizeObserver.disconnect();
       };
     }
-  }, [casts]);
+  }, [casts, showCreateCast, loadingCasts]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -980,7 +999,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             onClick={() => setShowCreateCast(true)}
             className="text-xs text-black/60 hover:text-black underline"
           >
-            Create new cast
+            Or.. Create new cast
           </button>
         </div>
       </>
