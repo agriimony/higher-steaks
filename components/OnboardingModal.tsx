@@ -218,20 +218,59 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const scrollToCard = (index: number) => {
     if (!scrollContainerRef.current) return;
     const container = scrollContainerRef.current;
-    const cardWidthWithGap = CARD_WIDTH + 16; // card width + gap
-    const targetScroll = index * cardWidthWithGap;
-    container.scrollTo({ left: targetScroll, behavior: 'smooth' });
-    setActiveCardIndex(index);
+    const cardElements = container.querySelectorAll('[data-card-index]');
+    const targetCard = cardElements[index] as HTMLElement;
+    
+    if (targetCard) {
+      // Temporarily disable scroll snap for smooth programmatic scroll
+      const originalSnap = container.style.scrollSnapType;
+      container.style.scrollSnapType = 'none';
+      
+      targetCard.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'nearest',
+        inline: 'start' 
+      });
+      
+      setActiveCardIndex(index);
+      
+      // Re-enable scroll snap after scroll completes
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.style.scrollSnapType = originalSnap;
+        }
+      }, 500);
+    }
   };
 
   // Scroll to first card when new cast is added
   useEffect(() => {
     if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0]?.hash === temporaryNewCast.hash) {
       const container = scrollContainerRef.current;
-      const cardWidthWithGap = CARD_WIDTH + 16;
-      container.scrollTo({ left: 0, behavior: 'smooth' });
-      setActiveCardIndex(0);
-      setTemporaryNewCast(null);
+      const cardElements = container.querySelectorAll('[data-card-index]');
+      const firstCard = cardElements[0] as HTMLElement;
+      
+      if (firstCard) {
+        // Temporarily disable scroll snap for smooth programmatic scroll
+        const originalSnap = container.style.scrollSnapType;
+        container.style.scrollSnapType = 'none';
+        
+        firstCard.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'nearest',
+          inline: 'start' 
+        });
+        
+        setActiveCardIndex(0);
+        setTemporaryNewCast(null);
+        
+        // Re-enable scroll snap after scroll completes
+        setTimeout(() => {
+          if (scrollContainerRef.current) {
+            scrollContainerRef.current.style.scrollSnapType = originalSnap;
+          }
+        }, 500);
+      }
     }
   }, [casts, temporaryNewCast]);
 
@@ -789,6 +828,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             {casts.map((cast, index) => (
               <div
                 key={cast.hash}
+                data-card-index={index}
                 className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 snap-start"
                 style={{ 
                   width: `${CARD_WIDTH}px`,
