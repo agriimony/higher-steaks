@@ -222,24 +222,55 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   // Scroll to first card when temporary new cast is added (only once)
   useEffect(() => {
     if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0].hash === temporaryNewCast.hash && !hasAutoScrolled.current) {
-      // Use setTimeout to ensure DOM is updated
-      setTimeout(() => {
-        if (scrollContainerRef.current) {
+      // Don't auto-scroll if user has already scrolled (indicating they've interacted)
+      if (scrollContainerRef.current.scrollLeft > 5) {
+        hasAutoScrolled.current = true;
+        return;
+      }
+      
+      // Disable snap temporarily during programmatic scroll
+      const container = scrollContainerRef.current;
+      const originalSnap = container.style.scrollSnapType;
+      container.style.scrollSnapType = 'none';
+      
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current && !hasAutoScrolled.current) {
           scrollContainerRef.current.scrollLeft = 0;
-          //setActiveCardIndex(0);
+          setActiveCardIndex(0);
           hasAutoScrolled.current = true;
+          
+          // Re-enable snap after a brief delay
+          setTimeout(() => {
+            if (scrollContainerRef.current) {
+              scrollContainerRef.current.style.scrollSnapType = originalSnap;
+            }
+          }, 100);
         }
-      }, 0);
+      });
     }
-  }, [temporaryNewCast, casts.length]); // Include casts.length to detect when casts array changes
+  }, [temporaryNewCast]); // Only depend on temporaryNewCast
 
   // Handle dot click to scroll to specific card
   const scrollToCard = (index: number) => {
     if (!scrollContainerRef.current) return;
     const container = scrollContainerRef.current;
+    
+    // Temporarily disable snap during programmatic scroll
+    const originalSnap = container.style.scrollSnapType;
+    container.style.scrollSnapType = 'none';
+    
     const cardWidthWithGap = cardWidth + 16; // card width + gap
     const targetScroll = index * cardWidthWithGap;
+    
     container.scrollTo({ left: targetScroll, behavior: 'smooth' });
+    
+    // Re-enable snap after scroll completes
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.scrollSnapType = originalSnap;
+      }
+    }, 500);
   };
 
   // Handle mouse drag for card navigation
