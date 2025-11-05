@@ -19,7 +19,7 @@ export interface HigherCastData {
   supporterStakeAmounts: string[];
   supporterStakeFids: number[];
   supporterStakePfps: string[];
-  castState: 'invalid' | 'valid' | 'higher';
+  castState: 'invalid' | 'valid' | 'higher' | 'expired';
 }
 
 /**
@@ -77,7 +77,7 @@ export async function getHigherCast(hash: string): Promise<HigherCastData | null
       supporterStakeAmounts: row.supporter_stake_amounts?.map((a: any) => a.toString()) || [],
       supporterStakeFids: row.supporter_stake_fids || [],
       supporterStakePfps: row.supporter_stake_pfps || [],
-      castState: (row.cast_state || 'higher') as 'invalid' | 'valid' | 'higher',
+      castState: (row.cast_state || 'higher') as 'invalid' | 'valid' | 'higher' | 'expired',
     };
   } catch (error) {
     console.error('[db-service] Error getting higher cast:', error);
@@ -130,7 +130,7 @@ export async function upsertHigherCast(data: {
   supporterStakeFids?: number[];
   supporterStakePfps?: string[]; // Array of PFP URLs corresponding to supporter_stake_fids (same order)
   stakerFids?: number[]; // For backward compatibility: [creator_fid, ...supporter_stake_fids]
-  castState?: 'invalid' | 'valid' | 'higher';
+  castState?: 'invalid' | 'valid' | 'higher' | 'expired';
 }): Promise<void> {
   try {
     // Calculate staker_fids if not provided (backward compatibility)

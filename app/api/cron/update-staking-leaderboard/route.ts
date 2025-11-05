@@ -207,8 +207,8 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    // Step 2: Fetch lockup details and classify as caster or supporter stakes
-    console.log('Step 2: Fetching lockup details and classifying stakes...');
+    // Step 2: Fetch lockup details (including expired and unlocked)
+    console.log('Step 2: Fetching lockup details (including expired and unlocked)...');
     const currentTime = Math.floor(Date.now() / 1000);
     
     // Map to store lockups by cast hash
@@ -217,6 +217,7 @@ export async function GET(request: NextRequest) {
       receiver: string;
       amount: bigint;
       unlockTime: number;
+      unlocked: boolean;
       type: 'caster' | 'supporter' | 'pending';
     }>>();
     
@@ -239,25 +240,14 @@ export async function GET(request: NextRequest) {
         // Destructure: [token, isERC20, unlockTime, unlocked, amount, receiver, title]
         const [token, isERC20, unlockTime, unlocked, amount, receiver, title] = lockup;
         
-        // Create lockup data object
-        const lockupData: LockupData = {
-          lockupId: lockupId.toString(),
-          token,
-          isERC20,
-          unlockTime: Number(unlockTime),
-          unlocked: unlocked as boolean,
-          amount: amount as bigint,
-          receiver,
-          title,
-        };
+        // Only check if token is HIGHER and has valid cast hash
+        // Include ALL lockups regardless of expired/unlocked status
+        if (token.toLowerCase() !== HIGHER_TOKEN.toLowerCase()) {
+          continue;
+        }
         
-        // Validate stake
-        if (!isValidStake(lockupData, currentTime)) {
-          if (unlocked) {
-            lockupsUnlocked++;
-          } else if (!isValidCastHash(title)) {
-            lockupsInvalidHash++;
-          }
+        if (!isValidCastHash(title)) {
+          lockupsInvalidHash++;
           continue;
         }
         
@@ -269,14 +259,19 @@ export async function GET(request: NextRequest) {
           castLockups.set(castHash, []);
         }
         
-        // Classify as pending for now (will be classified after getting creator FIDs)
+        // Include ALL lockups (expired, unlocked, valid)
         castLockups.get(castHash)!.push({
           lockupId,
           receiver: receiver.toLowerCase(),
           amount,
           unlockTime: Number(unlockTime),
+          unlocked: unlocked as boolean,
           type: 'pending',
         });
+        
+        if (unlocked) {
+          lockupsUnlocked++;
+        }
       } catch (error) {
         console.error(`Error fetching lockup ${lockupId}:`, error);
         // Continue with other lockups
@@ -285,10 +280,10 @@ export async function GET(request: NextRequest) {
     
     console.log(`Lockup processing summary:`);
     console.log(`  Total lockups processed: ${lockupsProcessed}`);
-    console.log(`  Unlocked (skipped): ${lockupsUnlocked}`);
+    console.log(`  Unlocked (included): ${lockupsUnlocked}`);
     console.log(`  Invalid cast hash (skipped): ${lockupsInvalidHash}`);
-    console.log(`  Valid lockups (included): ${lockupsWithValidHash}`);
-    console.log(`Found ${castLockups.size} unique cast hashes with active lockups`);
+    console.log(`  Lockups with valid hash (included): ${lockupsWithValidHash}`);
+    console.log(`Found ${castLockups.size} unique cast hashes with lockups`);
     
     // Step 3: Validate casts and get creator FIDs
     console.log('Step 3: Validating casts and fetching creator info...');
@@ -421,6 +416,7 @@ export async function GET(request: NextRequest) {
       supporterStakePfps: string[]; // PFP URLs corresponding to supporter_stake_fids (same order)
       stakerFids: number[]; // For backward compatibility: [creator_fid, ...supporter_stake_fids]
       totalStaked: bigint;
+      castState: 'higher' | 'expired';
     }> = [];
     
     for (const [castHash, info] of castInfo.entries()) {
@@ -429,50 +425,66 @@ export async function GET(request: NextRequest) {
       const lockups = castLockups.get(castHash) || [];
       const creatorFid = info.creatorFid;
       
-      // Classify stakes
-      const casterStakes: Array<{ lockupId: bigint; amount: bigint; unlockTime: number }> = [];
-      const supporterStakes: Array<{ lockupId: bigint; amount: bigint; unlockTime: number; fid: number }> = [];
+      // Classify ALL stakes (including expired/unlocked)
+      const allCasterStakes: Array<{ lockupId: bigint; amount: bigint; unlockTime: number; unlocked: boolean }> = [];
+      const allSupporterStakes: Array<{ lockupId: bigint; amount: bigint; unlockTime: number; fid: number; unlocked: boolean }> = [];
       
       for (const lockup of lockups) {
         const receiverFid = addressToFid.get(lockup.receiver);
         if (receiverFid === creatorFid) {
           // Caster stake
-          casterStakes.push({
+          allCasterStakes.push({
             lockupId: lockup.lockupId,
             amount: lockup.amount,
             unlockTime: lockup.unlockTime,
+            unlocked: lockup.unlocked,
           });
         } else if (receiverFid) {
           // Supporter stake
-          supporterStakes.push({
+          allSupporterStakes.push({
             lockupId: lockup.lockupId,
             amount: lockup.amount,
             unlockTime: lockup.unlockTime,
             fid: receiverFid,
+            unlocked: lockup.unlocked,
           });
         }
       }
       
-      // Only include casts with at least one valid caster stake
-      if (casterStakes.length === 0) {
-        console.log(`  ✗ Cast ${castHash} has no valid caster stake, skipping`);
+      // Filter valid caster stakes: currentTime < unlockTime AND unlocked = false
+      const validCasterStakes = allCasterStakes.filter(s => 
+        currentTime < s.unlockTime && !s.unlocked
+      );
+      
+      // If no caster stakes at all, skip this cast
+      if (allCasterStakes.length === 0) {
+        console.log(`  ✗ Cast ${castHash} has no caster stakes, skipping`);
         continue;
       }
       
-      // Filter supporter stakes: only include if unlockTime > min caster stake unlockTime
-      const minCasterUnlockTime = Math.min(...casterStakes.map(s => s.unlockTime));
-      const validSupporterStakes = supporterStakes.filter(s => s.unlockTime > minCasterUnlockTime);
+      // Determine cast_state: 'higher' if has valid caster stake(s), 'expired' otherwise
+      const castState: 'higher' | 'expired' = validCasterStakes.length > 0 ? 'higher' : 'expired';
       
-      // Calculate total staked (caster + supporter)
-      const totalCasterStaked = casterStakes.reduce((sum, s) => sum + s.amount, BigInt(0));
+      // Filter valid supporter stakes: currentTime < unlockTime AND unlocked = false AND unlockTime > min valid caster unlockTime
+      let validSupporterStakes: Array<{ lockupId: bigint; amount: bigint; unlockTime: number; fid: number }> = [];
+      if (validCasterStakes.length > 0) {
+        const minValidCasterUnlockTime = Math.min(...validCasterStakes.map(s => s.unlockTime));
+        validSupporterStakes = allSupporterStakes
+          .filter(s => currentTime < s.unlockTime && !s.unlocked && s.unlockTime > minValidCasterUnlockTime)
+          .map(s => ({ lockupId: s.lockupId, amount: s.amount, unlockTime: s.unlockTime, fid: s.fid }));
+      }
+      
+      // Calculate total staked from VALID stakes only
+      const totalCasterStaked = validCasterStakes.reduce((sum, s) => sum + s.amount, BigInt(0));
       const totalSupporterStaked = validSupporterStakes.reduce((sum, s) => sum + s.amount, BigInt(0));
       const totalStaked = totalCasterStaked + totalSupporterStaked;
       
-      // Build staker_fids array: [creator_fid, ...unique supporter_fids]
-      // (for backward compatibility - can be derived from creator_fid + supporter_stake_fids)
+      // Build staker_fids array: [creator_fid, ...unique supporter_fids from valid supporter stakes]
+      // (for backward compatibility)
       const stakerFids = new Set<number>([creatorFid]);
       validSupporterStakes.forEach(s => stakerFids.add(s.fid));
       
+      // Store ALL stakes in arrays (including expired/unlocked)
       validEntries.push({
         castHash,
         creatorFid: info.creatorFid,
@@ -482,19 +494,20 @@ export async function GET(request: NextRequest) {
         castText: info.castText,
         description: info.description,
         timestamp: info.timestamp,
-        casterStakeLockupIds: casterStakes.map(s => Number(s.lockupId)),
-        casterStakeAmounts: casterStakes.map(s => s.amount.toString()),
-        casterStakeUnlockTimes: casterStakes.map(s => s.unlockTime),
-        supporterStakeLockupIds: validSupporterStakes.map(s => Number(s.lockupId)),
-        supporterStakeAmounts: validSupporterStakes.map(s => s.amount.toString()),
-        supporterStakeFids: validSupporterStakes.map(s => s.fid),
-        supporterStakePfps: validSupporterStakes.map(s => fidToPfp.get(s.fid) || ''), // Fetch PFP for each supporter FID
+        casterStakeLockupIds: allCasterStakes.map(s => Number(s.lockupId)),
+        casterStakeAmounts: allCasterStakes.map(s => s.amount.toString()),
+        casterStakeUnlockTimes: allCasterStakes.map(s => s.unlockTime),
+        supporterStakeLockupIds: allSupporterStakes.map(s => Number(s.lockupId)),
+        supporterStakeAmounts: allSupporterStakes.map(s => s.amount.toString()),
+        supporterStakeFids: allSupporterStakes.map(s => s.fid),
+        supporterStakePfps: allSupporterStakes.map(s => fidToPfp.get(s.fid) || ''), // Fetch PFP for each supporter FID
         stakerFids: Array.from(stakerFids), // For backward compatibility
         totalStaked,
+        castState,
       });
     }
     
-    console.log(`Built ${validEntries.length} higher casts with valid caster stakes`);
+    console.log(`Built ${validEntries.length} casts (${validEntries.filter(e => e.castState === 'higher').length} higher, ${validEntries.filter(e => e.castState === 'expired').length} expired)`);
     
     // Step 5: Calculate USD values and sort
     const tokenPrice = await getTokenPrice();
@@ -508,27 +521,36 @@ export async function GET(request: NextRequest) {
         ...entry,
         balanceFormatted,
         usdValue,
+        rank: null as number | null,
       };
     });
     
-    // Sort by total staked balance descending and take top 100
+    // Sort by total staked balance descending (no limit - store all casts)
     entriesWithUsd.sort((a, b) => b.balanceFormatted - a.balanceFormatted);
     
-    const top100 = entriesWithUsd.slice(0, 100);
+    // Calculate ranks only for 'higher' casts
+    let rank = 1;
+    for (const entry of entriesWithUsd) {
+      if (entry.castState === 'higher') {
+        entry.rank = rank++;
+      } else {
+        entry.rank = null;
+      }
+    }
     
-    console.log(`Sorted by balance, storing top ${top100.length} entries`);
+    console.log(`Sorted by balance, storing ${entriesWithUsd.length} entries (${entriesWithUsd.filter(e => e.castState === 'higher').length} higher, ${entriesWithUsd.filter(e => e.castState === 'expired').length} expired)`);
     
     // Step 6: Update database using new schema
     console.log('Step 6: Updating database with new schema...');
     
-    // First, delete all entries (we'll only keep casts with valid caster stakes)
+    // First, delete all entries (we'll store all casts with state 'higher' or 'expired')
     const deleteResult = await sql`DELETE FROM leaderboard_entries`;
     console.log(`Deleted ${deleteResult.rowCount} old entries`);
     
     console.log('Inserting new entries with caster/supporter stake separation...');
-    for (let i = 0; i < top100.length; i++) {
-      const entry = top100[i];
-      console.log(`Inserting entry ${i + 1}: Cast ${entry.castHash}, Creator FID ${entry.creatorFid}, balance ${entry.balanceFormatted}`);
+    for (let i = 0; i < entriesWithUsd.length; i++) {
+      const entry = entriesWithUsd[i];
+      console.log(`Inserting entry ${i + 1}/${entriesWithUsd.length}: Cast ${entry.castHash}, Creator FID ${entry.creatorFid}, state ${entry.castState}, balance ${entry.balanceFormatted}`);
       
       try {
         await upsertHigherCast({
@@ -540,18 +562,18 @@ export async function GET(request: NextRequest) {
           castText: entry.castText,
           description: entry.description,
           castTimestamp: entry.timestamp,
-          totalHigherStaked: entry.balanceFormatted, // Sum of caster_stake_amounts + supporter_stake_amounts
+          totalHigherStaked: entry.balanceFormatted, // Sum of valid caster_stake_amounts + valid supporter_stake_amounts
           usdValue: entry.usdValue,
-          rank: i + 1,
-          casterStakeLockupIds: entry.casterStakeLockupIds,
-          casterStakeAmounts: entry.casterStakeAmounts,
-          casterStakeUnlockTimes: entry.casterStakeUnlockTimes,
-          supporterStakeLockupIds: entry.supporterStakeLockupIds,
-          supporterStakeAmounts: entry.supporterStakeAmounts,
-          supporterStakeFids: entry.supporterStakeFids,
-          supporterStakePfps: entry.supporterStakePfps,
+          rank: entry.rank ?? undefined, // Only assigned to 'higher' casts
+          casterStakeLockupIds: entry.casterStakeLockupIds, // ALL caster stakes (including expired/unlocked)
+          casterStakeAmounts: entry.casterStakeAmounts, // ALL caster stakes
+          casterStakeUnlockTimes: entry.casterStakeUnlockTimes, // ALL caster stakes
+          supporterStakeLockupIds: entry.supporterStakeLockupIds, // ALL supporter stakes (including expired/unlocked)
+          supporterStakeAmounts: entry.supporterStakeAmounts, // ALL supporter stakes
+          supporterStakeFids: entry.supporterStakeFids, // ALL supporter stakes
+          supporterStakePfps: entry.supporterStakePfps, // ALL supporter stakes
           stakerFids: entry.stakerFids, // For backward compatibility
-          castState: 'higher',
+          castState: entry.castState,
         });
         console.log(`Inserted/Updated entry ${i + 1}`);
       } catch (insertError: any) {
@@ -566,8 +588,8 @@ export async function GET(request: NextRequest) {
     const finalCount = parseInt(verifyResult.rows[0]?.count || '0');
     console.log(`Database now contains ${finalCount} entries`);
     
-    if (finalCount !== top100.length) {
-      console.error(`WARNING: Expected ${top100.length} entries but found ${finalCount}`);
+    if (finalCount !== entriesWithUsd.length) {
+      console.error(`WARNING: Expected ${entriesWithUsd.length} entries but found ${finalCount}`);
     }
     
     console.log('=== Staking leaderboard updated successfully ===');
@@ -578,7 +600,9 @@ export async function GET(request: NextRequest) {
       higherLockups: higherLockupIds.length,
       uniqueCasts: castLockups.size,
       validCasts: validEntries.length,
-      stored: top100.length,
+      higherCasts: validEntries.filter(e => e.castState === 'higher').length,
+      expiredCasts: validEntries.filter(e => e.castState === 'expired').length,
+      stored: entriesWithUsd.length,
       timestamp: new Date().toISOString(),
     });
     

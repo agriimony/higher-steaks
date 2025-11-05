@@ -11,7 +11,7 @@ export interface CastData {
   description: string;
   timestamp: string;
   valid: boolean;
-  state: 'invalid' | 'valid' | 'higher';
+  state: 'invalid' | 'valid' | 'higher' | 'expired';
 }
 
 export interface ValidateCastResult {
@@ -94,7 +94,7 @@ export async function validateCast(hash: string): Promise<ValidateCastResult> {
 /**
  * Determine cast state based on DB + onchain data
  */
-export async function determineCastState(hash: string): Promise<'invalid' | 'valid' | 'higher'> {
+export async function determineCastState(hash: string): Promise<'invalid' | 'valid' | 'higher' | 'expired'> {
   const dbCast = await getHigherCast(hash);
   if (dbCast) {
     return dbCast.castState;
