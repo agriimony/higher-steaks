@@ -198,14 +198,35 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               supporterStakeFids: cast.supporterStakeFids || [],
             };
           });
-          setCasts(castsWithTotals);
+          
+          // Merge with temporary casts (valid casts not yet in database)
+          setCasts(prevCasts => {
+            // Get temporary casts (valid state, not found in API results)
+            const temporaryCasts = prevCasts.filter(cast => 
+              cast.castState === 'valid' && 
+              !castsWithTotals.find((apiCast: CastCard) => apiCast.hash === cast.hash)
+            );
+            
+            // Combine API casts with temporary casts, deduplicate by hash
+            const allCasts = [...castsWithTotals, ...temporaryCasts];
+            const uniqueCasts = allCasts.reduce((acc: CastCard[], cast: CastCard) => {
+              if (!acc.find(c => c.hash === cast.hash)) {
+                acc.push(cast);
+              }
+              return acc;
+            }, []);
+            
+            return uniqueCasts;
+          });
+          
+          setTemporaryNewCast(null); // Clear temporary cast flag when API data is loaded
         } else {
           console.error('Failed to fetch casts');
-          setCasts([]);
+          // Keep existing casts if API fails
         }
       } catch (error) {
         console.error('Error fetching casts:', error);
-        setCasts([]);
+        // Keep existing casts if API fails
       } finally {
         setLoadingCasts(false);
       }
@@ -396,7 +417,28 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 supporterStakeFids: cast.supporterStakeFids || [],
               };
             });
-            setCasts(castsWithTotals);
+            
+            // Merge with temporary casts (valid casts not yet in database)
+            setCasts(prevCasts => {
+              // Get temporary casts (valid state, not found in API results)
+              const temporaryCasts = prevCasts.filter(cast => 
+                cast.castState === 'valid' && 
+                !castsWithTotals.find((apiCast: CastCard) => apiCast.hash === cast.hash)
+              );
+              
+              // Combine API casts with temporary casts, deduplicate by hash
+              const allCasts = [...castsWithTotals, ...temporaryCasts];
+              const uniqueCasts = allCasts.reduce((acc: CastCard[], cast: CastCard) => {
+                if (!acc.find(c => c.hash === cast.hash)) {
+                  acc.push(cast);
+                }
+                return acc;
+              }, []);
+              
+              return uniqueCasts;
+            });
+            
+            setTemporaryNewCast(null); // Clear temporary cast flag when API data is loaded
           }
         } catch (error) {
           console.error('Error refreshing casts:', error);
