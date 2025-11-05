@@ -135,6 +135,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const [isDragging, setIsDragging] = useState(false);
   const dragStartX = useRef<number>(0);
   const dragScrollLeft = useRef<number>(0);
+  const hasAutoScrolled = useRef<boolean>(false);
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -218,15 +219,30 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     fetchCasts();
   }, [userFid]);
 
-  // Scroll to first card when temporary new cast is added
+  // Scroll to first card when temporary new cast is added (only once)
   useEffect(() => {
-    if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0].hash === temporaryNewCast.hash) {
-      // Scroll to the beginning to show the new cast
-      setTimeout(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-        }
-      }, 100);
+    if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0].hash === temporaryNewCast.hash && !hasAutoScrolled.current) {
+      // Reset scroll position immediately, then smooth scroll after layout
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollLeft = 0;
+        setActiveCardIndex(0);
+        
+        // Wait for layout to complete, then ensure smooth scroll
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (scrollContainerRef.current) {
+              scrollContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+            }
+          }, 50);
+        });
+        
+        hasAutoScrolled.current = true;
+      }
+    }
+    
+    // Reset flag when temporary cast is cleared
+    if (!temporaryNewCast) {
+      hasAutoScrolled.current = false;
     }
   }, [temporaryNewCast, casts]);
 
@@ -293,9 +309,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       const container = scrollContainerRef.current;
       const scrollLeft = container.scrollLeft;
       const cardWidthWithGap = cardWidth + 16; // card width + gap
-      const currentIndex = Math.round(scrollLeft / cardWidthWithGap);
+      const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
       
-      setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
+      setActiveCardIndex(Math.min(currentIndex, Math.max(0, casts.length - 1)));
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(
         scrollLeft < container.scrollWidth - container.clientWidth - 1
@@ -523,6 +539,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           return [newCast, ...filtered];
         });
         setTemporaryNewCast(newCast);
+        setActiveCardIndex(0); // Reset to first card
+        hasAutoScrolled.current = false; // Reset scroll flag
         setShowCreateCast(false);
         setCustomMessage('');
       }
@@ -610,6 +628,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           return [newCast, ...filtered];
         });
         setTemporaryNewCast(newCast);
+        setActiveCardIndex(0); // Reset to first card
+        hasAutoScrolled.current = false; // Reset scroll flag
         setShowCreateCast(false);
       } else if (data.valid && data.fid !== userFid) {
         console.log('[Onboarding] Cast belongs to different user:', data.fid, 'vs', userFid);
