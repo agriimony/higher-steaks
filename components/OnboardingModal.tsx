@@ -127,6 +127,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [cardWidth, setCardWidth] = useState<number>(320);
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -206,7 +207,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     fetchCasts();
   }, [userFid]);
 
-  // Check scroll position for dots indicator
+  // Check scroll position for dots indicator and calculate card width
   useEffect(() => {
     const checkScroll = () => {
       if (!scrollContainerRef.current) return;
@@ -217,11 +218,32 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       );
     };
     
+    const calculateCardWidth = () => {
+      if (!scrollContainerRef.current) return;
+      const container = scrollContainerRef.current;
+      const containerWidth = container.clientWidth;
+      // Calculate card width: 90% of container minus gap, with min/max constraints
+      const calculatedWidth = Math.max(280, Math.min(380, containerWidth * 0.9 - 16));
+      setCardWidth(calculatedWidth);
+    };
+    
     const container = scrollContainerRef.current;
     if (container) {
       container.addEventListener('scroll', checkScroll);
       checkScroll();
-      return () => container.removeEventListener('scroll', checkScroll);
+      calculateCardWidth();
+      
+      // Recalculate on resize
+      const resizeObserver = new ResizeObserver(() => {
+        calculateCardWidth();
+        checkScroll();
+      });
+      resizeObserver.observe(container);
+      
+      return () => {
+        container.removeEventListener('scroll', checkScroll);
+        resizeObserver.disconnect();
+      };
     }
   }, [casts]);
 
@@ -782,7 +804,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         </h2>
         
         {/* Horizontal scrolling cards */}
-        <div className="mb-4">
+        <div className="mb-4 overflow-hidden">
           <div
             ref={scrollContainerRef}
             className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
@@ -791,7 +813,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             {casts.map((cast) => (
               <div
                 key={cast.hash}
-                className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 w-[300px] snap-start"
+                className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 snap-start"
+                style={{ 
+                  width: `${cardWidth}px`,
+                  minWidth: '280px',
+                  maxWidth: '380px'
+                }}
               >
                 <div className="text-xs text-black font-mono mb-2">
                   <strong>started aiming higher and it worked out!</strong> {cast.description}
