@@ -620,16 +620,11 @@ export default function HigherSteakMenu() {
   return (
     <>
       {/* Onboarding Modal */}
-      {showOnboardingModal && user && castData !== null && (
+      {showOnboardingModal && user && (
         <OnboardingModal
           onClose={handleCloseOnboardingModal}
           userFid={user.fid}
-          castData={castData}
           walletBalance={getWalletBalance()}
-          onCastUpdated={(newCastData) => {
-            // Update cast data when user creates/validates a cast
-            setCastData(newCastData);
-          }}
           onStakeSuccess={handleStakeSuccess}
         />
       )}

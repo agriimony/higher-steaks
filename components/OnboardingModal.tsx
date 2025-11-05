@@ -2,26 +2,32 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount } from 'wagmi';
-import { parseUnits } from 'viem';
+import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
 
-interface CastData {
-  hasCast: boolean;
-  hash?: string;
-  text?: string;
-  description?: string;
-  timestamp?: string;
-  totalStaked: number;
+interface CastCard {
+  hash: string;
+  text: string;
+  description: string;
+  timestamp: string;
+  castState: 'higher' | 'expired';
   rank: number | null;
+  totalHigherStaked: number;
+  totalCasterStaked: number;
+  totalSupporterStaked: number;
+  casterStakeLockupIds: number[];
+  casterStakeAmounts: string[];
+  casterStakeUnlockTimes: number[];
+  supporterStakeLockupIds: number[];
+  supporterStakeAmounts: string[];
+  supporterStakeFids: number[];
 }
 
 interface OnboardingModalProps {
   onClose: () => void;
   userFid: number;
-  castData: CastData | null;
   walletBalance?: number;
-  onCastUpdated?: (newCastData: CastData) => void;
   onStakeSuccess?: () => void;
 }
 
@@ -53,12 +59,58 @@ function durationToSeconds(duration: number, unit: 'minute' | 'day' | 'week' | '
   }
 }
 
-export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0, onCastUpdated, onStakeSuccess }: OnboardingModalProps) {
+// Calculate valid caster and supporter stakes from arrays
+function calculateStakeTotals(
+  casterStakeAmounts: string[],
+  casterStakeUnlockTimes: number[],
+  supporterStakeAmounts: string[],
+  totalHigherStaked: number
+): { totalCasterStaked: number; totalSupporterStaked: number } {
+  const currentTime = Math.floor(Date.now() / 1000);
+  
+  // Filter valid caster stakes: currentTime < unlockTime
+  const validCasterStakes = casterStakeAmounts
+    .map((amount, index) => ({
+      amount: BigInt(amount || '0'),
+      unlockTime: casterStakeUnlockTimes[index] || 0,
+    }))
+    .filter(stake => stake.unlockTime > currentTime);
+  
+  // Calculate total valid caster staked
+  const totalCasterStaked = validCasterStakes.reduce((sum, stake) => sum + stake.amount, BigInt(0));
+  
+  // For supporter stakes, we don't have unlock times in DB, so we'll use all of them
+  // This is a limitation - ideally we'd filter by unlock time too
+  const totalSupporterStaked = supporterStakeAmounts.reduce(
+    (sum, amount) => sum + BigInt(amount || '0'),
+    BigInt(0)
+  );
+  
+  // Convert to numbers (HIGHER tokens with 18 decimals)
+  const casterStakedNum = parseFloat(formatUnits(totalCasterStaked, 18));
+  const supporterStakedNum = parseFloat(formatUnits(totalSupporterStaked, 18));
+  
+  return {
+    totalCasterStaked: casterStakedNum,
+    totalSupporterStaked: supporterStakedNum,
+  };
+}
+
+export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSuccess }: OnboardingModalProps) {
+  // Cast cards state
+  const [casts, setCasts] = useState<CastCard[]>([]);
+  const [loadingCasts, setLoadingCasts] = useState(true);
+  const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
+  const [showCreateCast, setShowCreateCast] = useState(false);
+  
+  // Create cast state
   const [customMessage, setCustomMessage] = useState('');
   const [castUrl, setCastUrl] = useState('');
-  const [showStakingForm, setShowStakingForm] = useState(false);
   const [urlValidationError, setUrlValidationError] = useState<string | null>(null);
   const [validatingUrl, setValidatingUrl] = useState(false);
+  
+  // Staking form state
+  const [showStakingForm, setShowStakingForm] = useState(false);
   const [stakeAmount, setStakeAmount] = useState('');
   const [lockupDuration, setLockupDuration] = useState<string>('');
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
@@ -70,6 +122,11 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
     amountWei: bigint;
     unlockTime: number;
   } | null>(null);
+  
+  // Scroll state for cards
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -99,6 +156,75 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
   const processedTxHash = useRef<string | null>(null);
   const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Fetch all casts on mount
+  useEffect(() => {
+    const fetchCasts = async () => {
+      setLoadingCasts(true);
+      try {
+        const response = await fetch(`/api/user/casts/all?fid=${userFid}`);
+        if (response.ok) {
+          const data = await response.json();
+          const castsWithTotals = data.casts.map((cast: any) => {
+            const { totalCasterStaked, totalSupporterStaked } = calculateStakeTotals(
+              cast.casterStakeAmounts || [],
+              cast.casterStakeUnlockTimes || [],
+              cast.supporterStakeAmounts || [],
+              cast.totalHigherStaked
+            );
+            
+            return {
+              hash: cast.hash,
+              text: cast.text,
+              description: cast.description,
+              timestamp: cast.timestamp,
+              castState: cast.castState,
+              rank: cast.rank,
+              totalHigherStaked: cast.totalHigherStaked,
+              totalCasterStaked,
+              totalSupporterStaked,
+              casterStakeLockupIds: cast.casterStakeLockupIds || [],
+              casterStakeAmounts: cast.casterStakeAmounts || [],
+              casterStakeUnlockTimes: cast.casterStakeUnlockTimes || [],
+              supporterStakeLockupIds: cast.supporterStakeLockupIds || [],
+              supporterStakeAmounts: cast.supporterStakeAmounts || [],
+              supporterStakeFids: cast.supporterStakeFids || [],
+            };
+          });
+          setCasts(castsWithTotals);
+        } else {
+          console.error('Failed to fetch casts');
+          setCasts([]);
+        }
+      } catch (error) {
+        console.error('Error fetching casts:', error);
+        setCasts([]);
+      } finally {
+        setLoadingCasts(false);
+      }
+    };
+    
+    fetchCasts();
+  }, [userFid]);
+
+  // Check scroll position for dots indicator
+  useEffect(() => {
+    const checkScroll = () => {
+      if (!scrollContainerRef.current) return;
+      const container = scrollContainerRef.current;
+      setCanScrollLeft(container.scrollLeft > 0);
+      setCanScrollRight(
+        container.scrollLeft < container.scrollWidth - container.clientWidth - 1
+      );
+    };
+    
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener('scroll', checkScroll);
+      checkScroll();
+      return () => container.removeEventListener('scroll', checkScroll);
+    }
+  }, [casts]);
+
   // Handle escape key to close
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -113,7 +239,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
 
   // Chain createLockUp after approve succeeds
   useEffect(() => {
-    if (!isApproveSuccess || !approveReceipt || !createLockUpParams || !wagmiAddress || !castData?.hash || hasScheduledCreateLockUp.current) {
+    if (!isApproveSuccess || !approveReceipt || !createLockUpParams || !wagmiAddress || !selectedCastHash || hasScheduledCreateLockUp.current) {
       return;
     }
 
@@ -133,7 +259,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
             paramsToUse.amountWei,
             paramsToUse.unlockTime,
             wagmiAddress,
-            castData.hash || 'Higher Steaks!' // Use cast hash as title
+            selectedCastHash // Use selected cast hash as title
           ],
         });
       } catch (error: any) {
@@ -154,7 +280,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
         createLockUpTimeoutRef.current = null;
       }
     };
-  }, [isApproveSuccess, approveReceipt, wagmiAddress, castData, writeContractCreateLockUp]);
+  }, [isApproveSuccess, approveReceipt, wagmiAddress, selectedCastHash, writeContractCreateLockUp]);
 
   // Handle transaction success
   useEffect(() => {
@@ -173,16 +299,56 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       setStakeAmount('');
       setLockupDuration('');
       setLockupDurationUnit('day');
+      setSelectedCastHash(null);
       hasScheduledCreateLockUp.current = false;
       
-      // Webhook will automatically detect the transaction and refresh the balance
-      // Leaderboard refresh will be triggered by Webhook in app/page.tsx
       console.log('[Onboarding] Stake transaction successful - Webhook will refresh UI');
       
-      // Call parent callback to adjust timers and refresh balance
+      // Refresh casts list
+      const fetchCasts = async () => {
+        try {
+          const response = await fetch(`/api/user/casts/all?fid=${userFid}`);
+          if (response.ok) {
+            const data = await response.json();
+            const castsWithTotals = data.casts.map((cast: any) => {
+              const { totalCasterStaked, totalSupporterStaked } = calculateStakeTotals(
+                cast.casterStakeAmounts || [],
+                cast.casterStakeUnlockTimes || [],
+                cast.supporterStakeAmounts || [],
+                cast.totalHigherStaked
+              );
+              
+              return {
+                hash: cast.hash,
+                text: cast.text,
+                description: cast.description,
+                timestamp: cast.timestamp,
+                castState: cast.castState,
+                rank: cast.rank,
+                totalHigherStaked: cast.totalHigherStaked,
+                totalCasterStaked,
+                totalSupporterStaked,
+                casterStakeLockupIds: cast.casterStakeLockupIds || [],
+                casterStakeAmounts: cast.casterStakeAmounts || [],
+                casterStakeUnlockTimes: cast.casterStakeUnlockTimes || [],
+                supporterStakeLockupIds: cast.supporterStakeLockupIds || [],
+                supporterStakeAmounts: cast.supporterStakeAmounts || [],
+                supporterStakeFids: cast.supporterStakeFids || [],
+              };
+            });
+            setCasts(castsWithTotals);
+          }
+        } catch (error) {
+          console.error('Error refreshing casts:', error);
+        }
+      };
+      
+      fetchCasts();
+      
+      // Call parent callback
       onStakeSuccess?.();
     }
-  }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess]);
+  }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess, userFid]);
 
   // Error handling
   useEffect(() => {
@@ -203,29 +369,54 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       });
       console.log('Compose cast result:', result);
       
-      // If result contains cast hash, we can use it immediately
+      // If result contains cast hash, refresh casts list
       if (result?.cast?.hash && result?.cast?.text) {
         console.log('Got cast hash from composeCast:', result.cast.hash);
         
-        // Extract description from cast text
-        const keyphraseMatch = result.cast.text.match(/started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i);
-        const description = keyphraseMatch && keyphraseMatch[1] 
-          ? keyphraseMatch[1].trim() 
-          : '';
-        
-        // Update cast data directly with the new cast
-        if (onCastUpdated) {
-          onCastUpdated({
-            hasCast: true,
-            hash: result.cast.hash,
-            text: result.cast.text,
-            description: description,
-            timestamp: new Date().toISOString(),
-            totalStaked: 0,
-            rank: null,
-          });
-        }
-        // Modal will stay open and automatically show the new cast state
+        // Refresh casts list after a short delay (cast may not be in DB yet)
+        setTimeout(() => {
+          const fetchCasts = async () => {
+            try {
+              const response = await fetch(`/api/user/casts/all?fid=${userFid}`);
+              if (response.ok) {
+                const data = await response.json();
+                const castsWithTotals = data.casts.map((cast: any) => {
+                  const { totalCasterStaked, totalSupporterStaked } = calculateStakeTotals(
+                    cast.casterStakeAmounts || [],
+                    cast.casterStakeUnlockTimes || [],
+                    cast.supporterStakeAmounts || [],
+                    cast.totalHigherStaked
+                  );
+                  
+                  return {
+                    hash: cast.hash,
+                    text: cast.text,
+                    description: cast.description,
+                    timestamp: cast.timestamp,
+                    castState: cast.castState,
+                    rank: cast.rank,
+                    totalHigherStaked: cast.totalHigherStaked,
+                    totalCasterStaked,
+                    totalSupporterStaked,
+                    casterStakeLockupIds: cast.casterStakeLockupIds || [],
+                    casterStakeAmounts: cast.casterStakeAmounts || [],
+                    casterStakeUnlockTimes: cast.casterStakeUnlockTimes || [],
+                    supporterStakeLockupIds: cast.supporterStakeLockupIds || [],
+                    supporterStakeAmounts: cast.supporterStakeAmounts || [],
+                    supporterStakeFids: cast.supporterStakeFids || [],
+                  };
+                });
+                setCasts(castsWithTotals);
+                setShowCreateCast(false);
+                setCustomMessage('');
+              }
+            } catch (error) {
+              console.error('Error refreshing casts:', error);
+            }
+          };
+          
+          fetchCasts();
+        }, 2000);
       }
     } catch (error) {
       console.error("Failed to open cast composer:", error);
@@ -244,14 +435,11 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       
       // Extract hash from various URL formats
       if (identifierToLookup.includes('farcaster.xyz')) {
-        // For farcaster.xyz URLs, use the full URL with 'url' type
         isFullUrl = true;
         console.log('[Onboarding] Using full farcaster.xyz URL as-is:', identifierToLookup);
       } else if (identifierToLookup.includes('warpcast.com')) {
-        // For Warpcast URLs, extract the hash part
         const match = identifierToLookup.match(/warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)$/);
         if (match && match[1]) {
-          // Prepend 0x if it's a hex string
           if (!match[1].startsWith('0x')) {
             identifierToLookup = '0x' + match[1];
           } else {
@@ -264,7 +452,6 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
           return;
         }
       } else {
-        // Assume it's already a hash - add 0x prefix if missing
         if (!identifierToLookup.startsWith('0x') && /^[a-fA-F0-9]+$/.test(identifierToLookup)) {
           identifierToLookup = '0x' + identifierToLookup;
         }
@@ -285,21 +472,53 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
       console.log('[Onboarding] Validation response:', data);
       
       if (data.valid && data.fid === userFid) {
-        // Valid cast by this user - update cast data directly
-        console.log('[Onboarding] Cast is valid, updating cast data');
+        console.log('[Onboarding] Cast is valid');
         setUrlValidationError(null);
         setCastUrl('');
-        if (onCastUpdated) {
-          onCastUpdated({
-            hasCast: true,
-            hash: data.hash,
-            text: data.text,
-            description: data.description || '',
-            timestamp: data.timestamp,
-            totalStaked: 0,
-            rank: null,
-          });
-        }
+        
+        // Refresh casts list after a short delay
+        setTimeout(() => {
+          const fetchCasts = async () => {
+            try {
+              const response = await fetch(`/api/user/casts/all?fid=${userFid}`);
+              if (response.ok) {
+                const data = await response.json();
+                const castsWithTotals = data.casts.map((cast: any) => {
+                  const { totalCasterStaked, totalSupporterStaked } = calculateStakeTotals(
+                    cast.casterStakeAmounts || [],
+                    cast.casterStakeUnlockTimes || [],
+                    cast.supporterStakeAmounts || [],
+                    cast.totalHigherStaked
+                  );
+                  
+                  return {
+                    hash: cast.hash,
+                    text: cast.text,
+                    description: cast.description,
+                    timestamp: cast.timestamp,
+                    castState: cast.castState,
+                    rank: cast.rank,
+                    totalHigherStaked: cast.totalHigherStaked,
+                    totalCasterStaked,
+                    totalSupporterStaked,
+                    casterStakeLockupIds: cast.casterStakeLockupIds || [],
+                    casterStakeAmounts: cast.casterStakeAmounts || [],
+                    casterStakeUnlockTimes: cast.casterStakeUnlockTimes || [],
+                    supporterStakeLockupIds: cast.supporterStakeLockupIds || [],
+                    supporterStakeAmounts: cast.supporterStakeAmounts || [],
+                    supporterStakeFids: cast.supporterStakeFids || [],
+                  };
+                });
+                setCasts(castsWithTotals);
+                setShowCreateCast(false);
+              }
+            } catch (error) {
+              console.error('Error refreshing casts:', error);
+            }
+          };
+          
+          fetchCasts();
+        }, 2000);
       } else if (data.valid && data.fid !== userFid) {
         console.log('[Onboarding] Cast belongs to different user:', data.fid, 'vs', userFid);
         setUrlValidationError('This cast belongs to a different user');
@@ -340,29 +559,23 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
     }
   };
 
-  const handleStake = async () => {
+  const handleStake = async (castHash: string) => {
     if (!wagmiAddress) {
       setStakeError('No wallet connected');
       return;
     }
 
     // Validate that cast exists and belongs to user (caster-only staking)
-    if (!castData || !castData.hash) {
-      setStakeError('No cast found. Please create or validate a cast first.');
-      return;
-    }
-
-    // Double-check that the cast belongs to this user (should already be validated, but be safe)
     try {
-      const castResponse = await fetch(`/api/cast/${castData.hash}`);
+      const castResponse = await fetch(`/api/cast/${castHash}`);
       if (castResponse.ok) {
         const castInfo = await castResponse.json();
         if (castInfo.fid !== userFid) {
           setStakeError('Only the caster can stake on their own cast');
           return;
         }
-        // Check cast state - must be 'valid' or 'higher'
-        if (castInfo.state && castInfo.state !== 'valid' && castInfo.state !== 'higher') {
+        // Check cast state - must be 'valid' or 'higher' (expired casts can be re-staked)
+        if (castInfo.state && castInfo.state !== 'valid' && castInfo.state !== 'higher' && castInfo.state !== 'expired') {
           setStakeError('Cast is not valid for staking');
           return;
         }
@@ -414,6 +627,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
 
       // Store params for createLockUp (will be called after approve succeeds or if already approved)
       setCreateLockUpParams({ amountWei, unlockTime });
+      setSelectedCastHash(castHash);
 
       // Step 1: Check if we need to approve (only approve if current allowance is insufficient)
       const allowance = currentAllowance || BigInt(0);
@@ -427,13 +641,6 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
         // Call createLockUp directly after a short delay
         const delay = setTimeout(() => {
           try {
-            if (!castData) {
-              setStakeError('No cast data available');
-              setPendingCreateLockUp(false);
-              hasScheduledCreateLockUp.current = false;
-              return;
-            }
-            
             writeContractCreateLockUp({
               address: LOCKUP_CONTRACT,
               abi: LOCKUP_ABI,
@@ -444,7 +651,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
                 amountWei,
                 unlockTime,
                 wagmiAddress,
-                castData.hash || 'Higher Steaks!' // Use cast hash as title
+                castHash // Use cast hash as title
               ],
             });
           } catch (error: any) {
@@ -475,199 +682,180 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
 
   const isLoadingTransaction = isApprovePending || isApproveConfirming || isCreateLockUpPending || isCreateLockUpConfirming || pendingCreateLockUp;
 
-  // State A: No Cast Found
-  if (!castData || !castData.hasCast) {
-    return (
-      <div 
-        className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-        onClick={onClose}
-      >
-        <div 
-          className="bg-[#fefdfb] border-2 border-black rounded-none p-6 max-w-md w-full relative font-mono shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)'
-          }}
-        >
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 text-black/40 hover:text-black transition"
-            aria-label="Close"
-          >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              width="20" 
-              height="20" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-            >
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-          
-          <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
-            Are you aiming higher today?
-          </h2>
-          
-          <p className="mb-3 text-black text-sm">
-            Start your journey with /higher:
-          </p>
-          
-          <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
-            <div className="text-xs text-black font-mono mb-2">
-              <strong>started aiming higher and it worked out!</strong>
-            </div>
-            <textarea
-              value={customMessage}
-              onChange={(e) => setCustomMessage(e.target.value)}
-              placeholder="[your message here]"
-              className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black resize-none"
-              rows={3}
-            />
-          </div>
+  // Create Cast Flow Component
+  const CreateCastFlow = () => (
+    <>
+      <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
+        Are you aiming higher today?
+      </h2>
+      
+      <p className="mb-3 text-black text-sm">
+        Start your journey with /higher:
+      </p>
+      
+      <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
+        <div className="text-xs text-black font-mono mb-2">
+          <strong>started aiming higher and it worked out!</strong>
+        </div>
+        <textarea
+          value={customMessage}
+          onChange={(e) => setCustomMessage(e.target.value)}
+          placeholder="[your message here]"
+          className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black resize-none"
+          rows={3}
+        />
+      </div>
 
-          <div className="relative mb-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-black/20"></div>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-[#fefdfb] px-2 text-black/60">Or</span>
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <input
-              type="text"
-              value={castUrl}
-              onChange={(e) => {
-                setCastUrl(e.target.value);
-                setUrlValidationError(null);
-              }}
-              placeholder="Paste your cast URL here..."
-              className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
-            />
-            {urlValidationError && (
-              <div className="mt-2 text-xs text-red-600">
-                {urlValidationError}
-              </div>
-            )}
-          </div>
-          
-          <div className="flex gap-3 border-t border-black/20 pt-4">
-            <button
-              onClick={handleQuickCast}
-              className="flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
-            >
-              Cast to /higher
-            </button>
-            {castUrl && (
-              <button
-                onClick={handleValidateAndUseCastUrl}
-                disabled={validatingUrl}
-                className="relative group flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {validatingUrl ? 'Validating...' : 'Use URL'}
-                <span className="absolute top-0 right-0 text-xs opacity-60 group-hover:opacity-100">ⓘ</span>
-                <div className="absolute bottom-full right-0 mb-2 w-64 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                  Valid cast must begin with "started aiming higher and it worked out!" and be cast by you
-                </div>
-              </button>
-            )}
-          </div>
-          
-          <div className="mt-3">
-            <button
-              onClick={onClose}
-              className="text-xs text-black/60 hover:text-black underline"
-            >
-              Maybe Later
-            </button>
-          </div>
+      <div className="relative mb-4">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-black/20"></div>
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-[#fefdfb] px-2 text-black/60">Or</span>
         </div>
       </div>
-    );
-  }
 
-  // State B: Cast Found
-  return (
-    <div 
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-[#fefdfb] border-2 border-black rounded-none p-6 max-w-md w-full relative font-mono shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)'
-        }}
-      >
+      <div className="mb-4">
+        <input
+          type="text"
+          value={castUrl}
+          onChange={(e) => {
+            setCastUrl(e.target.value);
+            setUrlValidationError(null);
+          }}
+          placeholder="Paste your cast URL here..."
+          className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
+        />
+        {urlValidationError && (
+          <div className="mt-2 text-xs text-red-600">
+            {urlValidationError}
+          </div>
+        )}
+      </div>
+      
+      <div className="flex gap-3 border-t border-black/20 pt-4">
         <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-black/40 hover:text-black transition"
-          aria-label="Close"
+          onClick={handleQuickCast}
+          className="flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
         >
-          <svg 
-            xmlns="http://www.w3.org/2000/svg" 
-            width="20" 
-            height="20" 
-            viewBox="0 0 24 24" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          >
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
+          Cast to /higher
         </button>
-        
+        {castUrl && (
+          <button
+            onClick={handleValidateAndUseCastUrl}
+            disabled={validatingUrl}
+            className="relative group flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {validatingUrl ? 'Validating...' : 'Use URL'}
+            <span className="absolute top-0 right-0 text-xs opacity-60 group-hover:opacity-100">ⓘ</span>
+            <div className="absolute bottom-full right-0 mb-2 w-64 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              Valid cast must begin with "started aiming higher and it worked out!" and be cast by you
+            </div>
+          </button>
+        )}
+      </div>
+      
+      <div className="mt-3">
+        <button
+          onClick={() => {
+            setShowCreateCast(false);
+            setCustomMessage('');
+            setCastUrl('');
+            setUrlValidationError(null);
+          }}
+          className="text-xs text-black/60 hover:text-black underline"
+        >
+          Cancel
+        </button>
+      </div>
+    </>
+  );
+
+  // Cast Cards View Component
+  const CastCardsView = () => {
+    const selectedCast = casts.find(c => c.hash === selectedCastHash);
+    
+    return (
+      <>
         <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
           You are aiming higher!
         </h2>
         
-        <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
-          <div className="text-xs text-black font-mono mb-2">
-            <strong>started aiming higher and it worked out!</strong> {castData.description}
+        {/* Horizontal scrolling cards */}
+        <div className="mb-4">
+          <div
+            ref={scrollContainerRef}
+            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {casts.map((cast) => (
+              <div
+                key={cast.hash}
+                className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 w-80 snap-start"
+              >
+                <div className="text-xs text-black font-mono mb-2">
+                  <strong>started aiming higher and it worked out!</strong> {cast.description}
+                </div>
+                {cast.timestamp && (
+                  <div className="text-xs text-black/50 font-mono mb-3">
+                    {formatTimestamp(cast.timestamp)}
+                  </div>
+                )}
+                
+                <div className="border-t border-black/20 pt-3 mt-3">
+                  {cast.castState === 'higher' ? (
+                    <>
+                      <div className="text-sm text-black font-bold mb-1">
+                        Rank: {cast.rank ? `#${cast.rank}` : 'Unranked'}
+                      </div>
+                      <div className="text-xs text-black/80 mb-2">
+                        {cast.totalHigherStaked.toFixed(2)} HIGHER staked
+                      </div>
+                      <div className="text-xs text-black/60 flex items-center gap-1">
+                        <img 
+                          src="/higher-logo.png" 
+                          alt="HIGHER" 
+                          className="w-3 h-3 rounded-full"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = 'none';
+                          }}
+                        />
+                        <span>{cast.totalCasterStaked.toFixed(2)}</span>
+                        <span className="text-black/40">|</span>
+                        <span>{cast.totalSupporterStaked.toFixed(2)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-xs text-black/60 italic mb-2">
+                      This cast is expired, add stake to rejoin the leaderboard
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      setSelectedCastHash(cast.hash);
+                      setShowStakingForm(true);
+                    }}
+                    className="mt-2 w-full px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+                  >
+                    Add stake
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-          {castData.timestamp && (
-            <div className="text-xs text-black/50 font-mono">
-              {formatTimestamp(castData.timestamp)}
+          
+          {/* Dots indicator */}
+          {casts.length > 1 && (
+            <div className="flex justify-center gap-1 mt-2">
+              {canScrollLeft && <span className="text-xs text-black/40">●</span>}
+              {canScrollRight && <span className="text-xs text-black/40">●</span>}
             </div>
           )}
         </div>
-
-        <div className="mb-4 text-sm">
-          <div className="text-black font-bold">
-            Rank: {castData.rank ? `#${castData.rank}` : 'Unranked'}
-          </div>
-          <div className="text-black/80">
-            {castData.totalStaked.toFixed(2)} HIGHER staked on this cast
-          </div>
-        </div>
-
-        {!showStakingForm ? (
-          <div className="flex gap-3 border-t border-black/20 pt-4">
-            <button
-              onClick={() => setShowStakingForm(true)}
-              className="flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
-            >
-              Add stake
-            </button>
-            <button
-              onClick={handleSwapToHigher}
-              className="flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm"
-            >
-              Buy HIGHER
-            </button>
-          </div>
-        ) : (
-          <div className="border-t border-black/20 pt-4">
+        
+        {/* Staking form */}
+        {showStakingForm && selectedCast && (
+          <div className="border-t border-black/20 pt-4 mt-4">
             <h3 className="text-sm font-bold mb-3">Add stake to this cast</h3>
             
             <div className="mb-3">
@@ -717,7 +905,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
 
             <div className="flex gap-3">
               <button
-                onClick={handleStake}
+                onClick={() => handleStake(selectedCast.hash)}
                 disabled={isLoadingTransaction}
                 className="relative group flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -737,6 +925,7 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
                   setStakeAmount('');
                   setLockupDuration('');
                   setLockupDurationUnit('day');
+                  setSelectedCastHash(null);
                 }}
                 className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
               >
@@ -744,6 +933,83 @@ export function OnboardingModal({ onClose, userFid, castData, walletBalance = 0,
               </button>
             </div>
           </div>
+        )}
+        
+        {/* Buy HIGHER button */}
+        {!showStakingForm && (
+          <div className="border-t border-black/20 pt-4 mt-4">
+            <button
+              onClick={handleSwapToHigher}
+              className="w-full px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm"
+            >
+              Buy HIGHER
+            </button>
+          </div>
+        )}
+        
+        {/* Create new cast link */}
+        <div className="mt-3 text-center">
+          <button
+            onClick={() => setShowCreateCast(true)}
+            className="text-xs text-black/60 hover:text-black underline"
+          >
+            Create new cast
+          </button>
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-[#fefdfb] border-2 border-black rounded-none p-6 max-w-md w-full relative font-mono shadow-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)'
+        }}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-black/40 hover:text-black transition z-10"
+          aria-label="Close"
+        >
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width="20" 
+            height="20" 
+            viewBox="0 0 24 24" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        
+        {loadingCasts ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="text-base font-bold text-black">
+                Loading
+                <span className="inline-block ml-1">
+                  <span className="loading-dot-1">.</span>
+                  <span className="loading-dot-2">.</span>
+                  <span className="loading-dot-3">.</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : showCreateCast || casts.length === 0 ? (
+          <CreateCastFlow />
+        ) : (
+          <CastCardsView />
         )}
       </div>
     </div>
