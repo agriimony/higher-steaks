@@ -48,12 +48,32 @@ function formatTimestamp(timestamp: string): string {
   }
 }
 
+// Convert duration and unit to seconds
+function durationToSeconds(duration: number, unit: 'minute' | 'day' | 'week' | 'month' | 'year'): number {
+  switch (unit) {
+    case 'minute':
+      return duration * 60;
+    case 'day':
+      return duration * 86400;
+    case 'week':
+      return duration * 604800;
+    case 'month':
+      return duration * 2592000; // 30 days
+    case 'year':
+      return duration * 31536000; // 365 days
+    default:
+      return duration * 86400;
+  }
+}
+
 export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, onStakeSuccess }: SupporterModalProps) {
   const [castData, setCastData] = useState<CastData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showStakingForm, setShowStakingForm] = useState(false);
   const [stakeAmount, setStakeAmount] = useState('');
+  const [lockupDuration, setLockupDuration] = useState<string>('');
+  const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   
   // Staking transaction state
   const [stakeError, setStakeError] = useState<string | null>(null);
@@ -262,10 +282,13 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
       return;
     }
 
-    if (!castData || !castData.maxCasterUnlockTime) {
-      setStakeError('No valid cast found or no caster stakes');
+    if (!castData) {
+      setStakeError('No valid cast found');
       return;
     }
+
+    // Check if user is the caster
+    const isCaster = userFid !== null && castData.fid === userFid;
 
     // Validation
     const amountNum = parseFloat(stakeAmount.replace(/,/g, ''));
@@ -287,8 +310,28 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
       // Convert amount to wei (18 decimals)
       const amountWei = parseUnits(stakeAmount.replace(/,/g, ''), 18);
       
-      // Use max caster unlock time as the unlock time
-      const unlockTime = castData.maxCasterUnlockTime;
+      let unlockTime: number;
+      
+      if (isCaster) {
+        // Caster: calculate unlock time from user-defined duration
+        const durationNum = parseFloat(lockupDuration);
+        
+        if (isNaN(durationNum) || durationNum <= 0) {
+          setStakeError('Please enter a valid duration');
+          return;
+        }
+        
+        // Calculate unlock time (current time + duration in seconds)
+        const durationSeconds = durationToSeconds(durationNum, lockupDurationUnit);
+        unlockTime = Math.floor(Date.now() / 1000) + durationSeconds;
+      } else {
+        // Supporter: use max caster unlock time
+        if (!castData.maxCasterUnlockTime || castData.maxCasterUnlockTime <= 0) {
+          setStakeError('No valid caster stake found');
+          return;
+        }
+        unlockTime = castData.maxCasterUnlockTime;
+      }
       
       // Validate unlockTime fits in uint40
       if (unlockTime > 0xFFFFFFFF) {
@@ -436,6 +479,9 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
     stake => !userFid || stake.fid !== userFid
   );
   const connectedUserStake = castData.connectedUserStake;
+
+  // Check if user is the caster
+  const isCaster = userFid !== null && castData.fid === userFid;
 
   // Format amounts
   const totalCasterStakedFormatted = formatUnits(BigInt(castData.totalCasterStaked || '0'), 18);
@@ -600,23 +646,54 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 className="w-full text-sm font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
               />
             </div>
-            <div className="mb-3">
-              <label className="block text-xs font-bold text-black mb-1">
-                until {castData.maxCasterUnlockTime > 0 
-                  ? new Date(castData.maxCasterUnlockTime * 1000).toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true
-                    })
-                  : 'N/A'}
-              </label>
-              <div className="text-xs text-black/50 mt-1">
-                Your stake will unlock together with @{castData.username}
+            {isCaster ? (
+              /* Caster: Show duration input */
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-black mb-1">
+                  Duration
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={lockupDuration}
+                    onChange={(e) => setLockupDuration(e.target.value)}
+                    placeholder="1"
+                    min="1"
+                    className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
+                  />
+                  <select
+                    value={lockupDurationUnit}
+                    onChange={(e) => setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year')}
+                    className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
+                  >
+                    <option value="minute">Minute(s)</option>
+                    <option value="day">Day(s)</option>
+                    <option value="week">Week(s)</option>
+                    <option value="month">Month(s)</option>
+                    <option value="year">Year(s)</option>
+                  </select>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* Supporter: Show unlock time info */
+              <div className="mb-3">
+                <label className="block text-xs font-bold text-black mb-1">
+                  until {castData.maxCasterUnlockTime > 0 
+                    ? new Date(castData.maxCasterUnlockTime * 1000).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })
+                    : 'N/A'}
+                </label>
+                <div className="text-xs text-black/50 mt-1">
+                  Your stake will unlock together with @{castData.username}
+                </div>
+              </div>
+            )}
             {stakeError && (
               <div className="mb-3 text-xs text-red-600">{stakeError}</div>
             )}
@@ -625,6 +702,9 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 onClick={() => {
                   setShowStakingForm(false);
                   setStakeError(null);
+                  setStakeAmount('');
+                  setLockupDuration('');
+                  setLockupDurationUnit('day');
                 }}
                 className="flex-1 px-4 py-2 bg-white text-black font-bold border-2 border-black hover:bg-black hover:text-white transition text-sm"
               >
@@ -646,7 +726,16 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
         ) : (
           /* Action Buttons */
           <div className="flex gap-2">
-            {castData.maxCasterUnlockTime > 0 ? (
+            {isCaster ? (
+              /* Caster: Show "Add Stake" button */
+              <button
+                onClick={() => setShowStakingForm(true)}
+                className="flex-1 px-4 py-2 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
+              >
+                Add Stake
+              </button>
+            ) : castData.maxCasterUnlockTime > 0 ? (
+              /* Supporter: Show "Add Support" button if not expired */
               <button
                 onClick={() => setShowStakingForm(true)}
                 className="flex-1 px-4 py-2 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
@@ -654,6 +743,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 Add Support
               </button>
             ) : (
+              /* Supporter: Show "Expired" button if expired */
               <button
                 disabled
                 className="flex-1 px-4 py-2 bg-gray-300 text-gray-500 font-bold border-2 border-gray-300 cursor-not-allowed transition text-sm"
