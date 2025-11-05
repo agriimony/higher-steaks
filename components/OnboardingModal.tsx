@@ -131,6 +131,10 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [cardWidth, setCardWidth] = useState<number>(320);
   const previousCardWidthRef = useRef<number>(320);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartX = useRef<number>(0);
+  const dragScrollLeft = useRef<number>(0);
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -226,6 +230,56 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
   }, [temporaryNewCast, casts]);
 
+  // Handle dot click to scroll to specific card
+  const scrollToCard = (index: number) => {
+    if (!scrollContainerRef.current) return;
+    const container = scrollContainerRef.current;
+    const cardWidthWithGap = cardWidth + 16; // card width + gap
+    const targetScroll = index * cardWidthWithGap;
+    container.scrollTo({ left: targetScroll, behavior: 'smooth' });
+  };
+
+  // Handle mouse drag for card navigation
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollContainerRef.current) return;
+    setIsDragging(true);
+    dragStartX.current = e.pageX - scrollContainerRef.current.offsetLeft;
+    dragScrollLeft.current = scrollContainerRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollContainerRef.current.offsetLeft;
+    const walk = (x - dragStartX.current) * 2; // Scroll speed multiplier
+    scrollContainerRef.current.scrollLeft = dragScrollLeft.current - walk;
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseLeave = () => {
+    setIsDragging(false);
+  };
+
+  // Handle touch swipe for mobile
+  const touchStartX = useRef<number>(0);
+  const touchScrollLeft = useRef<number>(0);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!scrollContainerRef.current) return;
+    touchStartX.current = e.touches[0].pageX;
+    touchScrollLeft.current = scrollContainerRef.current.scrollLeft;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!scrollContainerRef.current) return;
+    const x = e.touches[0].pageX;
+    const walk = (x - touchStartX.current) * 2;
+    scrollContainerRef.current.scrollLeft = touchScrollLeft.current - walk;
+  };
+
   // Check scroll position for dots indicator and calculate card width
   // Only run when showing cards view (not create cast flow)
   useEffect(() => {
@@ -237,9 +291,14 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     const checkScroll = () => {
       if (!scrollContainerRef.current) return;
       const container = scrollContainerRef.current;
-      setCanScrollLeft(container.scrollLeft > 0);
+      const scrollLeft = container.scrollLeft;
+      const cardWidthWithGap = cardWidth + 16; // card width + gap
+      const currentIndex = Math.round(scrollLeft / cardWidthWithGap);
+      
+      setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
+      setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(
-        container.scrollLeft < container.scrollWidth - container.clientWidth - 1
+        scrollLeft < container.scrollWidth - container.clientWidth - 1
       );
     };
     
@@ -822,10 +881,19 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         <div className="mb-4 overflow-hidden">
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 justify-center"
-            style={{ scrollbarWidth: 'thin' }}
+            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 justify-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            style={{ 
+              cursor: isDragging ? 'grabbing' : 'grab',
+              WebkitOverflowScrolling: 'touch'
+            } as React.CSSProperties}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
           >
-            {casts.map((cast) => (
+            {casts.map((cast, index) => (
               <div
                 key={cast.hash}
                 className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 snap-start"
@@ -890,14 +958,25 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             ))}
           </div>
           
-          {/* Dots indicator */}
-          {casts.length > 1 && (
-            <div className="flex justify-center gap-1 mt-2">
-              {canScrollLeft && <span className="text-xs text-black/40">●</span>}
-              {canScrollRight && <span className="text-xs text-black/40">●</span>}
-            </div>
-          )}
         </div>
+        
+        {/* Dots indicator */}
+        {casts.length > 1 && (
+          <div className="flex justify-center gap-2 mt-2">
+            {casts.map((_, index) => (
+              <button
+                key={index}
+                onClick={() => scrollToCard(index)}
+                className={`h-2 rounded-full transition-all ${
+                  index === activeCardIndex 
+                    ? 'bg-black w-6' 
+                    : 'bg-black/30 hover:bg-black/50 w-2'
+                }`}
+                aria-label={`Go to card ${index + 1}`}
+              />
+            ))}
+          </div>
+        )}
         
         {/* Staking form */}
         {showStakingForm && selectedCast && (
