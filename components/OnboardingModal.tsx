@@ -11,7 +11,7 @@ interface CastCard {
   text: string;
   description: string;
   timestamp: string;
-  castState: 'higher' | 'expired';
+  castState: 'higher' | 'expired' | 'valid';
   rank: number | null;
   totalHigherStaked: number;
   totalCasterStaked: number;
@@ -102,6 +102,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const [loadingCasts, setLoadingCasts] = useState(true);
   const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
   const [showCreateCast, setShowCreateCast] = useState(false);
+  const [temporaryNewCast, setTemporaryNewCast] = useState<CastCard | null>(null);
   
   // Create cast state
   const [customMessage, setCustomMessage] = useState('');
@@ -212,6 +213,18 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     
     fetchCasts();
   }, [userFid]);
+
+  // Scroll to first card when temporary new cast is added
+  useEffect(() => {
+    if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0].hash === temporaryNewCast.hash) {
+      // Scroll to the beginning to show the new cast
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+        }
+      }, 100);
+    }
+  }, [temporaryNewCast, casts]);
 
   // Check scroll position for dots indicator and calculate card width
   // Only run when showing cards view (not create cast flow)
@@ -415,11 +428,46 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       });
       console.log('Compose cast result:', result);
       
-      // If result contains cast hash, refresh casts list
+      // If result contains cast hash, create temporary cast card
       if (result?.cast?.hash && result?.cast?.text) {
         console.log('Got cast hash from composeCast:', result.cast.hash);
         
-        // Refresh casts list after a short delay (cast may not be in DB yet)
+        // Extract description from cast text
+        const keyphraseMatch = result.cast.text.match(/started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i);
+        const description = keyphraseMatch && keyphraseMatch[1] 
+          ? keyphraseMatch[1].trim() 
+          : '';
+        
+        // Create temporary cast card
+        const newCast: CastCard = {
+          hash: result.cast.hash,
+          text: result.cast.text,
+          description: description,
+          timestamp: new Date().toISOString(),
+          castState: 'valid', // Not "higher" yet since not staked
+          rank: null,
+          totalHigherStaked: 0,
+          totalCasterStaked: 0,
+          totalSupporterStaked: 0,
+          casterStakeLockupIds: [],
+          casterStakeAmounts: [],
+          casterStakeUnlockTimes: [],
+          supporterStakeLockupIds: [],
+          supporterStakeAmounts: [],
+          supporterStakeFids: [],
+        };
+        
+        // Add temporary cast first, then existing casts
+        setCasts(prevCasts => {
+          // Remove any existing temporary cast with same hash
+          const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
+          return [newCast, ...filtered];
+        });
+        setTemporaryNewCast(newCast);
+        setShowCreateCast(false);
+        setCustomMessage('');
+        
+        // Refresh casts list after a delay (cast may not be in DB yet)
         setTimeout(() => {
           const fetchCasts = async () => {
             try {
@@ -452,9 +500,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                     supporterStakeFids: cast.supporterStakeFids || [],
                   };
                 });
+                // Replace temporary cast with real data if found
                 setCasts(castsWithTotals);
-                setShowCreateCast(false);
-                setCustomMessage('');
+                setTemporaryNewCast(null);
               }
             } catch (error) {
               console.error('Error refreshing casts:', error);
@@ -522,7 +570,35 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setUrlValidationError(null);
         setCastUrl('');
         
-        // Refresh casts list after a short delay
+        // Create temporary cast card from validation response
+        const newCast: CastCard = {
+          hash: data.hash,
+          text: data.castText || '',
+          description: data.description || '',
+          timestamp: data.timestamp || new Date().toISOString(),
+          castState: data.state || 'valid',
+          rank: null,
+          totalHigherStaked: 0,
+          totalCasterStaked: 0,
+          totalSupporterStaked: 0,
+          casterStakeLockupIds: [],
+          casterStakeAmounts: [],
+          casterStakeUnlockTimes: [],
+          supporterStakeLockupIds: [],
+          supporterStakeAmounts: [],
+          supporterStakeFids: [],
+        };
+        
+        // Add temporary cast first, then existing casts
+        setCasts(prevCasts => {
+          // Remove any existing temporary cast with same hash
+          const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
+          return [newCast, ...filtered];
+        });
+        setTemporaryNewCast(newCast);
+        setShowCreateCast(false);
+        
+        // Refresh casts list after a delay (cast may not be in DB yet)
         setTimeout(() => {
           const fetchCasts = async () => {
             try {
@@ -555,8 +631,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                     supporterStakeFids: cast.supporterStakeFids || [],
                   };
                 });
+                // Replace temporary cast with real data if found
                 setCasts(castsWithTotals);
-                setShowCreateCast(false);
+                setTemporaryNewCast(null);
               }
             } catch (error) {
               console.error('Error refreshing casts:', error);
@@ -880,9 +957,13 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                         <span>{cast.totalSupporterStaked.toFixed(2)}</span>
                       </div>
                     </>
-                  ) : (
+                  ) : cast.castState === 'expired' ? (
                     <div className="text-xs text-black/60 italic mb-2">
                       This cast is expired, add stake to rejoin the leaderboard
+                    </div>
+                  ) : (
+                    <div className="text-xs text-black/60 mb-2">
+                      Add stake to join the leaderboard
                     </div>
                   )}
                   <button
