@@ -226,7 +226,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       setTimeout(() => {
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollLeft = 0;
-          setActiveCardIndex(0);
+          //setActiveCardIndex(0);
           hasAutoScrolled.current = true;
         }
       }, 0);
