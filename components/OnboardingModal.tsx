@@ -791,7 +791,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             {casts.map((cast) => (
               <div
                 key={cast.hash}
-                className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 w-80 snap-start"
+                className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 w-[320px] snap-start"
               >
                 <div className="text-xs text-black font-mono mb-2">
                   <strong>started aiming higher and it worked out!</strong> {cast.description}
@@ -966,10 +966,11 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       onClick={onClose}
     >
       <div 
-        className="bg-[#fefdfb] border-2 border-black rounded-none p-6 max-w-md w-full relative font-mono shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-[#fefdfb] border-2 border-black rounded-none p-6 max-w-md w-full relative font-mono shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
         style={{
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)'
+          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)',
+          maxHeight: '90vh'
         }}
       >
         <button
@@ -993,24 +994,26 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           </svg>
         </button>
         
-        {loadingCasts ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="text-base font-bold text-black">
-                Loading
-                <span className="inline-block ml-1">
-                  <span className="loading-dot-1">.</span>
-                  <span className="loading-dot-2">.</span>
-                  <span className="loading-dot-3">.</span>
-                </span>
+        <div className="overflow-y-auto flex-1 min-h-0">
+          {loadingCasts ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="text-base font-bold text-black">
+                  Loading
+                  <span className="inline-block ml-1">
+                    <span className="loading-dot-1">.</span>
+                    <span className="loading-dot-2">.</span>
+                    <span className="loading-dot-3">.</span>
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        ) : showCreateCast || casts.length === 0 ? (
-          <CreateCastFlow />
-        ) : (
-          <CastCardsView />
-        )}
+          ) : showCreateCast || casts.length === 0 ? (
+            <CreateCastFlow />
+          ) : (
+            <CastCardsView />
+          )}
+        </div>
       </div>
     </div>
   );
