@@ -297,7 +297,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     e.preventDefault();
     const x = e.pageX - scrollContainerRef.current.offsetLeft;
     const walk = (x - dragStartX.current) * 2; // Scroll speed multiplier
-    scrollContainerRef.current.scrollLeft = dragScrollLeft.current - walk;
+    const newScrollLeft = dragScrollLeft.current - walk;
+    scrollContainerRef.current.scrollLeft = newScrollLeft;
+    console.log('[OnboardingModal] handleMouseMove - dragging, scrollLeft:', newScrollLeft);
   };
 
   const handleMouseUp = () => {
@@ -339,6 +341,18 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       const scrollLeft = container.scrollLeft;
       const cardWidthWithGap = cardWidth + 16; // card width + gap
       const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
+      
+      console.log('[OnboardingModal] checkScroll called:', {
+        scrollLeft,
+        cardWidth,
+        cardWidthWithGap,
+        currentIndex,
+        calculatedIndex: Math.min(currentIndex, Math.max(0, casts.length - 1)),
+        castsLength: casts.length,
+        hasAutoScrolled: hasAutoScrolled.current,
+        scrollWidth: container.scrollWidth,
+        clientWidth: container.clientWidth
+      });
       
       setActiveCardIndex(Math.min(currentIndex, Math.max(0, casts.length - 1)));
       setCanScrollLeft(scrollLeft > 0);
@@ -570,8 +584,17 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setCasts(prevCasts => {
           // Remove any existing temporary cast with same hash
           const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
-          return [newCast, ...filtered];
+          const newCasts = [newCast, ...filtered];
+          console.log('[OnboardingModal] handleQuickCast - updating casts:', {
+            prevCastsLength: prevCasts.length,
+            newCastsLength: newCasts.length,
+            newCastHash: newCast.hash,
+            currentScrollLeft: scrollContainerRef.current?.scrollLeft,
+            hasAutoScrolled: hasAutoScrolled.current
+          });
+          return newCasts;
         });
+        console.log('[OnboardingModal] handleQuickCast - setting temporaryNewCast');
         setTemporaryNewCast(newCast);
         //setActiveCardIndex(0); // Reset to first card
         //hasAutoScrolled.current = false; // Reset scroll flag
@@ -659,8 +682,17 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setCasts(prevCasts => {
           // Remove any existing temporary cast with same hash
           const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
-          return [newCast, ...filtered];
+          const newCasts = [newCast, ...filtered];
+          console.log('[OnboardingModal] handleValidateAndUseCastUrl - updating casts:', {
+            prevCastsLength: prevCasts.length,
+            newCastsLength: newCasts.length,
+            newCastHash: newCast.hash,
+            currentScrollLeft: scrollContainerRef.current?.scrollLeft,
+            hasAutoScrolled: hasAutoScrolled.current
+          });
+          return newCasts;
         });
+        console.log('[OnboardingModal] handleValidateAndUseCastUrl - setting temporaryNewCast');
         setTemporaryNewCast(newCast);
         //setActiveCardIndex(0); // Reset to first card
         //hasAutoScrolled.current = false; // Reset scroll flag
