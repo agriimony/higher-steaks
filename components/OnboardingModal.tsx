@@ -223,7 +223,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       const container = scrollContainerRef.current;
       const containerWidth = container.clientWidth;
       // Calculate card width: 90% of container minus gap, with min/max constraints
-      const calculatedWidth = Math.max(280, Math.min(380, containerWidth * 1 - 16));
+      const calculatedWidth = Math.max(280, Math.min(380, containerWidth));
       setCardWidth(calculatedWidth);
     };
     
@@ -807,7 +807,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         <div className="mb-4 overflow-hidden">
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
+            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 justify-center"
             style={{ scrollbarWidth: 'thin' }}
           >
             {casts.map((cast) => (
