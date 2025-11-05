@@ -214,8 +214,24 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     fetchCasts();
   }, [userFid]);
 
-  // Handle dot click to scroll to specific card
-  const scrollToCard = (index: number) => {
+  // Navigate to previous card
+  const scrollToPrevious = () => {
+    if (activeCardIndex > 0) {
+      const newIndex = activeCardIndex - 1;
+      scrollToCardIndex(newIndex);
+    }
+  };
+
+  // Navigate to next card
+  const scrollToNext = () => {
+    if (activeCardIndex < casts.length - 1) {
+      const newIndex = activeCardIndex + 1;
+      scrollToCardIndex(newIndex);
+    }
+  };
+
+  // Scroll to specific card index
+  const scrollToCardIndex = (index: number) => {
     if (!scrollContainerRef.current) return;
     const container = scrollContainerRef.current;
     const cardElements = container.querySelectorAll('[data-card-index]');
@@ -250,14 +266,14 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       return;
     }
 
-    const checkScroll = () => {
-      // if (!scrollContainerRef.current) return;
-      // const container = scrollContainerRef.current;
-      // const scrollLeft = container.scrollLeft;
-      // const cardWidthWithGap = CARD_WIDTH + 16;
-      // const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
-      // setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
-    };
+      const checkScroll = () => {
+        if (!scrollContainerRef.current) return;
+        const container = scrollContainerRef.current;
+        const scrollLeft = container.scrollLeft;
+        const cardWidthWithGap = CARD_WIDTH + 16;
+        const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
+        setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
+      };
     
     const container = scrollContainerRef.current;
     if (container) {
@@ -787,7 +803,33 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         </h2>
         
         {/* Horizontal scrolling cards */}
-        <div className="mb-4 overflow-hidden">
+        <div className="mb-4 overflow-hidden relative">
+          {/* Left arrow button */}
+          {casts.length > 1 && activeCardIndex > 0 && (
+            <button
+              onClick={scrollToPrevious}
+              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
+              aria-label="Previous card"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6"/>
+              </svg>
+            </button>
+          )}
+          
+          {/* Right arrow button */}
+          {casts.length > 1 && activeCardIndex < casts.length - 1 && (
+            <button
+              onClick={scrollToNext}
+              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
+              aria-label="Next card"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </button>
+          )}
+          
           <div
             ref={scrollContainerRef}
             className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
@@ -942,21 +984,10 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           </div>
         </div>
         
-        {/* Dots indicator */}
+        {/* Card indicator (e.g., "1 of 3") */}
         {casts.length > 1 && (
-          <div className="flex justify-center gap-2 mt-2">
-            {casts.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => scrollToCard(index)}
-                className={`h-2 rounded-full transition-all ${
-                  index === activeCardIndex 
-                    ? 'bg-black w-6' 
-                    : 'bg-black/30 hover:bg-black/50 w-2'
-                }`}
-                aria-label={`Go to card ${index + 1}`}
-              />
-            ))}
+          <div className="flex justify-center mt-2 text-xs text-black/60">
+            {activeCardIndex + 1} of {casts.length}
           </div>
         )}
         
