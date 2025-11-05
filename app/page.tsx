@@ -778,7 +778,10 @@ export default function HigherSteakMenu() {
                   </span>
                   <BlockLivenessIndicator />
                   {showFidSwitcher && (
-                    <div className="absolute top-full mt-2 right-0 bg-white border border-black/20 rounded-lg shadow-lg z-50 min-w-[200px] p-3">
+                    <div 
+                      className="absolute top-full mt-2 right-0 bg-white border border-black/20 rounded-lg shadow-lg z-50 min-w-[200px] p-3"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <div className="text-xs font-bold text-black mb-2">Switch FID for Testing</div>
                       <div className="mb-2">
                         <input
@@ -789,6 +792,7 @@ export default function HigherSteakMenu() {
                             const fid = e.target.value ? parseInt(e.target.value, 10) : null;
                             setSimulatedFid(fid);
                           }}
+                          onClick={(e) => e.stopPropagation()}
                           className="w-full text-xs border border-black/20 p-2 rounded"
                         />
                       </div>
@@ -797,7 +801,8 @@ export default function HigherSteakMenu() {
                         {leaderboard.slice(0, 10).map((entry) => (
                           <button
                             key={entry.fid}
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation();
                               setSimulatedFid(entry.fid);
                               setShowFidSwitcher(false);
                             }}
@@ -811,7 +816,8 @@ export default function HigherSteakMenu() {
                       </div>
                       <div className="mt-2 pt-2 border-t border-black/20">
                         <button
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSimulatedFid(null);
                             setShowFidSwitcher(false);
                           }}
