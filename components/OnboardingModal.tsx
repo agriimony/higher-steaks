@@ -222,29 +222,21 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   // Scroll to first card when temporary new cast is added (only once)
   useEffect(() => {
     if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0].hash === temporaryNewCast.hash && !hasAutoScrolled.current) {
-      // Reset scroll position immediately, then smooth scroll after layout
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.scrollLeft = 0;
-        setActiveCardIndex(0);
-        
-        // Wait for layout to complete, then ensure smooth scroll
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            if (scrollContainerRef.current) {
-              scrollContainerRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-            }
-          }, 50);
-        });
-        
-        hasAutoScrolled.current = true;
-      }
+      // Use setTimeout to ensure DOM is updated
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollLeft = 0;
+          setActiveCardIndex(0);
+          hasAutoScrolled.current = true;
+        }
+      }, 0);
     }
     
     // Reset flag when temporary cast is cleared
     if (!temporaryNewCast) {
       hasAutoScrolled.current = false;
     }
-  }, [temporaryNewCast, casts]);
+  }, [temporaryNewCast, casts.length]); // Include casts.length to detect when casts array changes
 
   // Handle dot click to scroll to specific card
   const scrollToCard = (index: number) => {
@@ -257,6 +249,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   // Handle mouse drag for card navigation
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Don't start dragging if clicking on interactive elements (buttons, links, inputs)
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'BUTTON' || target.tagName === 'A' || target.tagName === 'INPUT' || target.closest('button') || target.closest('a')) {
+      return;
+    }
+    
     if (!scrollContainerRef.current) return;
     setIsDragging(true);
     dragStartX.current = e.pageX - scrollContainerRef.current.offsetLeft;
@@ -901,10 +899,11 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         <div className="mb-4 overflow-hidden">
           <div
             ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 justify-center [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             style={{ 
               cursor: isDragging ? 'grabbing' : 'grab',
-              WebkitOverflowScrolling: 'touch'
+              WebkitOverflowScrolling: 'touch',
+              scrollPaddingLeft: '0px'
             } as React.CSSProperties}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
@@ -920,7 +919,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 style={{ 
                   width: `${cardWidth}px`,
                   minWidth: '280px',
-                  maxWidth: '380px'
+                  maxWidth: '380px',
+                  scrollSnapAlign: 'start'
                 }}
               >
                 <div className="text-xs text-black font-mono mb-2">
