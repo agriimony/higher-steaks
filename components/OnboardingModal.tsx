@@ -72,7 +72,7 @@ function calculateStakeTotals(
   const validCasterStakes = casterStakeAmounts
     .map((amount, index) => ({
       amount: BigInt(amount || '0'),
-      unlockTime: casterStakeUnlockTimes[index] || 0,
+      unlockTime: (index < casterStakeUnlockTimes.length ? casterStakeUnlockTimes[index] : 0) || 0,
     }))
     .filter(stake => stake.unlockTime > currentTime);
   
@@ -221,7 +221,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   // Scroll to first card when temporary new cast is added (only once)
   useEffect(() => {
-    if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0].hash === temporaryNewCast.hash && !hasAutoScrolled.current) {
+    if (temporaryNewCast && scrollContainerRef.current && casts.length > 0 && casts[0]?.hash === temporaryNewCast.hash && !hasAutoScrolled.current) {
       // Don't auto-scroll if user has already scrolled (indicating they've interacted)
       if (scrollContainerRef.current.scrollLeft > 5) {
         hasAutoScrolled.current = true;
@@ -251,7 +251,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
     
     // Reset flag when temporary cast is cleared OR when casts array changes (new cast added)
-    if (!temporaryNewCast || (casts.length > 0 && casts[0].hash !== temporaryNewCast?.hash)) {
+    if (!temporaryNewCast || (casts.length > 0 && casts[0]?.hash !== temporaryNewCast?.hash)) {
       hasAutoScrolled.current = false;
     }
   }, [temporaryNewCast, casts]); // Add casts to dependencies
@@ -354,7 +354,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         clientWidth: container.clientWidth
       });
       
-      setActiveCardIndex(Math.min(currentIndex, Math.max(0, casts.length - 1)));
+      setActiveCardIndex(Math.min(Math.max(0, currentIndex), Math.max(0, casts.length - 1)));
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(
         scrollLeft < container.scrollWidth - container.clientWidth - 1
