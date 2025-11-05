@@ -791,7 +791,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             {casts.map((cast) => (
               <div
                 key={cast.hash}
-                className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 w-[320px] snap-start"
+                className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 w-[300px] snap-start"
               >
                 <div className="text-xs text-black font-mono mb-2">
                   <strong>started aiming higher and it worked out!</strong> {cast.description}
