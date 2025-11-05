@@ -251,12 +251,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
 
     const checkScroll = () => {
-      if (!scrollContainerRef.current) return;
-      const container = scrollContainerRef.current;
-      const scrollLeft = container.scrollLeft;
-      const cardWidthWithGap = CARD_WIDTH + 16;
-      const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
-      setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
+      // if (!scrollContainerRef.current) return;
+      // const container = scrollContainerRef.current;
+      // const scrollLeft = container.scrollLeft;
+      // const cardWidthWithGap = CARD_WIDTH + 16;
+      // const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
+      // setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
     };
     
     const container = scrollContainerRef.current;
