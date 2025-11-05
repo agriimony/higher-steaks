@@ -249,7 +249,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         }
       });
     }
-  }, [temporaryNewCast]); // Only depend on temporaryNewCast
+    
+    // Reset flag when temporary cast is cleared OR when casts array changes (new cast added)
+    if (!temporaryNewCast || (casts.length > 0 && casts[0].hash !== temporaryNewCast?.hash)) {
+      hasAutoScrolled.current = false;
+    }
+  }, [temporaryNewCast, casts]); // Add casts to dependencies
 
   // Handle dot click to scroll to specific card
   const scrollToCard = (index: number) => {
@@ -361,7 +366,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     const container = scrollContainerRef.current;
     if (container) {
       container.addEventListener('scroll', checkScroll);
-      checkScroll();
+      
+      // Only call checkScroll immediately if we haven't auto-scrolled recently
+      // This prevents interference with the autoscroll effect
+      if (!hasAutoScrolled.current) {
+        checkScroll();
+      }
       calculateCardWidth();
       
       // Recalculate on resize with debouncing
@@ -370,7 +380,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         clearTimeout(resizeTimeout);
         resizeTimeout = setTimeout(() => {
           calculateCardWidth();
-          checkScroll();
+          // Don't call checkScroll on resize - it can interfere with user scrolling
         }, 100); // Debounce resize events
       });
       resizeObserver.observe(container);
@@ -381,7 +391,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         resizeObserver.disconnect();
       };
     }
-  }, [casts, showCreateCast, loadingCasts]);
+  }, [casts, showCreateCast, loadingCasts, cardWidth]); // Add cardWidth to dependencies
 
   // Handle escape key to close
   useEffect(() => {
