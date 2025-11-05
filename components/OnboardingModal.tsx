@@ -128,6 +128,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const castUrlInputRef = useRef<HTMLInputElement>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const isProgrammaticScrollRef = useRef(false);
   
   // Fixed card width
   const CARD_WIDTH = 320;
@@ -259,6 +260,15 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
     
     const container = scrollContainerRef.current;
+    
+    // Find the target card element
+    const targetCard = container.querySelector(`[data-card-index="${index}"]`) as HTMLElement;
+    
+    if (!targetCard) {
+      console.log('[OnboardingModal] scrollToCardIndex - target card not found:', index);
+      return;
+    }
+    
     const cardWidthWithGap = CARD_WIDTH + 16; // card width + gap
     const targetScroll = index * cardWidthWithGap;
     
@@ -268,27 +278,70 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       cardWidthWithGap,
       targetScroll,
       currentScrollLeft: container.scrollLeft,
-      castsLength: casts.length
+      castsLength: casts.length,
+      containerWidth: container.clientWidth,
+      scrollWidth: container.scrollWidth,
+      targetCardOffsetLeft: targetCard.offsetLeft
     });
     
-    // Temporarily disable scroll snap for smooth programmatic scroll
-    const originalSnap = container.style.scrollSnapType;
-    container.style.scrollSnapType = 'none';
-    
-    container.scrollTo({ 
-      left: targetScroll, 
-      behavior: 'smooth' 
-    });
-    
+    // Mark that we're doing a programmatic scroll
+    isProgrammaticScrollRef.current = true;
     setActiveCardIndex(index);
     
-    // Re-enable scroll snap after scroll completes
-    setTimeout(() => {
-      if (scrollContainerRef.current) {
-        scrollContainerRef.current.style.scrollSnapType = originalSnap;
-        console.log('[OnboardingModal] scrollToCardIndex - scroll completed, final scrollLeft:', scrollContainerRef.current.scrollLeft);
-      }
-    }, 500);
+    // Temporarily disable scroll snap for smooth programmatic scroll
+    const originalSnapType = container.style.scrollSnapType;
+    container.style.scrollSnapType = 'none';
+    
+    // Also disable scroll snap on all child cards
+    const cards = container.querySelectorAll('[data-card-index]');
+    const originalSnapAligns: string[] = [];
+    cards.forEach((card, i) => {
+      const cardEl = card as HTMLElement;
+      originalSnapAligns[i] = cardEl.style.scrollSnapAlign;
+      cardEl.style.scrollSnapAlign = 'none';
+    });
+    
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      if (!scrollContainerRef.current || !targetCard) return;
+      
+      // Use the actual offsetLeft of the card element for accurate positioning
+      // offsetLeft is already relative to the container (since card is a direct child)
+      const targetScrollPosition = targetCard.offsetLeft;
+      
+      console.log('[OnboardingModal] Scrolling to position:', {
+        targetScrollPosition,
+        cardOffsetLeft: targetCard.offsetLeft,
+        calculatedPosition: index * cardWidthWithGap
+      });
+      
+      // Perform the scroll
+      container.scrollTo({ 
+        left: targetScrollPosition, 
+        behavior: 'smooth' 
+      });
+      
+      // Re-enable scroll snap after scroll animation completes
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.style.scrollSnapType = originalSnapType;
+          
+          // Re-enable scroll snap on cards
+          const cards = scrollContainerRef.current.querySelectorAll('[data-card-index]');
+          cards.forEach((card, i) => {
+            const cardEl = card as HTMLElement;
+            cardEl.style.scrollSnapAlign = originalSnapAligns[i] || '';
+          });
+          
+          // Allow scroll listener to work again after animation completes
+          setTimeout(() => {
+            isProgrammaticScrollRef.current = false;
+            const finalScrollLeft = scrollContainerRef.current?.scrollLeft;
+            console.log('[OnboardingModal] scrollToCardIndex - scroll completed, final scrollLeft:', finalScrollLeft, 'expected:', targetScrollPosition);
+          }, 100);
+        }
+      }, 600);
+    });
   };
 
 
@@ -298,18 +351,23 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       return;
     }
 
-      const checkScroll = () => {
-        if (!scrollContainerRef.current) return;
-        const container = scrollContainerRef.current;
-        const scrollLeft = container.scrollLeft;
-        const cardWidthWithGap = CARD_WIDTH + 16;
-        const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
-        setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
-      };
+    const checkScroll = () => {
+      // Don't update index during programmatic scrolls
+      if (isProgrammaticScrollRef.current) {
+        return;
+      }
+      
+      if (!scrollContainerRef.current) return;
+      const container = scrollContainerRef.current;
+      const scrollLeft = container.scrollLeft;
+      const cardWidthWithGap = CARD_WIDTH + 16;
+      const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
+      setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
+    };
     
     const container = scrollContainerRef.current;
     if (container) {
-      container.addEventListener('scroll', checkScroll);
+      container.addEventListener('scroll', checkScroll, { passive: true });
       checkScroll(); // Initial check
       return () => {
         container.removeEventListener('scroll', checkScroll);
