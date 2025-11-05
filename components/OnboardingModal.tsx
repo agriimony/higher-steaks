@@ -233,13 +233,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       });
       
       setActiveCardIndex(index);
-      
-      // Re-enable scroll snap after scroll completes
-      setTimeout(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.style.scrollSnapType = originalSnap;
-        }
-      }, 500);
     }
   };
 
@@ -251,12 +244,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
 
     const checkScroll = () => {
-      if (!scrollContainerRef.current) return;
-      const container = scrollContainerRef.current;
-      const scrollLeft = container.scrollLeft;
-      const cardWidthWithGap = CARD_WIDTH + 16;
-      const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
-      setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
+      // if (!scrollContainerRef.current) return;
+      // const container = scrollContainerRef.current;
+      // const scrollLeft = container.scrollLeft;
+      // const cardWidthWithGap = CARD_WIDTH + 16;
+      // const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
+      // setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
     };
     
     const container = scrollContainerRef.current;
@@ -544,8 +537,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
           return [newCast, ...filtered];
         });
-        setTemporaryNewCast(newCast);
-        setShowCreateCast(false);
+        //setTemporaryNewCast(newCast);
+        //setShowCreateCast(false);
       } else if (data.valid && data.fid !== userFid) {
         console.log('[Onboarding] Cast belongs to different user:', data.fid, 'vs', userFid);
         setUrlValidationError('This cast belongs to a different user');
@@ -802,7 +795,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 snap-start"
                 style={{ 
                   width: `${CARD_WIDTH}px`,
-                  scrollSnapAlign: 'start'
+                  //scrollSnapAlign: 'start'
                 }}
               >
                 <div className="text-xs text-black font-mono mb-2">
@@ -954,7 +947,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                     ? 'bg-black w-6' 
                     : 'bg-black/30 hover:bg-black/50 w-2'
                 }`}
-                aria-label={`Go to card ${index + 1}`}
+                aria-label={`Go to cast ${index + 1}`}
               />
             ))}
           </div>
