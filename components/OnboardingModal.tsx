@@ -532,7 +532,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           return [newCast, ...filtered];
         });
         setTemporaryNewCast(newCast);
-        setActiveCardIndex(0); // Reset to first card
+        //setActiveCardIndex(0); // Reset to first card
         //hasAutoScrolled.current = false; // Reset scroll flag
         setShowCreateCast(false);
         setCustomMessage('');
@@ -621,8 +621,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           return [newCast, ...filtered];
         });
         setTemporaryNewCast(newCast);
-        setActiveCardIndex(0); // Reset to first card
-        hasAutoScrolled.current = false; // Reset scroll flag
+        //setActiveCardIndex(0); // Reset to first card
+        //hasAutoScrolled.current = false; // Reset scroll flag
         setShowCreateCast(false);
       } else if (data.valid && data.fid !== userFid) {
         console.log('[Onboarding] Cast belongs to different user:', data.fid, 'vs', userFid);
