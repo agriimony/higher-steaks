@@ -10,7 +10,6 @@ interface LockupDetail {
   amount: string;
   amountFormatted: string;
   unlockTime: number;
-  timeRemaining: number;
   receiver: string;
   title: string;
 }
@@ -34,7 +33,6 @@ interface StakingModalProps {
   lockups: LockupDetail[];
   wallets: WalletDetail[];
   loading?: boolean;
-  elapsedSeconds?: number;
   onTransactionSuccess?: () => void;
   onRefresh?: () => void;
 }
@@ -85,7 +83,7 @@ function formatTokenAmount(amount: string): string {
   }
 }
 
-export function StakingModal({ onClose, balance, lockups, wallets, loading = false, elapsedSeconds: externalElapsedSeconds = 0, onTransactionSuccess, onRefresh }: StakingModalProps) {
+export function StakingModal({ onClose, balance, lockups, wallets, loading = false, onTransactionSuccess, onRefresh }: StakingModalProps) {
   // Transaction state
   const [unstakeLockupId, setUnstakeLockupId] = useState<string | null>(null);
   const [unstakeError, setUnstakeError] = useState<string | null>(null);
@@ -95,8 +93,17 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   // Cast text state
   const [castTexts, setCastTexts] = useState<Record<string, string | null>>({});
   
-  // Use external elapsed seconds (from parent) for countdown timer
-  const elapsedSeconds = externalElapsedSeconds;
+  // Current time state - updates every second for countdown timers
+  const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000));
+  
+  // Update currentTime every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Math.floor(Date.now() / 1000));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -142,6 +149,10 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   // Sort lockups: (1) connected wallet first, (2) expired first, then by time remaining
   // (3) then by amount descending
   const sortedLockups = [...lockups].sort((a, b) => {
+    // Calculate time remaining for sorting
+    const aTimeRemaining = a.unlockTime - currentTime;
+    const bTimeRemaining = b.unlockTime - currentTime;
+    
     // (1) Connected wallet first
     if (wagmiAddress) {
       const aIsConnected = a.receiver.toLowerCase() === wagmiAddress.toLowerCase();
@@ -151,14 +162,14 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
     }
     
     // (2) Expired lockups first
-    const aExpired = a.timeRemaining <= 0;
-    const bExpired = b.timeRemaining <= 0;
+    const aExpired = aTimeRemaining <= 0;
+    const bExpired = bTimeRemaining <= 0;
     if (aExpired && !bExpired) return -1;
     if (!aExpired && bExpired) return 1;
     
     // (3) Then by time remaining ascending (earlier expiry first)
-    if (a.timeRemaining !== b.timeRemaining) {
-      return a.timeRemaining - b.timeRemaining;
+    if (aTimeRemaining !== bTimeRemaining) {
+      return aTimeRemaining - bTimeRemaining;
     }
     
     // (4) Finally by amount descending (largest first)
@@ -334,8 +345,8 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                               </span>
                             </div>
                             {(() => {
-                              const dynamicTimeRemaining = Math.max(0, lockup.timeRemaining - elapsedSeconds);
-                              const isExpired = dynamicTimeRemaining <= 0;
+                              const timeRemaining = lockup.unlockTime - currentTime;
+                              const isExpired = timeRemaining <= 0;
                               
                               if (isConnected && isExpired) {
                                 const isThisUnstaking = unstakeLockupId === lockup.lockupId && (isUnstakePending || isUnstakeConfirming);
@@ -356,7 +367,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                               } else if (!isExpired) {
                                 return (
                                   <span className="text-gray-600 text-s flex-shrink-0">
-                                    {formatTimeRemaining(dynamicTimeRemaining)} left
+                                    {formatTimeRemaining(timeRemaining)} left
                                   </span>
                                 );
                               } else {

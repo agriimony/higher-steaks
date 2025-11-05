@@ -44,7 +44,6 @@ type DetailedLockupResult = {
     amount: string;
     amountFormatted: string;
     unlockTime: number;
-    timeRemaining: number;
     receiver: string;
     title: string;
   }>;
@@ -379,7 +378,6 @@ export async function GET(request: NextRequest) {
             amount: string;
             amountFormatted: string;
             unlockTime: number;
-            timeRemaining: number;
             receiver: string;
             title: string;
           }> = [];
@@ -423,7 +421,6 @@ export async function GET(request: NextRequest) {
 
               // Store details for modal (only if not yet unlocked/claimed)
               if (!unlockedBool) {
-                const timeRemaining = unlockTimeNum - currentTime;
                 lockups.push({
                   lockupId: id.toString(),
                   amount: amountBigInt.toString(),
@@ -432,7 +429,6 @@ export async function GET(request: NextRequest) {
                     maximumFractionDigits: 2,
                   }),
                   unlockTime: unlockTimeNum,
-                  timeRemaining,
                   receiver: receiverAddr,
                   title: title as string,
                 });

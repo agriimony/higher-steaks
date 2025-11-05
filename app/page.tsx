@@ -52,7 +52,6 @@ interface LockupDetail {
   amount: string;
   amountFormatted: string;
   unlockTime: number;
-  timeRemaining: number;
   receiver: string;
   title: string;
 }
@@ -170,33 +169,19 @@ export default function HigherSteakMenu() {
     }
   };
   
-  // Handle stake success: adjust timers, reset elapsed seconds, and refresh balance
+  // Handle stake success: refresh balance to get the new lockup
   const handleStakeSuccess = useCallback(() => {
-    console.log('[Stake Success] Adjusting timers, elapsed:', elapsedSeconds);
-    
-    // Subtract elapsed time from all existing lockups
-    if (stakingDetails?.lockups) {
-      const updatedLockups = stakingDetails.lockups.map(lockup => ({
-        ...lockup,
-        timeRemaining: Math.max(0, lockup.timeRemaining - elapsedSeconds),
-      }));
-      
-      setStakingDetails({
-        lockups: updatedLockups,
-        wallets: stakingDetails.wallets,
-      });
-    }
+    console.log('[Stake Success] Refreshing balance and staking details');
     
     // Reset the elapsed counter
     setElapsedSeconds(0);
     
     // Refresh balance and staking details from API to get the new lockup
     if (user?.fid) {
-      console.log('[Stake Success] Refreshing balance and staking details');
       fetchTokenBalance(user.fid);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [elapsedSeconds, stakingDetails, user?.fid]);
+  }, [user?.fid]);
 
   const fetchTokenBalance = async (fid: number) => {
     console.log('[fetchTokenBalance] Called for fid:', fid);
@@ -464,14 +449,15 @@ export default function HigherSteakMenu() {
 
   const filteredLeaderboard = getFilteredLeaderboard();
 
-  // Check if there are any unstakeable positions (timeRemaining <= 0)
+  // Check if there are any unstakeable positions (unlockTime <= currentTime)
   const hasUnstakeablePositions = useMemo(() => {
     if (!stakingDetails?.lockups) return false;
+    const currentTime = Math.floor(Date.now() / 1000);
     return stakingDetails.lockups.some(lockup => {
-      const dynamicTimeRemaining = Math.max(0, lockup.timeRemaining - elapsedSeconds);
-      return dynamicTimeRemaining <= 0;
+      const timeRemaining = lockup.unlockTime - currentTime;
+      return timeRemaining <= 0;
     });
-  }, [stakingDetails?.lockups, elapsedSeconds]);
+  }, [stakingDetails?.lockups]);
 
   // Handle lockup events (via CDP webhooks)
   useEffect(() => {
@@ -656,15 +642,12 @@ export default function HigherSteakMenu() {
           lockups={stakingDetails?.lockups || []}
           wallets={stakingDetails?.wallets || []}
           loading={loadingStakingDetails || !stakingDetails}
-          elapsedSeconds={elapsedSeconds}
           onTransactionSuccess={async () => {
             // CDP webhook will automatically detect the transaction and refresh the balance
             // No manual refresh needed
           }}
           onRefresh={() => {
             if (user?.fid) {
-              // Reset elapsed time counter when manually refreshing
-              setElapsedSeconds(0);
               fetchTokenBalance(user.fid);
             }
           }}
