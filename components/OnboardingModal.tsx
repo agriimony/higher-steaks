@@ -785,7 +785,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         <div className="mb-4">
           <div
             ref={scrollContainerRef}
-            className="flex gap-2 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
+            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
             style={{ scrollbarWidth: 'thin' }}
           >
             {casts.map((cast) => (
@@ -970,7 +970,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         onClick={(e) => e.stopPropagation()}
         style={{
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)',
-          maxHeight: '90vh'
+          maxHeight: '90vh',
+          maxWidth: 'min(448px, calc(100vw - 2rem))'
         }}
       >
         <button
