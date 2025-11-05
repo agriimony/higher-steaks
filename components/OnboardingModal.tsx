@@ -458,29 +458,31 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       let identifierToLookup = castUrl.trim();
       let isFullUrl = false;
       
-      // Extract hash from various URL formats
+      // Normalize and validate URL formats
       if (identifierToLookup.includes('farcaster.xyz')) {
-        isFullUrl = true;
-        console.log('[Onboarding] Using full farcaster.xyz URL as-is:', identifierToLookup);
-      } else if (identifierToLookup.includes('warpcast.com')) {
-        const match = identifierToLookup.match(/warpcast\.com\/[^/]+\/([a-zA-Z0-9]+)$/);
-        if (match && match[1]) {
-          if (!match[1].startsWith('0x')) {
-            identifierToLookup = '0x' + match[1];
-          } else {
-            identifierToLookup = match[1];
-          }
-          console.log('[Onboarding] Extracted hash from warpcast.com URL:', identifierToLookup);
-        } else {
-          setUrlValidationError('Invalid Warpcast URL format');
-          setValidatingUrl(false);
-          return;
+        // Ensure it's a full URL
+        if (!identifierToLookup.startsWith('http://') && !identifierToLookup.startsWith('https://')) {
+          identifierToLookup = 'https://' + identifierToLookup;
         }
+        isFullUrl = true;
+        console.log('[Onboarding] Using full farcaster.xyz URL:', identifierToLookup);
+      } else if (identifierToLookup.includes('warpcast.com')) {
+        // Ensure it's a full URL
+        if (!identifierToLookup.startsWith('http://') && !identifierToLookup.startsWith('https://')) {
+          identifierToLookup = 'https://' + identifierToLookup;
+        }
+        isFullUrl = true;
+        console.log('[Onboarding] Using full warpcast.com URL:', identifierToLookup);
+      } else if (identifierToLookup.startsWith('http://') || identifierToLookup.startsWith('https://')) {
+        // Generic URL - try as-is
+        isFullUrl = true;
+        console.log('[Onboarding] Using generic URL:', identifierToLookup);
       } else {
+        // Assume it's a hash - normalize format
         if (!identifierToLookup.startsWith('0x') && /^[a-fA-F0-9]+$/.test(identifierToLookup)) {
           identifierToLookup = '0x' + identifierToLookup;
         }
-        console.log('[Onboarding] Using as-is (assuming hash):', identifierToLookup);
+        console.log('[Onboarding] Using as hash:', identifierToLookup);
       }
       
       if (!identifierToLookup) {
@@ -489,11 +491,18 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         return;
       }
       
-      // Validate the cast using Neynar API
-      console.log('[Onboarding] Calling validation API with:', identifierToLookup);
+      // Validate the cast using API - pass URL directly for better handling
+      console.log('[Onboarding] Calling validation API with:', identifierToLookup, 'isUrl:', isFullUrl);
       const response = await fetch(`/api/validate-cast?hash=${encodeURIComponent(identifierToLookup)}&isUrl=${isFullUrl}`);
-      const data = await response.json();
       
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Network error' }));
+        setUrlValidationError(errorData.error || 'Failed to validate cast');
+        setValidatingUrl(false);
+        return;
+      }
+      
+      const data = await response.json();
       console.log('[Onboarding] Validation response:', data);
       
       if (data.valid && data.fid === userFid) {
@@ -537,7 +546,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       }
     } catch (error) {
       console.error('Error validating cast URL:', error);
-      setUrlValidationError('Failed to validate cast URL');
+      setUrlValidationError('Failed to validate cast URL. Please check the URL format and try again.');
     } finally {
       setValidatingUrl(false);
     }
