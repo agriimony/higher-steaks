@@ -702,7 +702,7 @@ export default function HigherSteakMenu() {
       <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
         <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
         {/* Header Row - Balance left, Profile right */}
-        <div className="flex justify-between items-center gap-2 mb-3 sm:mb-4">
+        <div className="flex justify-between items-center gap-2 mb-3 sm:mb-4 relative z-[100]">
           {/* Token Balance Pill - Left */}
           <div 
             className="relative bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-full px-3 py-1.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
@@ -760,7 +760,7 @@ export default function HigherSteakMenu() {
           ) : (
             <div 
               ref={fidSwitcherRef}
-              className="relative flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              className="relative flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer z-[100]"
               onClick={() => setShowFidSwitcher(!showFidSwitcher)}
             >
               {user ? (
@@ -779,7 +779,7 @@ export default function HigherSteakMenu() {
                   <BlockLivenessIndicator />
                   {showFidSwitcher && (
                     <div 
-                      className="absolute top-full mt-2 right-0 bg-white border border-black/20 rounded-lg shadow-lg z-50 min-w-[200px] p-3"
+                      className="absolute top-full mt-2 right-0 bg-white border border-black/20 rounded-lg shadow-lg z-[100] min-w-[200px] p-3"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="text-xs font-bold text-black mb-2">Switch FID for Testing</div>
