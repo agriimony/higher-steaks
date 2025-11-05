@@ -253,31 +253,42 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   // Scroll to specific card index
   const scrollToCardIndex = (index: number) => {
-    if (!scrollContainerRef.current) return;
-    const container = scrollContainerRef.current;
-    const cardElements = container.querySelectorAll('[data-card-index]');
-    const targetCard = cardElements[index] as HTMLElement;
-    
-    if (targetCard) {
-      // Temporarily disable scroll snap for smooth programmatic scroll
-      const originalSnap = container.style.scrollSnapType;
-      container.style.scrollSnapType = 'none';
-      
-      targetCard.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'nearest',
-        inline: 'start' 
-      });
-      
-      setActiveCardIndex(index);
-      
-      // Re-enable scroll snap after scroll completes
-      setTimeout(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.style.scrollSnapType = originalSnap;
-        }
-      }, 500);
+    if (!scrollContainerRef.current) {
+      console.log('[OnboardingModal] scrollToCardIndex - no container ref');
+      return;
     }
+    
+    const container = scrollContainerRef.current;
+    const cardWidthWithGap = CARD_WIDTH + 16; // card width + gap
+    const targetScroll = index * cardWidthWithGap;
+    
+    console.log('[OnboardingModal] scrollToCardIndex:', {
+      index,
+      cardWidth: CARD_WIDTH,
+      cardWidthWithGap,
+      targetScroll,
+      currentScrollLeft: container.scrollLeft,
+      castsLength: casts.length
+    });
+    
+    // Temporarily disable scroll snap for smooth programmatic scroll
+    const originalSnap = container.style.scrollSnapType;
+    container.style.scrollSnapType = 'none';
+    
+    container.scrollTo({ 
+      left: targetScroll, 
+      behavior: 'smooth' 
+    });
+    
+    setActiveCardIndex(index);
+    
+    // Re-enable scroll snap after scroll completes
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.style.scrollSnapType = originalSnap;
+        console.log('[OnboardingModal] scrollToCardIndex - scroll completed, final scrollLeft:', scrollContainerRef.current.scrollLeft);
+      }
+    }, 500);
   };
 
 
@@ -849,7 +860,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           {/* Left arrow button */}
           {casts.length > 1 && activeCardIndex > 0 && (
             <button
-              onClick={scrollToPrevious}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[OnboardingModal] Left arrow clicked, activeCardIndex:', activeCardIndex);
+                scrollToPrevious();
+              }}
               className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
               aria-label="Previous card"
             >
@@ -862,7 +878,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           {/* Right arrow button */}
           {casts.length > 1 && activeCardIndex < casts.length - 1 && (
             <button
-              onClick={scrollToNext}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[OnboardingModal] Right arrow clicked, activeCardIndex:', activeCardIndex);
+                scrollToNext();
+              }}
               className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
               aria-label="Next card"
             >
