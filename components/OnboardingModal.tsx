@@ -241,33 +241,39 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
   }, [casts.length, activeCardIndex]);
 
-  // Navigate to previous card
-  const scrollToPrevious = () => {
-    if (activeCardIndex > 0) {
-      setActiveCardIndex(activeCardIndex - 1);
-      // Reset staking form when changing cards
-      setSelectedCastIndex(null);
-      setStakeError(null);
-      setStakeAmount('');
-      setLockupDuration('');
-      setLockupDurationUnit('day');
-      setSelectedCastHash(null);
-    }
-  };
+  // Navigate to previous card - memoized to prevent recreating CastCardsView
+  const scrollToPrevious = useCallback(() => {
+    setActiveCardIndex(prev => {
+      if (prev > 0) {
+        // Reset staking form when changing cards
+        setSelectedCastIndex(null);
+        setStakeError(null);
+        setStakeAmount('');
+        setLockupDuration('');
+        setLockupDurationUnit('day');
+        setSelectedCastHash(null);
+        return prev - 1;
+      }
+      return prev;
+    });
+  }, []);
 
-  // Navigate to next card
-  const scrollToNext = () => {
-    if (activeCardIndex < casts.length - 1) {
-      setActiveCardIndex(activeCardIndex + 1);
-      // Reset staking form when changing cards
-      setSelectedCastIndex(null);
-      setStakeError(null);
-      setStakeAmount('');
-      setLockupDuration('');
-      setLockupDurationUnit('day');
-      setSelectedCastHash(null);
-    }
-  };
+  // Navigate to next card - memoized to prevent recreating CastCardsView
+  const scrollToNext = useCallback(() => {
+    setActiveCardIndex(prev => {
+      if (prev < casts.length - 1) {
+        // Reset staking form when changing cards
+        setSelectedCastIndex(null);
+        setStakeError(null);
+        setStakeAmount('');
+        setLockupDuration('');
+        setLockupDurationUnit('day');
+        setSelectedCastHash(null);
+        return prev + 1;
+      }
+      return prev;
+    });
+  }, [casts.length]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -1098,9 +1104,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     return false; // false = allow update (React will reconcile)
   });
 
-  // Cast Cards View Component - render directly without memoization
-  // The inputs are rendered separately to prevent focus loss
-  const CastCardsView = () => {
+  // Cast Cards View Component - memoized to prevent recreation on every render
+  const CastCardsView = useMemo(() => {
     const currentCast = casts[activeCardIndex];
     
     if (!currentCast) {
@@ -1196,28 +1201,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           )}
         </div>
         
-        {/* Staking form or Add stake button - below the card */}
-        {selectedCastIndex === activeCardIndex ? (
-          <StakingForm
-            stakeAmount={stakeAmount}
-            lockupDuration={lockupDuration}
-            lockupDurationUnit={lockupDurationUnit}
-            stakeError={stakeError}
-            isLoadingTransaction={isLoadingTransaction}
-            walletBalance={walletBalance}
-            castHash={currentCast.hash}
-            stakeAmountInputRef={stakeAmountInputRef}
-            lockupDurationInputRef={lockupDurationInputRef}
-            stakeInputMountCountRef={stakeInputMountCountRef}
-            durationInputMountCountRef={durationInputMountCountRef}
-            onStakeAmountChange={handleStakeAmountChange}
-            onLockupDurationChange={handleLockupDurationChange}
-            onLockupDurationUnitChange={handleLockupDurationUnitChange}
-            onSetAmount={handleSetAmount}
-            onStake={handleStake}
-            onCancel={handleCancelStake}
-          />
-        ) : (
+        {/* Add stake button - below the card (StakingForm rendered separately outside CastCardsView) */}
+        {selectedCastIndex !== activeCardIndex && (
           <div className="mb-4 flex gap-3">
             <button
               onClick={() => handleOpenStakeForm(activeCardIndex, currentCast.hash)}
@@ -1252,7 +1237,31 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         </div>
       </>
     );
-  };
+  }, [
+    casts,
+    activeCardIndex,
+    selectedCastIndex,
+    // Don't include stakeAmount, lockupDuration here - they're only used in StakingForm which is memoized
+    stakeError,
+    isLoadingTransaction,
+    walletBalance,
+    handleStakeAmountChange,
+    handleLockupDurationChange,
+    handleLockupDurationUnitChange,
+    handleSetAmount,
+    handleCancelStake,
+    handleOpenStakeForm,
+    handleStake,
+    handleBuyHigher,
+    scrollToPrevious,
+    scrollToNext,
+    showCreateCast,
+    formatTimestamp,
+    stakeAmountInputRef,
+    lockupDurationInputRef,
+    stakeInputMountCountRef,
+    durationInputMountCountRef
+  ]);
 
   return (
     <div 
@@ -1306,7 +1315,31 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         ) : showCreateCast || casts.length === 0 ? (
           CreateCastFlow
         ) : (
-          <CastCardsView />
+          <>
+            {CastCardsView}
+            {/* Render StakingForm outside CastCardsView to prevent remounting when CastCardsView re-renders */}
+            {selectedCastIndex === activeCardIndex && casts[activeCardIndex] && (
+              <StakingForm
+                stakeAmount={stakeAmount}
+                lockupDuration={lockupDuration}
+                lockupDurationUnit={lockupDurationUnit}
+                stakeError={stakeError}
+                isLoadingTransaction={isLoadingTransaction}
+                walletBalance={walletBalance}
+                castHash={casts[activeCardIndex].hash}
+                stakeAmountInputRef={stakeAmountInputRef}
+                lockupDurationInputRef={lockupDurationInputRef}
+                stakeInputMountCountRef={stakeInputMountCountRef}
+                durationInputMountCountRef={durationInputMountCountRef}
+                onStakeAmountChange={handleStakeAmountChange}
+                onLockupDurationChange={handleLockupDurationChange}
+                onLockupDurationUnitChange={handleLockupDurationUnitChange}
+                onSetAmount={handleSetAmount}
+                onStake={handleStake}
+                onCancel={handleCancelStake}
+              />
+            )}
+          </>
         )}
         </div>
       </div>
