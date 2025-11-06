@@ -129,6 +129,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const castUrlInputRef = useRef<HTMLInputElement>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const isProgrammaticScrollRef = useRef(false);
+  const scrollListenerRef = useRef<((e: Event) => void) | null>(null);
   
   // Fixed card width
   const CARD_WIDTH = 320;
@@ -295,9 +296,17 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       note: scrollPositionFromOffset !== calculatedPosition ? 'offsetLeft differs from calculated!' : 'positions match'
     });
     
-    // Mark that we're doing a programmatic scroll
+    // Mark that we're doing a programmatic scroll FIRST
     isProgrammaticScrollRef.current = true;
-    setActiveCardIndex(index);
+    
+    // TEMPORARILY REMOVE the scroll listener to prevent interference
+    if (scrollListenerRef.current && container) {
+      container.removeEventListener('scroll', scrollListenerRef.current);
+      console.log('[OnboardingModal] Removed scroll listener during programmatic scroll');
+    }
+    
+    // Don't call setActiveCardIndex yet - it will cause a re-render that might reset scroll
+    // We'll set it after scroll completes
     
     // Temporarily remove scroll snap classes and disable smooth scroll
     // Remove classes to prevent CSS from interfering
@@ -322,82 +331,109 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       cardEl.className = cardEl.className.replace(/snap-start/g, '').trim();
     });
     
-    // Force scroll position multiple times to prevent interference
-    const forceScroll = () => {
-      if (!scrollContainerRef.current) return;
-      const container = scrollContainerRef.current;
-      
-      // Set scroll position immediately
-      container.scrollLeft = targetScrollPosition;
-      
-      // Also try scrollTo as backup
-      container.scrollTo({ 
-        left: targetScrollPosition, 
-        behavior: 'auto' 
-      });
-    };
-    
+    // Use scrollIntoView on the actual element - more reliable than calculating positions
     // Use requestAnimationFrame to ensure DOM is ready
     requestAnimationFrame(() => {
-      if (!scrollContainerRef.current) return;
+      if (!scrollContainerRef.current || !targetCard) return;
       
       const container = scrollContainerRef.current;
       
-      console.log('[OnboardingModal] Scrolling to position:', {
+      console.log('[OnboardingModal] Scrolling to card:', {
+        index,
         targetScrollPosition,
         calculatedPosition,
         currentScrollLeft: container.scrollLeft,
         containerWidth: container.clientWidth,
-        scrollWidth: container.scrollWidth
+        scrollWidth: container.scrollWidth,
+        targetCardOffsetLeft: targetCard.offsetLeft
       });
       
-      // Force scroll position immediately
-      forceScroll();
+      // Use scrollIntoView which works better with disabled scroll snap
+      // block: 'nearest' prevents vertical scrolling, inline: 'start' aligns to left
+      targetCard.scrollIntoView({
+        behavior: 'auto', // Use auto (instant) since we disabled smooth scroll
+        block: 'nearest',
+        inline: 'start'
+      });
       
-      // Verify and force again if needed (scroll snap might reset it)
-      requestAnimationFrame(() => {
-        forceScroll();
-        
-        // Check again after a short delay
-        setTimeout(() => {
-          if (!scrollContainerRef.current) return;
-          const container = scrollContainerRef.current;
-          
-          if (Math.abs(container.scrollLeft - targetScrollPosition) > 5) {
-            console.warn('[OnboardingModal] Scroll position was reset, forcing again:', {
-              expected: targetScrollPosition,
-              actual: container.scrollLeft,
-              difference: Math.abs(container.scrollLeft - targetScrollPosition)
-            });
-            forceScroll();
+      // Continuously monitor and force scroll position until it sticks
+      // This prevents any interference from scroll snap or other sources
+      let forceAttempts = 0;
+      const maxAttempts = 20; // Try for 2 seconds (20 * 100ms)
+      const forceInterval = setInterval(() => {
+        if (!scrollContainerRef.current || !targetCard || forceAttempts >= maxAttempts) {
+          clearInterval(forceInterval);
+          if (forceAttempts >= maxAttempts) {
+            console.warn('[OnboardingModal] Force scroll attempts exhausted');
           }
+          return;
+        }
+        
+        forceAttempts++;
+        const container = scrollContainerRef.current;
+        const currentScroll = container.scrollLeft;
+        const expectedScroll = targetCard.offsetLeft;
+        const difference = Math.abs(currentScroll - expectedScroll);
+        
+        // If scroll position is wrong, force it
+        if (difference > 5) {
+          console.log(`[OnboardingModal] Force scroll attempt ${forceAttempts}:`, {
+            expected: expectedScroll,
+            actual: currentScroll,
+            difference
+          });
+          container.scrollLeft = expectedScroll;
+          // Also try scrollIntoView again
+          targetCard.scrollIntoView({
+            behavior: 'auto',
+            block: 'nearest',
+            inline: 'start'
+          });
+        } else {
+          // Scroll position is correct, stop forcing
+          console.log(`[OnboardingModal] Scroll position stable after ${forceAttempts} attempts:`, currentScroll);
+          clearInterval(forceInterval);
           
-          // Keep scroll snap disabled for a bit longer to prevent interference
+          // Wait a bit longer to ensure it stays stable, then restore
           setTimeout(() => {
-            if (scrollContainerRef.current) {
-              // Restore original classes
-              scrollContainerRef.current.className = originalClasses;
-              
-              // Restore inline styles
-              scrollContainerRef.current.style.scrollSnapType = originalSnapType || '';
-              scrollContainerRef.current.style.scrollBehavior = originalScrollBehavior || '';
-              
-              // Restore scroll snap on cards
-              const cards = scrollContainerRef.current.querySelectorAll('[data-card-index]');
-              cards.forEach((card, i) => {
-                const cardEl = card as HTMLElement;
-                cardEl.className = originalCardClasses[i] || cardEl.className;
-                cardEl.style.scrollSnapAlign = originalSnapAligns[i] || '';
-              });
-              
-              // Allow scroll listener to work again
-              isProgrammaticScrollRef.current = false;
-              const finalScrollLeft = scrollContainerRef.current.scrollLeft;
-              console.log('[OnboardingModal] scrollToCardIndex - scroll completed, final scrollLeft:', finalScrollLeft, 'expected:', targetScrollPosition);
+            if (!scrollContainerRef.current) return;
+            
+            // Final check
+            if (Math.abs(scrollContainerRef.current.scrollLeft - expectedScroll) > 5) {
+              scrollContainerRef.current.scrollLeft = expectedScroll;
             }
-          }, 500);
-        }, 50);
-      });
+            
+            // Restore original classes
+            scrollContainerRef.current.className = originalClasses;
+            
+            // Restore inline styles
+            scrollContainerRef.current.style.scrollSnapType = originalSnapType || '';
+            scrollContainerRef.current.style.scrollBehavior = originalScrollBehavior || '';
+            
+            // Restore scroll snap on cards
+            const cards = scrollContainerRef.current.querySelectorAll('[data-card-index]');
+            cards.forEach((card, i) => {
+              const cardEl = card as HTMLElement;
+              cardEl.className = originalCardClasses[i] || cardEl.className;
+              cardEl.style.scrollSnapAlign = originalSnapAligns[i] || '';
+            });
+            
+            // NOW set the active index (after scroll is complete and stable)
+            setActiveCardIndex(index);
+            
+            // Re-add scroll listener
+            if (scrollListenerRef.current && scrollContainerRef.current) {
+              scrollContainerRef.current.addEventListener('scroll', scrollListenerRef.current, { passive: true });
+              console.log('[OnboardingModal] Re-added scroll listener');
+            }
+            
+            // Allow scroll listener to work again
+            isProgrammaticScrollRef.current = false;
+            const finalScrollLeft = scrollContainerRef.current.scrollLeft;
+            console.log('[OnboardingModal] scrollToCardIndex - scroll completed, final scrollLeft:', finalScrollLeft);
+          }, 200);
+        }
+      }, 100); // Check every 100ms
     });
   };
 
@@ -411,6 +447,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     const checkScroll = () => {
       // Don't update index during programmatic scrolls
       if (isProgrammaticScrollRef.current) {
+        console.log('[OnboardingModal] checkScroll - ignoring during programmatic scroll');
         return;
       }
       
@@ -422,12 +459,16 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
     };
     
+    // Store the listener function so we can remove/re-add it
+    scrollListenerRef.current = checkScroll;
+    
     const container = scrollContainerRef.current;
     if (container) {
       container.addEventListener('scroll', checkScroll, { passive: true });
       checkScroll(); // Initial check
       return () => {
         container.removeEventListener('scroll', checkScroll);
+        scrollListenerRef.current = null;
       };
     }
   }, [casts, showCreateCast, loadingCasts]);
