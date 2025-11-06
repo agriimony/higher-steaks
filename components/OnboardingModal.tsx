@@ -124,15 +124,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     unlockTime: number;
   } | null>(null);
   
-  // Scroll state for cards
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // Card navigation state
   const castUrlInputRef = useRef<HTMLInputElement>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
-  const isProgrammaticScrollRef = useRef(false);
-  const scrollListenerRef = useRef<((e: Event) => void) | null>(null);
-  
-  // Fixed card width
-  const CARD_WIDTH = 320;
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -237,302 +231,40 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     fetchCasts();
   }, [userFid]);
 
+  // Reset activeCardIndex if it's out of bounds when casts change
+  useEffect(() => {
+    if (casts.length > 0 && activeCardIndex >= casts.length) {
+      setActiveCardIndex(0);
+    }
+  }, [casts.length, activeCardIndex]);
+
   // Navigate to previous card
   const scrollToPrevious = () => {
     if (activeCardIndex > 0) {
-      const newIndex = activeCardIndex - 1;
-      scrollToCardIndex(newIndex);
+      setActiveCardIndex(activeCardIndex - 1);
+      // Reset staking form when changing cards
+      setSelectedCastIndex(null);
+      setStakeError(null);
+      setStakeAmount('');
+      setLockupDuration('');
+      setLockupDurationUnit('day');
+      setSelectedCastHash(null);
     }
   };
 
   // Navigate to next card
   const scrollToNext = () => {
     if (activeCardIndex < casts.length - 1) {
-      const newIndex = activeCardIndex + 1;
-      scrollToCardIndex(newIndex);
+      setActiveCardIndex(activeCardIndex + 1);
+      // Reset staking form when changing cards
+      setSelectedCastIndex(null);
+      setStakeError(null);
+      setStakeAmount('');
+      setLockupDuration('');
+      setLockupDurationUnit('day');
+      setSelectedCastHash(null);
     }
   };
-
-  // Scroll to specific card index
-  const scrollToCardIndex = (index: number) => {
-    if (!scrollContainerRef.current) {
-      console.log('[OnboardingModal] scrollToCardIndex - no container ref');
-      return;
-    }
-    
-    const container = scrollContainerRef.current;
-    
-    // Find the target card element
-    const targetCard = container.querySelector(`[data-card-index="${index}"]`) as HTMLElement;
-    
-    if (!targetCard) {
-      console.log('[OnboardingModal] scrollToCardIndex - target card not found:', index);
-      return;
-    }
-    
-    const cardWidthWithGap = CARD_WIDTH + 16; // card width + gap
-    
-    // Capture positions BEFORE any DOM modifications
-    // offsetLeft can be unreliable in flex containers, so we'll use calculated position
-    // but also capture offsetLeft for debugging
-    const scrollPositionFromOffset = targetCard.offsetLeft;
-    const calculatedPosition = index * cardWidthWithGap;
-    
-    // Use calculated position as it's more reliable in flex containers
-    // The calculation is: index * (cardWidth + gap)
-    const targetScrollPosition = calculatedPosition;
-    
-    console.log('[OnboardingModal] scrollToCardIndex:', {
-      index,
-      cardWidth: CARD_WIDTH,
-      cardWidthWithGap,
-      calculatedPosition,
-      scrollPositionFromOffset,
-      targetScrollPosition,
-      currentScrollLeft: container.scrollLeft,
-      castsLength: casts.length,
-      containerWidth: container.clientWidth,
-      scrollWidth: container.scrollWidth,
-      note: scrollPositionFromOffset !== calculatedPosition ? 'offsetLeft differs from calculated!' : 'positions match'
-    });
-    
-    // Mark that we're doing a programmatic scroll FIRST
-    isProgrammaticScrollRef.current = true;
-    
-    // TEMPORARILY REMOVE the scroll listener to prevent interference
-    if (scrollListenerRef.current && container) {
-      container.removeEventListener('scroll', scrollListenerRef.current);
-      console.log('[OnboardingModal] Removed scroll listener during programmatic scroll');
-    }
-    
-    // Don't call setActiveCardIndex yet - it will cause a re-render that might reset scroll
-    // We'll set it after scroll completes
-    
-    // Temporarily remove scroll snap classes and disable smooth scroll
-    // Remove classes to prevent CSS from interfering
-    const originalClasses = container.className;
-    container.className = container.className.replace(/snap-x|snap-mandatory|scroll-smooth/g, '').trim();
-    
-    // Also disable scroll snap on inline styles
-    const originalSnapType = container.style.scrollSnapType;
-    const originalScrollBehavior = container.style.scrollBehavior;
-    container.style.scrollSnapType = 'none';
-    container.style.scrollBehavior = 'auto';
-    
-    // Also disable scroll snap on all child cards
-    const cards = container.querySelectorAll('[data-card-index]');
-    const originalSnapAligns: string[] = [];
-    const originalCardClasses: string[] = [];
-    cards.forEach((card, i) => {
-      const cardEl = card as HTMLElement;
-      originalSnapAligns[i] = cardEl.style.scrollSnapAlign;
-      originalCardClasses[i] = cardEl.className;
-      cardEl.style.scrollSnapAlign = 'none';
-      cardEl.className = cardEl.className.replace(/snap-start/g, '').trim();
-    });
-    
-    // Use scrollIntoView on the actual element - more reliable than calculating positions
-    // Use requestAnimationFrame to ensure DOM is ready
-    requestAnimationFrame(() => {
-      if (!scrollContainerRef.current || !targetCard) return;
-      
-      const container = scrollContainerRef.current;
-      
-      console.log('[OnboardingModal] Scrolling to card:', {
-        index,
-        targetScrollPosition,
-        calculatedPosition,
-        currentScrollLeft: container.scrollLeft,
-        containerWidth: container.clientWidth,
-        scrollWidth: container.scrollWidth,
-        targetCardOffsetLeft: targetCard.offsetLeft
-      });
-      
-      // Use scrollIntoView which works better with disabled scroll snap
-      // block: 'nearest' prevents vertical scrolling, inline: 'start' aligns to left
-      targetCard.scrollIntoView({
-        behavior: 'auto', // Use auto (instant) since we disabled smooth scroll
-        block: 'nearest',
-        inline: 'start'
-      });
-      
-      // Continuously monitor and force scroll position until it sticks
-      // This prevents any interference from scroll snap or other sources
-      let forceAttempts = 0;
-      const maxAttempts = 20; // Try for 2 seconds (20 * 100ms)
-      const forceInterval = setInterval(() => {
-        if (!scrollContainerRef.current || !targetCard || forceAttempts >= maxAttempts) {
-          clearInterval(forceInterval);
-          if (forceAttempts >= maxAttempts) {
-            console.warn('[OnboardingModal] Force scroll attempts exhausted');
-          }
-          return;
-        }
-        
-        forceAttempts++;
-        const container = scrollContainerRef.current;
-        const currentScroll = container.scrollLeft;
-        const expectedScroll = targetCard.offsetLeft;
-        const difference = Math.abs(currentScroll - expectedScroll);
-        
-        // If scroll position is wrong, force it
-        if (difference > 5) {
-          console.log(`[OnboardingModal] Force scroll attempt ${forceAttempts}:`, {
-            expected: expectedScroll,
-            actual: currentScroll,
-            difference
-          });
-          container.scrollLeft = expectedScroll;
-          // Also try scrollIntoView again
-          targetCard.scrollIntoView({
-            behavior: 'auto',
-            block: 'nearest',
-            inline: 'start'
-          });
-        } else {
-          // Scroll position is correct, stop forcing
-          console.log(`[OnboardingModal] Scroll position stable after ${forceAttempts} attempts:`, currentScroll);
-          clearInterval(forceInterval);
-          
-          // Wait a bit longer to ensure it stays stable, then restore
-          setTimeout(() => {
-            if (!scrollContainerRef.current) return;
-            
-            // Final check
-            if (Math.abs(scrollContainerRef.current.scrollLeft - expectedScroll) > 5) {
-              scrollContainerRef.current.scrollLeft = expectedScroll;
-            }
-            
-            // FIRST set the active index (before restoring scroll snap to prevent re-render issues)
-            // This causes a re-render, so we need to preserve scroll position during it
-            setActiveCardIndex(index);
-            
-            // Wait for React to finish re-rendering before restoring scroll snap
-            // This prevents scroll snap from interfering during the re-render
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                if (!scrollContainerRef.current) return;
-                
-                // Re-verify scroll position is still correct after re-render
-                const currentCard = scrollContainerRef.current.querySelector(`[data-card-index="${index}"]`) as HTMLElement;
-                if (currentCard) {
-                  const expectedScroll = currentCard.offsetLeft;
-                  const actualScroll = scrollContainerRef.current.scrollLeft;
-                  
-                  if (Math.abs(actualScroll - expectedScroll) > 5) {
-                    console.log('[OnboardingModal] Scroll position corrected after re-render:', {
-                      expected: expectedScroll,
-                      actual: actualScroll
-                    });
-                    scrollContainerRef.current.scrollLeft = expectedScroll;
-                  }
-                  
-                  // Wait one more frame to ensure scroll position is truly stable
-                  // This prevents scroll snap from snapping when we restore it
-                  requestAnimationFrame(() => {
-                    if (!scrollContainerRef.current || !currentCard) return;
-                    
-                    // Final scroll position correction
-                    const finalExpected = currentCard.offsetLeft;
-                    const finalActual = scrollContainerRef.current.scrollLeft;
-                    if (Math.abs(finalActual - finalExpected) > 5) {
-                      scrollContainerRef.current.scrollLeft = finalExpected;
-                    }
-                    
-                    // NOW restore scroll snap classes (scroll position is stable at correct position)
-                    scrollContainerRef.current.className = originalClasses;
-                    
-                    // Restore inline styles
-                    scrollContainerRef.current.style.scrollSnapType = originalSnapType || '';
-                    scrollContainerRef.current.style.scrollBehavior = originalScrollBehavior || '';
-                    
-                    // Restore scroll snap on cards
-                    const cards = scrollContainerRef.current.querySelectorAll('[data-card-index]');
-                    cards.forEach((card, i) => {
-                      const cardEl = card as HTMLElement;
-                      cardEl.className = originalCardClasses[i] || cardEl.className;
-                      cardEl.style.scrollSnapAlign = originalSnapAligns[i] || '';
-                    });
-                    
-                    // Re-add scroll listener AFTER scroll snap is restored
-                    if (scrollListenerRef.current && scrollContainerRef.current) {
-                      scrollContainerRef.current.addEventListener('scroll', scrollListenerRef.current, { passive: true });
-                      console.log('[OnboardingModal] Re-added scroll listener');
-                    }
-                    
-                    // Allow scroll listener to work again
-                    isProgrammaticScrollRef.current = false;
-                    const finalScrollLeft = scrollContainerRef.current.scrollLeft;
-                    console.log('[OnboardingModal] scrollToCardIndex - scroll completed, final scrollLeft:', finalScrollLeft);
-                  });
-                } else {
-                  // Card not found, restore everything anyway
-                  scrollContainerRef.current.className = originalClasses;
-                  scrollContainerRef.current.style.scrollSnapType = originalSnapType || '';
-                  scrollContainerRef.current.style.scrollBehavior = originalScrollBehavior || '';
-                  
-                  const cards = scrollContainerRef.current.querySelectorAll('[data-card-index]');
-                  cards.forEach((card, i) => {
-                    const cardEl = card as HTMLElement;
-                    cardEl.className = originalCardClasses[i] || cardEl.className;
-                    cardEl.style.scrollSnapAlign = originalSnapAligns[i] || '';
-                  });
-                  
-                  if (scrollListenerRef.current && scrollContainerRef.current) {
-                    scrollContainerRef.current.addEventListener('scroll', scrollListenerRef.current, { passive: true });
-                  }
-                  
-                  isProgrammaticScrollRef.current = false;
-                }
-              });
-            });
-          }, 200);
-        }
-      }, 100); // Check every 100ms
-    });
-  };
-
-
-  // Simple scroll listener to update active dot indicator
-  useEffect(() => {
-    if (showCreateCast || casts.length === 0 || loadingCasts) {
-      return;
-    }
-
-    const checkScroll = () => {
-      // Don't update index during programmatic scrolls
-      if (isProgrammaticScrollRef.current) {
-        console.log('[OnboardingModal] checkScroll - ignoring during programmatic scroll');
-        return;
-      }
-      
-      if (!scrollContainerRef.current) return;
-      const container = scrollContainerRef.current;
-      const scrollLeft = container.scrollLeft;
-      const cardWidthWithGap = CARD_WIDTH + 16;
-      const currentIndex = Math.max(0, Math.round(scrollLeft / cardWidthWithGap));
-      setActiveCardIndex(Math.min(currentIndex, casts.length - 1));
-    };
-    
-    // Store the listener function so we can remove/re-add it
-    scrollListenerRef.current = checkScroll;
-    
-    const container = scrollContainerRef.current;
-    if (container) {
-      container.addEventListener('scroll', checkScroll, { passive: true });
-      
-      // Don't run initial check if we're in the middle of a programmatic scroll
-      // This prevents resetting the index during scroll operations
-      if (!isProgrammaticScrollRef.current) {
-        checkScroll(); // Initial check
-      }
-      
-      return () => {
-        container.removeEventListener('scroll', checkScroll);
-        scrollListenerRef.current = null;
-      };
-    }
-  }, [casts, showCreateCast, loadingCasts]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -1066,21 +798,26 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   // Cast Cards View Component
   const CastCardsView = () => {
+    const currentCast = casts[activeCardIndex];
+    
+    if (!currentCast) {
+      return null;
+    }
+    
     return (
       <>
         <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
           You are aiming higher!
         </h2>
         
-        {/* Horizontal scrolling cards */}
-        <div className="mb-4 overflow-hidden relative">
+        {/* Single card display with navigation arrows */}
+        <div className="mb-4 relative">
           {/* Left arrow button */}
           {casts.length > 1 && activeCardIndex > 0 && (
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[OnboardingModal] Left arrow clicked, activeCardIndex:', activeCardIndex);
                 scrollToPrevious();
               }}
               className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
@@ -1098,7 +835,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                console.log('[OnboardingModal] Right arrow clicked, activeCardIndex:', activeCardIndex);
                 scrollToNext();
               }}
               className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
@@ -1110,165 +846,148 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             </button>
           )}
           
-          <div
-            ref={scrollContainerRef}
-            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-            style={{ 
-              scrollPaddingLeft: '0px',
-              scrollSnapType: 'x mandatory',
-              scrollBehavior: 'smooth'
-            } as React.CSSProperties}
-          >
-            {casts.map((cast, index) => (
-              <div
-                key={cast.hash}
-                data-card-index={index}
-                className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none flex-shrink-0 snap-start"
-                style={{ 
-                  width: `${CARD_WIDTH}px`,
-                  scrollSnapAlign: 'start'
-                }}
-              >
-                <div className="text-xs text-black font-mono mb-2">
-                  <strong>started aiming higher and it worked out!</strong> {cast.description}
-                </div>
-                {cast.timestamp && (
-                  <div className="text-xs text-black/50 font-mono mb-3">
-                    {formatTimestamp(cast.timestamp)}
-                  </div>
-                )}
-                
-                <div className="border-t border-black/20 pt-3 mt-3">
-                  {cast.castState === 'higher' ? (
-                    <>
-                      <div className="text-sm text-black font-bold mb-1">
-                        Rank: {cast.rank ? `#${cast.rank}` : 'Unranked'}
-                      </div>
-                      <div className="text-xs text-black/80 mb-2">
-                        {cast.totalHigherStaked.toFixed(2)} HIGHER staked
-                      </div>
-                      <div className="text-xs text-black/60 flex items-center gap-1">
-                        <img 
-                          src="/higher-logo.png" 
-                          alt="HIGHER" 
-                          className="w-3 h-3 rounded-full"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none';
-                          }}
-                        />
-                        <span>{cast.totalCasterStaked.toFixed(2)}</span>
-                        <span className="text-black/40">|</span>
-                        <span>{cast.totalSupporterStaked.toFixed(2)}</span>
-                      </div>
-                    </>
-                  ) : cast.castState === 'expired' ? (
-                    <div className="text-xs text-black/60 italic mb-2">
-                      This cast is expired, add stake to rejoin the leaderboard
-                    </div>
-                  ) : (
-                    <div className="text-xs text-black/60 mb-2">
-                      Add stake to join the leaderboard
-                    </div>
-                  )}
-                  
-                  {/* Inline staking form or Add stake button */}
-                  {selectedCastIndex === index ? (
-                    <div className="mt-2">
-                      <div className="mb-3">
-                        <label className="text-xs text-black/70 mb-1 block">Amount (HIGHER)</label>
-                        <input
-                          type="text"
-                          value={stakeAmount}
-                          onChange={(e) => setStakeAmount(e.target.value)}
-                          placeholder="0.00"
-                          className="w-full text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
-                        />
-                        <div className="text-xs text-black/50 mt-1">
-                          Available: {walletBalance.toFixed(2)} HIGHER
-                        </div>
-                      </div>
-
-                      <div className="mb-3">
-                        <label className="text-xs text-black/70 mb-1 block">Duration</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="number"
-                            value={lockupDuration}
-                            onChange={(e) => setLockupDuration(e.target.value)}
-                            placeholder="1"
-                            min="1"
-                            className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
-                          />
-                          <select
-                            value={lockupDurationUnit}
-                            onChange={(e) => setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year')}
-                            className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
-                          >
-                            <option value="minute">Minute(s)</option>
-                            <option value="day">Day(s)</option>
-                            <option value="week">Week(s)</option>
-                            <option value="month">Month(s)</option>
-                            <option value="year">Year(s)</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      {stakeError && (
-                        <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
-                          {stakeError}
-                        </div>
-                      )}
-
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => handleStake(cast.hash)}
-                          disabled={isLoadingTransaction}
-                          className="relative group flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isLoadingTransaction ? 'Staking...' : (
-                            <span className="flex items-center justify-center gap-1">
-                              Stake <span className="text-sm">ⓘ</span>
-                            </span>
-                          )}
-                          <div className="absolute bottom-full left-0 mb-2 w-72 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                            Uses mint.club lockup contracts for secure token staking (<a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">https://mint.club/lockup/create</a>)
-                          </div>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedCastIndex(null);
-                            setStakeError(null);
-                            setStakeAmount('');
-                            setLockupDuration('');
-                            setLockupDurationUnit('day');
-                            setSelectedCastHash(null);
-                          }}
-                          className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => {
-                        setSelectedCastIndex(index);
-                        setSelectedCastHash(cast.hash);
-                      }}
-                      className="mt-2 w-full px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
-                    >
-                      Add stake
-                    </button>
-                  )}
-                </div>
+          {/* Single card */}
+          <div className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none">
+            <div className="text-xs text-black font-mono mb-2">
+              <strong>started aiming higher and it worked out!</strong> {currentCast.description}
+            </div>
+            {currentCast.timestamp && (
+              <div className="text-xs text-black/50 font-mono mb-3">
+                {formatTimestamp(currentCast.timestamp)}
               </div>
-            ))}
+            )}
+            
+            <div className="border-t border-black/20 pt-3 mt-3">
+              {currentCast.castState === 'higher' ? (
+                <>
+                  <div className="text-sm text-black font-bold mb-1">
+                    Rank: {currentCast.rank ? `#${currentCast.rank}` : 'Unranked'}
+                  </div>
+                  <div className="text-xs text-black/80 mb-2">
+                    {currentCast.totalHigherStaked.toFixed(2)} HIGHER staked
+                  </div>
+                  <div className="text-xs text-black/60 flex items-center gap-1">
+                    <img 
+                      src="/higher-logo.png" 
+                      alt="HIGHER" 
+                      className="w-3 h-3 rounded-full"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                    <span>{currentCast.totalCasterStaked.toFixed(2)}</span>
+                    <span className="text-black/40">|</span>
+                    <span>{currentCast.totalSupporterStaked.toFixed(2)}</span>
+                  </div>
+                </>
+              ) : currentCast.castState === 'expired' ? (
+                <div className="text-xs text-black/60 italic mb-2">
+                  This cast is expired, add stake to rejoin the leaderboard
+                </div>
+              ) : (
+                <div className="text-xs text-black/60 mb-2">
+                  Add stake to join the leaderboard
+                </div>
+              )}
+            </div>
           </div>
         </div>
         
+        {/* Staking form or Add stake button - below the card */}
+        {selectedCastIndex === activeCardIndex ? (
+          <div className="mb-4">
+            <div className="mb-3">
+              <label className="text-xs text-black/70 mb-1 block">Amount (HIGHER)</label>
+              <input
+                type="text"
+                value={stakeAmount}
+                onChange={(e) => setStakeAmount(e.target.value)}
+                placeholder="0.00"
+                className="w-full text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
+              />
+              <div className="text-xs text-black/50 mt-1">
+                Available: {walletBalance.toFixed(2)} HIGHER
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="text-xs text-black/70 mb-1 block">Duration</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  value={lockupDuration}
+                  onChange={(e) => setLockupDuration(e.target.value)}
+                  placeholder="1"
+                  min="1"
+                  className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
+                />
+                <select
+                  value={lockupDurationUnit}
+                  onChange={(e) => setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year')}
+                  className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
+                >
+                  <option value="minute">Minute(s)</option>
+                  <option value="day">Day(s)</option>
+                  <option value="week">Week(s)</option>
+                  <option value="month">Month(s)</option>
+                  <option value="year">Year(s)</option>
+                </select>
+              </div>
+            </div>
+
+            {stakeError && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
+                {stakeError}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleStake(currentCast.hash)}
+                disabled={isLoadingTransaction}
+                className="relative group flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoadingTransaction ? 'Staking...' : (
+                  <span className="flex items-center justify-center gap-1">
+                    Stake <span className="text-sm">ⓘ</span>
+                  </span>
+                )}
+                <div className="absolute bottom-full left-0 mb-2 w-72 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Uses mint.club lockup contracts for secure token staking (<a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">https://mint.club/lockup/create</a>)
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedCastIndex(null);
+                  setStakeError(null);
+                  setStakeAmount('');
+                  setLockupDuration('');
+                  setLockupDurationUnit('day');
+                  setSelectedCastHash(null);
+                }}
+                className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-4">
+            <button
+              onClick={() => {
+                setSelectedCastIndex(activeCardIndex);
+                setSelectedCastHash(currentCast.hash);
+              }}
+              className="w-full px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+            >
+              Add stake
+            </button>
+          </div>
+        )}
+        
         {/* Card indicator (e.g., "1 of 3") */}
         {casts.length > 1 && (
-          <div className="flex justify-center mt-2 text-xs text-black/60">
+          <div className="flex justify-center mt-2 text-xs text-black/60 mb-4">
             {activeCardIndex + 1} of {casts.length}
           </div>
         )}
