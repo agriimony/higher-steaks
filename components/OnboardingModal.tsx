@@ -342,7 +342,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     };
   }, [isApproveSuccess, approveReceipt, wagmiAddress, selectedCastHash, writeContractCreateLockUp]);
 
-  // Handle transaction success
+  // Handle transaction success - no real-time updates, just reset form state
   useEffect(() => {
     if (isCreateLockUpSuccess && createLockUpHash) {
       // Check if we've already processed this transaction
@@ -362,81 +362,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       setSelectedCastHash(null);
       hasScheduledCreateLockUp.current = false;
       
-      console.log('[Onboarding] Stake transaction successful - Webhook will refresh UI');
+      console.log('[Onboarding] Stake transaction successful - Parent component will handle updates');
       
-      // Refresh casts list
-      const fetchCasts = async () => {
-        try {
-          const response = await fetch(`/api/user/casts/all?fid=${userFid}`);
-          if (response.ok) {
-            const data = await response.json();
-            const castsWithTotals = data.casts.map((cast: any) => {
-              const { totalCasterStaked, totalSupporterStaked } = calculateStakeTotals(
-                cast.casterStakeAmounts || [],
-                cast.casterStakeUnlockTimes || [],
-                cast.supporterStakeAmounts || [],
-                cast.totalHigherStaked
-              );
-              
-              return {
-                hash: cast.hash,
-                text: cast.text,
-                description: cast.description,
-                timestamp: cast.timestamp,
-                castState: cast.castState,
-                rank: cast.rank,
-                totalHigherStaked: cast.totalHigherStaked,
-                totalCasterStaked,
-                totalSupporterStaked,
-                casterStakeLockupIds: cast.casterStakeLockupIds || [],
-                casterStakeAmounts: cast.casterStakeAmounts || [],
-                casterStakeUnlockTimes: cast.casterStakeUnlockTimes || [],
-                supporterStakeLockupIds: cast.supporterStakeLockupIds || [],
-                supporterStakeAmounts: cast.supporterStakeAmounts || [],
-                supporterStakeFids: cast.supporterStakeFids || [],
-              };
-            });
-            
-            // Merge with temporary casts (valid casts not yet in database)
-            setCasts(prevCasts => {
-              // Get temporary casts (valid state, not found in API results)
-              const temporaryCasts = prevCasts.filter(cast => 
-                cast.castState === 'valid' && 
-                !castsWithTotals.find((apiCast: CastCard) => apiCast.hash === cast.hash)
-              );
-              
-              // Combine API casts with temporary casts, deduplicate by hash
-              const allCasts = [...castsWithTotals, ...temporaryCasts];
-              const uniqueCasts = allCasts.reduce((acc: CastCard[], cast: CastCard) => {
-                if (!acc.find(c => c.hash === cast.hash)) {
-                  acc.push(cast);
-                }
-                return acc;
-              }, []);
-              
-              // Only update if hashes actually changed
-              const prevHashes = prevCasts.map((c: CastCard) => c.hash).sort().join(',');
-              const newHashes = uniqueCasts.map((c: CastCard) => c.hash).sort().join(',');
-              if (prevHashes === newHashes) {
-                return prevCasts; // Return previous array reference if hashes unchanged
-              }
-              
-              return uniqueCasts;
-            });
-            
-            setTemporaryNewCast(null); // Clear temporary cast flag when API data is loaded
-          }
-        } catch (error) {
-          console.error('Error refreshing casts:', error);
-        }
-      };
-      
-      fetchCasts();
-      
-      // Call parent callback
+      // Call parent callback - let the parent/staking modal handle real-time updates
       onStakeSuccess?.();
     }
-  }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess, userFid]);
+  }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess]);
 
   // Error handling
   useEffect(() => {
