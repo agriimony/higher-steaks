@@ -812,7 +812,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         
         {/* Single card display with navigation arrows */}
         <div className="mb-4 relative">
-          {/* Left arrow button */}
+          {/* Left arrow button - positioned outside and overlapping halfway */}
           {casts.length > 1 && activeCardIndex > 0 && (
             <button
               onClick={(e) => {
@@ -820,7 +820,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 e.stopPropagation();
                 scrollToPrevious();
               }}
-              className="absolute left-5 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
+              className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-black/80 hover:bg-black text-white p-2 rounded-full transition shadow-lg"
               aria-label="Previous card"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -829,25 +829,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             </button>
           )}
           
-          {/* Right arrow button */}
-          {casts.length > 1 && activeCardIndex < casts.length - 1 && (
-            <button
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                scrollToNext();
-              }}
-              className="absolute -right-5 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
-              aria-label="Next card"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 18l6-6-6-6"/>
-              </svg>
-            </button>
-          )}
-          
           {/* Single card */}
-          <div className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none">
+          <div className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none relative z-10">
             <div className="text-xs text-black font-mono mb-2">
               <strong>started aiming higher and it worked out!</strong> {currentCast.description}
             </div>
@@ -891,6 +874,23 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               )}
             </div>
           </div>
+          
+          {/* Right arrow button - positioned outside and overlapping halfway */}
+          {casts.length > 1 && activeCardIndex < casts.length - 1 && (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                scrollToNext();
+              }}
+              className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 z-20 bg-black/80 hover:bg-black text-white p-2 rounded-full transition shadow-lg"
+              aria-label="Next card"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </button>
+          )}
         </div>
         
         {/* Staking form or Add stake button - below the card */}
