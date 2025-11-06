@@ -299,20 +299,43 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     isProgrammaticScrollRef.current = true;
     setActiveCardIndex(index);
     
-    // Temporarily disable scroll snap and smooth scroll for programmatic scroll
+    // Temporarily remove scroll snap classes and disable smooth scroll
+    // Remove classes to prevent CSS from interfering
+    const originalClasses = container.className;
+    container.className = container.className.replace(/snap-x|snap-mandatory|scroll-smooth/g, '').trim();
+    
+    // Also disable scroll snap on inline styles
     const originalSnapType = container.style.scrollSnapType;
     const originalScrollBehavior = container.style.scrollBehavior;
     container.style.scrollSnapType = 'none';
-    container.style.scrollBehavior = 'auto'; // Disable smooth scroll temporarily
+    container.style.scrollBehavior = 'auto';
     
     // Also disable scroll snap on all child cards
     const cards = container.querySelectorAll('[data-card-index]');
     const originalSnapAligns: string[] = [];
+    const originalCardClasses: string[] = [];
     cards.forEach((card, i) => {
       const cardEl = card as HTMLElement;
       originalSnapAligns[i] = cardEl.style.scrollSnapAlign;
+      originalCardClasses[i] = cardEl.className;
       cardEl.style.scrollSnapAlign = 'none';
+      cardEl.className = cardEl.className.replace(/snap-start/g, '').trim();
     });
+    
+    // Force scroll position multiple times to prevent interference
+    const forceScroll = () => {
+      if (!scrollContainerRef.current) return;
+      const container = scrollContainerRef.current;
+      
+      // Set scroll position immediately
+      container.scrollLeft = targetScrollPosition;
+      
+      // Also try scrollTo as backup
+      container.scrollTo({ 
+        left: targetScrollPosition, 
+        behavior: 'auto' 
+      });
+    };
     
     // Use requestAnimationFrame to ensure DOM is ready
     requestAnimationFrame(() => {
@@ -320,7 +343,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       
       const container = scrollContainerRef.current;
       
-      // Use the captured position - don't re-read from DOM as it may have changed
       console.log('[OnboardingModal] Scrolling to position:', {
         targetScrollPosition,
         calculatedPosition,
@@ -329,47 +351,52 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         scrollWidth: container.scrollWidth
       });
       
-      // Try instant scroll first to ensure it works, then we can add smooth if needed
-      // Sometimes smooth scroll can be blocked or reset
-      container.scrollLeft = targetScrollPosition;
+      // Force scroll position immediately
+      forceScroll();
       
-      // Verify the scroll actually happened
+      // Verify and force again if needed (scroll snap might reset it)
       requestAnimationFrame(() => {
-        if (container.scrollLeft !== targetScrollPosition) {
-          console.warn('[OnboardingModal] Scroll position mismatch, trying scrollTo:', {
-            expected: targetScrollPosition,
-            actual: container.scrollLeft
-          });
-          // Fallback: try scrollTo with instant behavior
-          container.scrollTo({ 
-            left: targetScrollPosition, 
-            behavior: 'auto' 
-          });
-        } else {
-          console.log('[OnboardingModal] Scroll position set successfully:', container.scrollLeft);
-        }
-      });
-      
-      // Re-enable scroll snap and smooth scroll after scroll completes
-      requestAnimationFrame(() => {
+        forceScroll();
+        
+        // Check again after a short delay
         setTimeout(() => {
-          if (scrollContainerRef.current) {
-            scrollContainerRef.current.style.scrollSnapType = originalSnapType;
-            scrollContainerRef.current.style.scrollBehavior = originalScrollBehavior || '';
-            
-            // Re-enable scroll snap on cards
-            const cards = scrollContainerRef.current.querySelectorAll('[data-card-index]');
-            cards.forEach((card, i) => {
-              const cardEl = card as HTMLElement;
-              cardEl.style.scrollSnapAlign = originalSnapAligns[i] || '';
+          if (!scrollContainerRef.current) return;
+          const container = scrollContainerRef.current;
+          
+          if (Math.abs(container.scrollLeft - targetScrollPosition) > 5) {
+            console.warn('[OnboardingModal] Scroll position was reset, forcing again:', {
+              expected: targetScrollPosition,
+              actual: container.scrollLeft,
+              difference: Math.abs(container.scrollLeft - targetScrollPosition)
             });
-            
-            // Allow scroll listener to work again
-            isProgrammaticScrollRef.current = false;
-            const finalScrollLeft = scrollContainerRef.current.scrollLeft;
-            console.log('[OnboardingModal] scrollToCardIndex - scroll completed, final scrollLeft:', finalScrollLeft, 'expected:', targetScrollPosition);
+            forceScroll();
           }
-        }, 100);
+          
+          // Keep scroll snap disabled for a bit longer to prevent interference
+          setTimeout(() => {
+            if (scrollContainerRef.current) {
+              // Restore original classes
+              scrollContainerRef.current.className = originalClasses;
+              
+              // Restore inline styles
+              scrollContainerRef.current.style.scrollSnapType = originalSnapType || '';
+              scrollContainerRef.current.style.scrollBehavior = originalScrollBehavior || '';
+              
+              // Restore scroll snap on cards
+              const cards = scrollContainerRef.current.querySelectorAll('[data-card-index]');
+              cards.forEach((card, i) => {
+                const cardEl = card as HTMLElement;
+                cardEl.className = originalCardClasses[i] || cardEl.className;
+                cardEl.style.scrollSnapAlign = originalSnapAligns[i] || '';
+              });
+              
+              // Allow scroll listener to work again
+              isProgrammaticScrollRef.current = false;
+              const finalScrollLeft = scrollContainerRef.current.scrollLeft;
+              console.log('[OnboardingModal] scrollToCardIndex - scroll completed, final scrollLeft:', finalScrollLeft, 'expected:', targetScrollPosition);
+            }
+          }, 500);
+        }, 50);
       });
     });
   };
@@ -985,7 +1012,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             ref={scrollContainerRef}
             className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             style={{ 
-              scrollPaddingLeft: '0px'
+              scrollPaddingLeft: '0px',
+              scrollSnapType: 'x mandatory',
+              scrollBehavior: 'smooth'
             } as React.CSSProperties}
           >
             {casts.map((cast, index) => (
