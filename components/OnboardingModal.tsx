@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
@@ -861,6 +861,231 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     setSelectedCastHash(hash);
   }, []);
 
+  // Track component renders and input lifecycle
+  const renderCountRef = useRef(0);
+  const stakeInputMountCountRef = useRef(0);
+  const durationInputMountCountRef = useRef(0);
+  
+  useEffect(() => {
+    renderCountRef.current += 1;
+    console.log('[OnboardingModal] Component render count:', renderCountRef.current);
+  });
+  
+  useEffect(() => {
+    console.log('[OnboardingModal] stakeAmount changed:', stakeAmount);
+  }, [stakeAmount]);
+  
+  useEffect(() => {
+    console.log('[OnboardingModal] lockupDuration changed:', lockupDuration);
+  }, [lockupDuration]);
+  
+  useEffect(() => {
+    console.log('[OnboardingModal] selectedCastIndex changed:', selectedCastIndex);
+  }, [selectedCastIndex]);
+  
+  useEffect(() => {
+    console.log('[OnboardingModal] activeCardIndex changed:', activeCardIndex);
+  }, [activeCardIndex]);
+
+  // Separate StakingForm component - memoized to prevent remounting
+  const StakingForm = React.memo(({
+    stakeAmount,
+    lockupDuration,
+    lockupDurationUnit,
+    stakeError,
+    isLoadingTransaction,
+    walletBalance,
+    castHash,
+    stakeAmountInputRef,
+    lockupDurationInputRef,
+    stakeInputMountCountRef,
+    durationInputMountCountRef,
+    onStakeAmountChange,
+    onLockupDurationChange,
+    onLockupDurationUnitChange,
+    onSetAmount,
+    onStake,
+    onCancel
+  }: {
+    stakeAmount: string;
+    lockupDuration: string;
+    lockupDurationUnit: 'minute' | 'day' | 'week' | 'month' | 'year';
+    stakeError: string | null;
+    isLoadingTransaction: boolean;
+    walletBalance: number;
+    castHash: string;
+    stakeAmountInputRef: React.RefObject<HTMLInputElement>;
+    lockupDurationInputRef: React.RefObject<HTMLInputElement>;
+    stakeInputMountCountRef: React.MutableRefObject<number>;
+    durationInputMountCountRef: React.MutableRefObject<number>;
+    onStakeAmountChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onLockupDurationChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onLockupDurationUnitChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+    onSetAmount: (percentage: number) => void;
+    onStake: (hash: string) => void;
+    onCancel: () => void;
+  }) => {
+    console.log('[StakingForm] Rendering with stakeAmount:', stakeAmount, 'lockupDuration:', lockupDuration);
+    
+    return (
+      <div className="mb-4">
+        <div className="mb-3">
+          <label className="text-xs text-black/70 mb-1 block">Amount (HIGHER)</label>
+          <div className="flex gap-2">
+            <input
+              ref={(node) => {
+                if (node) {
+                  stakeInputMountCountRef.current += 1;
+                  console.log('[StakingForm] Stake amount input MOUNTED, count:', stakeInputMountCountRef.current, 'focused:', document.activeElement === node);
+                  if (stakeAmountInputRef) {
+                    (stakeAmountInputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
+                  }
+                } else {
+                  console.log('[StakingForm] Stake amount input UNMOUNTED');
+                }
+              }}
+              type="text"
+              value={stakeAmount}
+              onChange={onStakeAmountChange}
+              onFocus={(e) => {
+                console.log('[StakingForm] Stake amount input FOCUSED');
+              }}
+              onBlur={(e) => {
+                console.log('[StakingForm] Stake amount input BLURRED');
+              }}
+              placeholder="0.00"
+              className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
+            />
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => onSetAmount(0.25)}
+                className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
+              >
+                25%
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetAmount(0.5)}
+                className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
+              >
+                50%
+              </button>
+              <button
+                type="button"
+                onClick={() => onSetAmount(1)}
+                className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
+              >
+                Max
+              </button>
+            </div>
+          </div>
+          <div className="text-xs text-black/50 mt-1">
+            Available: {walletBalance.toFixed(2)} HIGHER
+          </div>
+        </div>
+
+        <div className="mb-3">
+          <label className="text-xs text-black/70 mb-1 block">Duration</label>
+          <div className="flex gap-2">
+            <input
+              ref={(node) => {
+                if (node) {
+                  durationInputMountCountRef.current += 1;
+                  console.log('[StakingForm] Duration input MOUNTED, count:', durationInputMountCountRef.current, 'focused:', document.activeElement === node);
+                  if (lockupDurationInputRef) {
+                    (lockupDurationInputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
+                  }
+                } else {
+                  console.log('[StakingForm] Duration input UNMOUNTED');
+                }
+              }}
+              type="number"
+              value={lockupDuration}
+              onChange={onLockupDurationChange}
+              onFocus={(e) => {
+                console.log('[StakingForm] Duration input FOCUSED');
+              }}
+              onBlur={(e) => {
+                console.log('[StakingForm] Duration input BLURRED');
+              }}
+              placeholder="1"
+              min="1"
+              className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
+            />
+            <select
+              value={lockupDurationUnit}
+              onChange={onLockupDurationUnitChange}
+              onFocus={(e) => {
+                console.log('[StakingForm] Duration unit select FOCUSED');
+              }}
+              onBlur={(e) => {
+                console.log('[StakingForm] Duration unit select BLURRED');
+              }}
+              className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
+            >
+              <option value="minute">Minute(s)</option>
+              <option value="day">Day(s)</option>
+              <option value="week">Week(s)</option>
+              <option value="month">Month(s)</option>
+              <option value="year">Year(s)</option>
+            </select>
+          </div>
+        </div>
+
+        {stakeError && (
+          <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
+            {stakeError}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => onStake(castHash)}
+            disabled={isLoadingTransaction}
+            className="relative group flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isLoadingTransaction ? 'Staking...' : (
+              <span className="flex items-center justify-center gap-1">
+                Stake <span className="text-sm">ⓘ</span>
+              </span>
+            )}
+            <div className="absolute bottom-full left-0 mb-2 w-72 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              Uses mint.club lockup contracts for secure token staking (<a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">https://mint.club/lockup/create</a>)
+            </div>
+          </button>
+          <button
+            onClick={onCancel}
+            className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }, (prevProps, nextProps) => {
+    // Custom comparison - only re-render if these specific props change
+    const shouldUpdate = 
+      prevProps.stakeAmount !== nextProps.stakeAmount ||
+      prevProps.lockupDuration !== nextProps.lockupDuration ||
+      prevProps.lockupDurationUnit !== nextProps.lockupDurationUnit ||
+      prevProps.stakeError !== nextProps.stakeError ||
+      prevProps.isLoadingTransaction !== nextProps.isLoadingTransaction ||
+      prevProps.walletBalance !== nextProps.walletBalance ||
+      prevProps.castHash !== nextProps.castHash;
+    
+    console.log('[StakingForm] Should update?', shouldUpdate, {
+      stakeAmount: prevProps.stakeAmount !== nextProps.stakeAmount,
+      lockupDuration: prevProps.lockupDuration !== nextProps.lockupDuration,
+      lockupDurationUnit: prevProps.lockupDurationUnit !== nextProps.lockupDurationUnit,
+      stakeError: prevProps.stakeError !== nextProps.stakeError,
+      isLoadingTransaction: prevProps.isLoadingTransaction !== nextProps.isLoadingTransaction,
+      walletBalance: prevProps.walletBalance !== nextProps.walletBalance,
+      castHash: prevProps.castHash !== nextProps.castHash
+    });
+    
+    return !shouldUpdate; // Return true to skip update, false to update
+  });
 
   // Cast Cards View Component - render directly without memoization
   // The inputs are rendered separately to prevent focus loss
@@ -962,102 +1187,25 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         
         {/* Staking form or Add stake button - below the card */}
         {selectedCastIndex === activeCardIndex ? (
-          <div className="mb-4">
-            <div className="mb-3">
-              <label className="text-xs text-black/70 mb-1 block">Amount (HIGHER)</label>
-              <div className="flex gap-2">
-                <input
-                  ref={stakeAmountInputRef}
-                  type="text"
-                  value={stakeAmount}
-                  onChange={handleStakeAmountChange}
-                  placeholder="0.00"
-                  className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
-                />
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleSetAmount(0.25)}
-                    className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
-                  >
-                    25%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetAmount(0.5)}
-                    className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
-                  >
-                    50%
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetAmount(1)}
-                    className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
-                  >
-                    Max
-                  </button>
-                </div>
-              </div>
-              <div className="text-xs text-black/50 mt-1">
-                Available: {walletBalance.toFixed(2)} HIGHER
-              </div>
-            </div>
-
-            <div className="mb-3">
-              <label className="text-xs text-black/70 mb-1 block">Duration</label>
-              <div className="flex gap-2">
-                <input
-                  ref={lockupDurationInputRef}
-                  type="number"
-                  value={lockupDuration}
-                  onChange={handleLockupDurationChange}
-                  placeholder="1"
-                  min="1"
-                  className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
-                />
-                <select
-                  value={lockupDurationUnit}
-                  onChange={handleLockupDurationUnitChange}
-                  className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
-                >
-                  <option value="minute">Minute(s)</option>
-                  <option value="day">Day(s)</option>
-                  <option value="week">Week(s)</option>
-                  <option value="month">Month(s)</option>
-                  <option value="year">Year(s)</option>
-                </select>
-              </div>
-            </div>
-
-            {stakeError && (
-              <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
-                {stakeError}
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => handleStake(currentCast.hash)}
-                disabled={isLoadingTransaction}
-                className="relative group flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoadingTransaction ? 'Staking...' : (
-                  <span className="flex items-center justify-center gap-1">
-                    Stake <span className="text-sm">ⓘ</span>
-                  </span>
-                )}
-                <div className="absolute bottom-full left-0 mb-2 w-72 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                  Uses mint.club lockup contracts for secure token staking (<a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">https://mint.club/lockup/create</a>)
-                </div>
-              </button>
-              <button
-                onClick={handleCancelStake}
-                className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+          <StakingForm
+            stakeAmount={stakeAmount}
+            lockupDuration={lockupDuration}
+            lockupDurationUnit={lockupDurationUnit}
+            stakeError={stakeError}
+            isLoadingTransaction={isLoadingTransaction}
+            walletBalance={walletBalance}
+            castHash={currentCast.hash}
+            stakeAmountInputRef={stakeAmountInputRef}
+            lockupDurationInputRef={lockupDurationInputRef}
+            stakeInputMountCountRef={stakeInputMountCountRef}
+            durationInputMountCountRef={durationInputMountCountRef}
+            onStakeAmountChange={handleStakeAmountChange}
+            onLockupDurationChange={handleLockupDurationChange}
+            onLockupDurationUnitChange={handleLockupDurationUnitChange}
+            onSetAmount={handleSetAmount}
+            onStake={handleStake}
+            onCancel={handleCancelStake}
+          />
         ) : (
           <div className="mb-4 flex gap-3">
             <button
