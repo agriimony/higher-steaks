@@ -820,7 +820,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 e.stopPropagation();
                 scrollToPrevious();
               }}
-              className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
+              className="absolute -left-10 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
               aria-label="Previous card"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -837,7 +837,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 e.stopPropagation();
                 scrollToNext();
               }}
-              className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
+              className="absolute right-10 top-1/2 -translate-y-1/2 z-10 bg-black/80 hover:bg-black text-white p-2 rounded-full transition"
               aria-label="Next card"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
