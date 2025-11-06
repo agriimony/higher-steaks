@@ -475,6 +475,32 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
   }, [customMessage, userFid]);
 
+  const handleBuyHigher = useCallback(async () => {
+    try {
+      const buyToken = "eip155:8453/erc20:0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe";
+      
+      console.log('[OnboardingModal] Opening swap for HIGHER token:', buyToken);
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const result = await sdk.actions.swapToken({
+        buyToken,
+      });
+      
+      console.log('[OnboardingModal] Swap result:', result);
+      
+      if (result.success) {
+        console.log('[OnboardingModal] Swap successful, transactions:', result.swap.transactions);
+        // Optionally refresh balance after successful swap
+        // The user can manually refresh or we can trigger a refresh here
+      } else if (result.reason !== 'rejected_by_user') {
+        alert('Swap failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('[OnboardingModal] Failed to open swap:', error);
+      alert('Failed to open swap. Please try again.');
+    }
+  }, []);
+
   const handleValidateAndUseCastUrl = useCallback(async () => {
     setUrlValidationError(null);
     setValidatingUrl(true);
@@ -811,8 +837,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         </h2>
         
         {/* Single card display with navigation arrows */}
-        <div className="mb-4 relative">
-          {/* Left arrow button - positioned outside and overlapping halfway */}
+        <div className="mb-4 relative" style={{ overflow: 'visible' }}>
+          {/* Left arrow button - positioned outside container, overlapping halfway */}
           {casts.length > 1 && activeCardIndex > 0 && (
             <button
               onClick={(e) => {
@@ -875,7 +901,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             </div>
           </div>
           
-          {/* Right arrow button - positioned outside and overlapping halfway */}
+          {/* Right arrow button - positioned outside container, overlapping halfway */}
           {casts.length > 1 && activeCardIndex < casts.length - 1 && (
             <button
               onClick={(e) => {
@@ -957,6 +983,13 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 </div>
               </button>
               <button
+                onClick={handleBuyHigher}
+                disabled={isLoadingTransaction}
+                className="flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Buy HIGHER
+              </button>
+              <button
                 onClick={() => {
                   setSelectedCastIndex(null);
                   setStakeError(null);
@@ -972,15 +1005,21 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             </div>
           </div>
         ) : (
-          <div className="mb-4">
+          <div className="mb-4 flex gap-3">
             <button
               onClick={() => {
                 setSelectedCastIndex(activeCardIndex);
                 setSelectedCastHash(currentCast.hash);
               }}
-              className="w-full px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+              className="flex-1 px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
             >
               Add stake
+            </button>
+            <button
+              onClick={handleBuyHigher}
+              className="flex-1 px-4 py-2 bg-purple-600 text-white text-xs font-bold border-2 border-purple-600 hover:bg-purple-700 transition"
+            >
+              Buy HIGHER
             </button>
           </div>
         )}
@@ -1040,7 +1079,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           </svg>
         </button>
         
-        <div className="overflow-y-auto flex-1 min-h-0">
+        <div className="overflow-y-auto flex-1 min-h-0 px-4 -mx-4">
         {loadingCasts ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
