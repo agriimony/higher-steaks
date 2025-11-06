@@ -130,6 +130,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const lockupDurationInputRef = useRef<HTMLInputElement>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   
+  
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
   
@@ -824,7 +825,45 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     </>
   ), [customMessage, castUrl, urlValidationError, validatingUrl, showCreateCast, handleQuickCast, handleValidateAndUseCastUrl]);
 
-  // Cast Cards View Component
+  // Memoized handlers for staking form to prevent re-renders
+  const handleStakeAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setStakeAmount(e.target.value);
+  }, []);
+
+  const handleLockupDurationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setLockupDuration(e.target.value);
+  }, []);
+
+  const handleLockupDurationUnitChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year');
+  }, []);
+
+  const handleSetAmount = useCallback((percentage: number) => {
+    const amount = percentage === 1 ? walletBalance : walletBalance * percentage;
+    setStakeAmount(amount.toFixed(2));
+    // Use setTimeout to ensure state update completes before focusing
+    setTimeout(() => {
+      stakeAmountInputRef.current?.focus();
+    }, 0);
+  }, [walletBalance]);
+
+  const handleCancelStake = useCallback(() => {
+    setSelectedCastIndex(null);
+    setStakeError(null);
+    setStakeAmount('');
+    setLockupDuration('');
+    setLockupDurationUnit('day');
+    setSelectedCastHash(null);
+  }, []);
+
+  const handleOpenStakeForm = useCallback((index: number, hash: string) => {
+    setSelectedCastIndex(index);
+    setSelectedCastHash(hash);
+  }, []);
+
+
+  // Cast Cards View Component - render directly without memoization
+  // The inputs are rendered separately to prevent focus loss
   const CastCardsView = () => {
     const currentCast = casts[activeCardIndex];
     
@@ -929,40 +968,30 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               <div className="flex gap-2">
                 <input
                   ref={stakeAmountInputRef}
-                  key={`stake-amount-${activeCardIndex}`}
                   type="text"
                   value={stakeAmount}
-                  onChange={(e) => setStakeAmount(e.target.value)}
+                  onChange={handleStakeAmountChange}
                   placeholder="0.00"
                   className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
                 />
                 <div className="flex gap-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      setStakeAmount((walletBalance * 0.25).toFixed(2));
-                      stakeAmountInputRef.current?.focus();
-                    }}
+                    onClick={() => handleSetAmount(0.25)}
                     className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
                   >
                     25%
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setStakeAmount((walletBalance * 0.5).toFixed(2));
-                      stakeAmountInputRef.current?.focus();
-                    }}
+                    onClick={() => handleSetAmount(0.5)}
                     className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
                   >
                     50%
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setStakeAmount(walletBalance.toFixed(2));
-                      stakeAmountInputRef.current?.focus();
-                    }}
+                    onClick={() => handleSetAmount(1)}
                     className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
                   >
                     Max
@@ -979,17 +1008,16 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               <div className="flex gap-2">
                 <input
                   ref={lockupDurationInputRef}
-                  key={`lockup-duration-${activeCardIndex}`}
                   type="number"
                   value={lockupDuration}
-                  onChange={(e) => setLockupDuration(e.target.value)}
+                  onChange={handleLockupDurationChange}
                   placeholder="1"
                   min="1"
                   className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
                 />
                 <select
                   value={lockupDurationUnit}
-                  onChange={(e) => setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year')}
+                  onChange={handleLockupDurationUnitChange}
                   className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
                 >
                   <option value="minute">Minute(s)</option>
@@ -1023,14 +1051,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 </div>
               </button>
               <button
-                onClick={() => {
-                  setSelectedCastIndex(null);
-                  setStakeError(null);
-                  setStakeAmount('');
-                  setLockupDuration('');
-                  setLockupDurationUnit('day');
-                  setSelectedCastHash(null);
-                }}
+                onClick={handleCancelStake}
                 className="px-4 py-2.5 bg-white text-black border-2 border-black/20 hover:border-black transition text-sm"
               >
                 Cancel
@@ -1040,10 +1061,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         ) : (
           <div className="mb-4 flex gap-3">
             <button
-              onClick={() => {
-                setSelectedCastIndex(activeCardIndex);
-                setSelectedCastHash(currentCast.hash);
-              }}
+              onClick={() => handleOpenStakeForm(activeCardIndex, currentCast.hash)}
               className="flex-1 px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
             >
               Add stake
