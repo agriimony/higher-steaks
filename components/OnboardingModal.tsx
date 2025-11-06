@@ -1064,8 +1064,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       </div>
     );
   }, (prevProps, nextProps) => {
-    // Custom comparison - only re-render if these specific props change
-    const shouldUpdate = 
+    // Custom comparison - we want to update when values change, but refs and callbacks should be stable
+    // The key is that React should UPDATE the inputs (change value prop) not REMOUNT them
+    const valuePropsChanged = 
       prevProps.stakeAmount !== nextProps.stakeAmount ||
       prevProps.lockupDuration !== nextProps.lockupDuration ||
       prevProps.lockupDurationUnit !== nextProps.lockupDurationUnit ||
@@ -1074,17 +1075,27 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       prevProps.walletBalance !== nextProps.walletBalance ||
       prevProps.castHash !== nextProps.castHash;
     
-    console.log('[StakingForm] Should update?', shouldUpdate, {
+    // Check if callbacks changed (they shouldn't if memoized properly)
+    const callbacksChanged = 
+      prevProps.onStakeAmountChange !== nextProps.onStakeAmountChange ||
+      prevProps.onLockupDurationChange !== nextProps.onLockupDurationChange ||
+      prevProps.onLockupDurationUnitChange !== nextProps.onLockupDurationUnitChange ||
+      prevProps.onSetAmount !== nextProps.onSetAmount ||
+      prevProps.onStake !== nextProps.onStake ||
+      prevProps.onCancel !== nextProps.onCancel;
+    
+    console.log('[StakingForm] Memo comparison:', {
+      valuePropsChanged,
+      callbacksChanged,
       stakeAmount: prevProps.stakeAmount !== nextProps.stakeAmount,
       lockupDuration: prevProps.lockupDuration !== nextProps.lockupDuration,
-      lockupDurationUnit: prevProps.lockupDurationUnit !== nextProps.lockupDurationUnit,
-      stakeError: prevProps.stakeError !== nextProps.stakeError,
-      isLoadingTransaction: prevProps.isLoadingTransaction !== nextProps.isLoadingTransaction,
-      walletBalance: prevProps.walletBalance !== nextProps.walletBalance,
-      castHash: prevProps.castHash !== nextProps.castHash
+      'prev stakeAmount': prevProps.stakeAmount,
+      'next stakeAmount': nextProps.stakeAmount
     });
     
-    return !shouldUpdate; // Return true to skip update, false to update
+    // Always allow updates - React should reconcile, not remount
+    // The issue is likely elsewhere (refs or component structure)
+    return false; // false = allow update (React will reconcile)
   });
 
   // Cast Cards View Component - render directly without memoization
