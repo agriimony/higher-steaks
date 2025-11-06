@@ -126,6 +126,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   
   // Card navigation state
   const castUrlInputRef = useRef<HTMLInputElement>(null);
+  const stakeAmountInputRef = useRef<HTMLInputElement>(null);
+  const lockupDurationInputRef = useRef<HTMLInputElement>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   
   // Wagmi hooks
@@ -849,7 +851,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-black/80 hover:bg-black text-white p-2 rounded-full transition shadow-lg"
               aria-label="Previous card"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 18l-6-6 6-6"/>
               </svg>
             </button>
@@ -912,7 +914,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 z-20 bg-black/80 hover:bg-black text-white p-2 rounded-full transition shadow-lg"
               aria-label="Next card"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 18l6-6-6-6"/>
               </svg>
             </button>
@@ -924,13 +926,49 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           <div className="mb-4">
             <div className="mb-3">
               <label className="text-xs text-black/70 mb-1 block">Amount (HIGHER)</label>
-              <input
-                type="text"
-                value={stakeAmount}
-                onChange={(e) => setStakeAmount(e.target.value)}
-                placeholder="0.00"
-                className="w-full text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
-              />
+              <div className="flex gap-2">
+                <input
+                  ref={stakeAmountInputRef}
+                  key={`stake-amount-${activeCardIndex}`}
+                  type="text"
+                  value={stakeAmount}
+                  onChange={(e) => setStakeAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
+                />
+                <div className="flex gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStakeAmount((walletBalance * 0.25).toFixed(2));
+                      stakeAmountInputRef.current?.focus();
+                    }}
+                    className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
+                  >
+                    25%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStakeAmount((walletBalance * 0.5).toFixed(2));
+                      stakeAmountInputRef.current?.focus();
+                    }}
+                    className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
+                  >
+                    50%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStakeAmount(walletBalance.toFixed(2));
+                      stakeAmountInputRef.current?.focus();
+                    }}
+                    className="px-2 py-1 text-xs font-mono bg-white border border-black/20 hover:border-black text-black transition"
+                  >
+                    Max
+                  </button>
+                </div>
+              </div>
               <div className="text-xs text-black/50 mt-1">
                 Available: {walletBalance.toFixed(2)} HIGHER
               </div>
@@ -940,6 +978,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               <label className="text-xs text-black/70 mb-1 block">Duration</label>
               <div className="flex gap-2">
                 <input
+                  ref={lockupDurationInputRef}
+                  key={`lockup-duration-${activeCardIndex}`}
                   type="number"
                   value={lockupDuration}
                   onChange={(e) => setLockupDuration(e.target.value)}
@@ -981,13 +1021,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 <div className="absolute bottom-full left-0 mb-2 w-72 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                   Uses mint.club lockup contracts for secure token staking (<a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">https://mint.club/lockup/create</a>)
                 </div>
-              </button>
-              <button
-                onClick={handleBuyHigher}
-                disabled={isLoadingTransaction}
-                className="flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Buy HIGHER
               </button>
               <button
                 onClick={() => {
