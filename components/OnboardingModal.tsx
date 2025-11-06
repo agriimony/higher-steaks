@@ -143,6 +143,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     args: wagmiAddress && !showCreateCast && casts.length > 0 ? [wagmiAddress, LOCKUP_CONTRACT] : undefined,
     query: {
       enabled: !!wagmiAddress && !showCreateCast && casts.length > 0,
+      refetchInterval: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
     },
   });
   
@@ -214,6 +217,13 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               }
               return acc;
             }, []);
+            
+            // Only update if hashes actually changed
+            const prevHashes = prevCasts.map((c: CastCard) => c.hash).sort().join(',');
+            const newHashes = uniqueCasts.map((c: CastCard) => c.hash).sort().join(',');
+            if (prevHashes === newHashes) {
+              return prevCasts; // Return previous array reference if hashes unchanged
+            }
             
             return uniqueCasts;
           });
@@ -404,6 +414,13 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 return acc;
               }, []);
               
+              // Only update if hashes actually changed
+              const prevHashes = prevCasts.map((c: CastCard) => c.hash).sort().join(',');
+              const newHashes = uniqueCasts.map((c: CastCard) => c.hash).sort().join(',');
+              if (prevHashes === newHashes) {
+                return prevCasts; // Return previous array reference if hashes unchanged
+              }
+              
               return uniqueCasts;
             });
             
@@ -473,7 +490,16 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setCasts(prevCasts => {
           // Remove any existing temporary cast with same hash
           const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
-          return [newCast, ...filtered];
+          const newCasts = [newCast, ...filtered];
+          
+          // Only update if hashes actually changed
+          const prevHashes = prevCasts.map(c => c.hash).sort().join(',');
+          const newHashes = newCasts.map(c => c.hash).sort().join(',');
+          if (prevHashes === newHashes) {
+            return prevCasts; // Return previous array reference if hashes unchanged
+          }
+          
+          return newCasts;
         });
         setTemporaryNewCast(newCast);
         setShowCreateCast(false);
@@ -595,7 +621,16 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setCasts(prevCasts => {
           // Remove any existing temporary cast with same hash
           const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
-          return [newCast, ...filtered];
+          const newCasts = [newCast, ...filtered];
+          
+          // Only update if hashes actually changed
+          const prevHashes = prevCasts.map(c => c.hash).sort().join(',');
+          const newHashes = newCasts.map(c => c.hash).sort().join(',');
+          if (prevHashes === newHashes) {
+            return prevCasts; // Return previous array reference if hashes unchanged
+          }
+          
+          return newCasts;
         });
         setTemporaryNewCast(newCast);
         setShowCreateCast(false);
@@ -871,10 +906,71 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const renderCountRef = useRef(0);
   const stakeInputMountCountRef = useRef(0);
   const durationInputMountCountRef = useRef(0);
+  const prevPropsRef = useRef<{
+    casts: CastCard[];
+    activeCardIndex: number;
+    selectedCastIndex: number | null;
+    stakeAmount: string;
+    lockupDuration: string;
+    lockupDurationUnit: string;
+    showCreateCast: boolean;
+    loadingCasts: boolean;
+    walletBalance: number;
+  } | null>(null);
   
   useEffect(() => {
     renderCountRef.current += 1;
-    console.log('[OnboardingModal] Component render count:', renderCountRef.current);
+    const currentProps = {
+      casts,
+      activeCardIndex,
+      selectedCastIndex,
+      stakeAmount,
+      lockupDuration,
+      lockupDurationUnit,
+      showCreateCast,
+      loadingCasts,
+      walletBalance,
+    };
+    
+    if (prevPropsRef.current) {
+      const changed: string[] = [];
+      if (prevPropsRef.current.casts.length !== currentProps.casts.length) {
+        changed.push(`casts.length: ${prevPropsRef.current.casts.length} → ${currentProps.casts.length}`);
+      }
+      if (prevPropsRef.current.casts.map(c => c.hash).join(',') !== currentProps.casts.map(c => c.hash).join(',')) {
+        changed.push('casts.hashes changed');
+      }
+      if (prevPropsRef.current.activeCardIndex !== currentProps.activeCardIndex) {
+        changed.push(`activeCardIndex: ${prevPropsRef.current.activeCardIndex} → ${currentProps.activeCardIndex}`);
+      }
+      if (prevPropsRef.current.selectedCastIndex !== currentProps.selectedCastIndex) {
+        changed.push(`selectedCastIndex: ${prevPropsRef.current.selectedCastIndex} → ${currentProps.selectedCastIndex}`);
+      }
+      if (prevPropsRef.current.stakeAmount !== currentProps.stakeAmount) {
+        changed.push(`stakeAmount: "${prevPropsRef.current.stakeAmount}" → "${currentProps.stakeAmount}"`);
+      }
+      if (prevPropsRef.current.lockupDuration !== currentProps.lockupDuration) {
+        changed.push(`lockupDuration: "${prevPropsRef.current.lockupDuration}" → "${currentProps.lockupDuration}"`);
+      }
+      if (prevPropsRef.current.lockupDurationUnit !== currentProps.lockupDurationUnit) {
+        changed.push(`lockupDurationUnit: ${prevPropsRef.current.lockupDurationUnit} → ${currentProps.lockupDurationUnit}`);
+      }
+      if (prevPropsRef.current.showCreateCast !== currentProps.showCreateCast) {
+        changed.push(`showCreateCast: ${prevPropsRef.current.showCreateCast} → ${currentProps.showCreateCast}`);
+      }
+      if (prevPropsRef.current.loadingCasts !== currentProps.loadingCasts) {
+        changed.push(`loadingCasts: ${prevPropsRef.current.loadingCasts} → ${currentProps.loadingCasts}`);
+      }
+      if (prevPropsRef.current.walletBalance !== currentProps.walletBalance) {
+        changed.push(`walletBalance: ${prevPropsRef.current.walletBalance} → ${currentProps.walletBalance}`);
+      }
+      
+      console.log(`[OnboardingModal] Render #${renderCountRef.current} - Changed:`, changed.length > 0 ? changed.join(', ') : 'none');
+    } else {
+      console.log(`[OnboardingModal] Render #${renderCountRef.current} - Initial render`);
+    }
+    
+    prevPropsRef.current = currentProps;
   });
   
   useEffect(() => {

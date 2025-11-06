@@ -13,6 +13,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
+    "tsBuildInfoFile": "D:/higher-steaks-tsbuildinfo.tsbuildinfo",
     "plugins": [
       {
         "name": "next"
