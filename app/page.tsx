@@ -100,9 +100,6 @@ export default function HigherSteakMenu() {
   const [pixelDensity, setPixelDensity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(0);
   
-  // Global countdown timer state - persists across modal opens/closes
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  
   // Event subscriptions for real-time updates (via SSE/CDP webhooks)
   const { address: wagmiAddress } = useAccount();
   const wsEnabled = user !== null && !isDevelopmentMode;
@@ -125,15 +122,6 @@ export default function HigherSteakMenu() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showFidSwitcher]);
-  
-  // Global countdown timer - runs continuously
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setElapsedSeconds(prev => prev + 1);
-    }, 1000);
-    
-    return () => clearInterval(interval);
-  }, []);
   
   // Extract staking details and calculate staked balance from balance data (single source of truth)
   const updateStakingDetailsFromBalance = (balanceData: TokenBalance) => {
@@ -172,9 +160,6 @@ export default function HigherSteakMenu() {
   // Handle stake success: refresh balance to get the new lockup
   const handleStakeSuccess = useCallback(() => {
     console.log('[Stake Success] Refreshing balance and staking details');
-    
-    // Reset the elapsed counter
-    setElapsedSeconds(0);
     
     // Refresh balance and staking details from API to get the new lockup
     if (user?.fid) {
