@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS leaderboard_entries (
   supporter_stake_amounts NUMERIC[] DEFAULT '{}',
   supporter_stake_fids INTEGER[] DEFAULT '{}',
   supporter_stake_pfps TEXT[] DEFAULT '{}',
+  supporter_stake_unlock_times INTEGER[] DEFAULT '{}',
+  caster_stake_unlocked BOOLEAN[] DEFAULT '{}',
+  supporter_stake_unlocked BOOLEAN[] DEFAULT '{}',
   cast_state VARCHAR(20) DEFAULT 'higher' -- 'invalid', 'valid', 'higher', or 'expired'
 );
 

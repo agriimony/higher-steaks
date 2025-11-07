@@ -48,14 +48,16 @@ export async function GET(
 
     const currentTime = Math.floor(Date.now() / 1000);
 
-    // Filter valid caster stakes (currentTime < unlockTime)
+    // Filter valid caster stakes (not unlocked and currentTime < unlockTime)
+    const casterStakeUnlocked = castData.casterStakeUnlocked || [];
     const validCasterStakes = castData.casterStakeLockupIds
       .map((lockupId, index) => ({
         lockupId,
         amount: castData.casterStakeAmounts[index] || '0',
         unlockTime: castData.casterStakeUnlockTimes[index] || 0,
+        unlocked: casterStakeUnlocked[index] || false,
       }))
-      .filter(stake => stake.unlockTime > currentTime);
+      .filter(stake => !stake.unlocked && stake.unlockTime > currentTime);
 
     // Calculate min and max caster unlock times
     const validCasterUnlockTimes = validCasterStakes.map(s => s.unlockTime);
@@ -71,18 +73,37 @@ export async function GET(
       return sum + BigInt(stake.amount);
     }, BigInt(0)).toString();
 
-    // Aggregate supporter stakes per FID
+    // Filter valid supporter stakes using unlock times
+    // Supporter stakes are valid if:
+    // 1. currentTime < unlockTime (not expired)
+    // 2. unlockTime > minCasterUnlockTime (unlocks after earliest caster stake)
+    const supporterStakeUnlockTimes = castData.supporterStakeUnlockTimes || [];
+    const supporterStakeUnlocked = castData.supporterStakeUnlocked || [];
+    
+    // Filter supporter stakes by unlock time and unlocked status
+    const validSupporterStakeIndices: number[] = [];
+    for (let i = 0; i < castData.supporterStakeLockupIds.length; i++) {
+      const unlockTime = supporterStakeUnlockTimes[i] || 0;
+      const unlocked = supporterStakeUnlocked[i] || false;
+      
+      // Valid if: not unlocked, not expired, and unlocks after min caster unlock time
+      if (!unlocked && unlockTime > currentTime && unlockTime > minCasterUnlockTime) {
+        validSupporterStakeIndices.push(i);
+      }
+    }
+    
+    // Build filtered arrays for aggregation
+    const validSupporterStakeFids = validSupporterStakeIndices.map(i => castData.supporterStakeFids[i] || 0);
+    const validSupporterStakeAmounts = validSupporterStakeIndices.map(i => castData.supporterStakeAmounts[i] || '0');
+    const validSupporterStakePfps = validSupporterStakeIndices.map(i => castData.supporterStakePfps[i] || '');
+    
+    // Aggregate supporter stakes per FID (only valid ones)
     const aggregatedSupporterStakes = aggregateSupporterStakes(
-      castData.supporterStakeFids,
-      castData.supporterStakeAmounts,
-      castData.supporterStakePfps
+      validSupporterStakeFids,
+      validSupporterStakeAmounts,
+      validSupporterStakePfps
     );
-
-    // Note: We don't have unlock times for supporter stakes in the database yet
-    // For now, we'll include all supporter stakes. This will be enhanced when
-    // we add supporter_stake_unlock_times column to filter by both conditions:
-    // 1. currentTime < unlockTime
-    // 2. unlockTime > minCasterUnlockTime
+    
     const validSupporterStakes = aggregatedSupporterStakes;
 
     // Calculate total supporter staked

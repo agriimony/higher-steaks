@@ -173,32 +173,39 @@ export async function getStakesForCast(castHash: string): Promise<{
 
   const currentTime = Math.floor(Date.now() / 1000);
 
-  // Filter valid caster stakes (currentTime < unlockTime)
+  // Filter valid caster stakes (not unlocked and currentTime < unlockTime)
+  const casterStakeUnlocked = cast.casterStakeUnlocked || [];
   const casterStakes = cast.casterStakeLockupIds
     .map((lockupId, index) => ({
       lockupId: lockupId.toString(),
       amount: cast.casterStakeAmounts[index] || '0',
       unlockTime: cast.casterStakeUnlockTimes[index] || 0,
+      unlocked: casterStakeUnlocked[index] || false,
     }))
-    .filter(stake => stake.unlockTime > currentTime);
+    .filter(stake => !stake.unlocked && stake.unlockTime > currentTime);
 
   // Filter valid supporter stakes (unlockTime > min caster stake unlockTime)
   const minCasterUnlockTime = cast.casterStakeUnlockTimes.length > 0
     ? Math.min(...cast.casterStakeUnlockTimes.filter(t => t > currentTime))
     : 0;
 
+  const supporterStakeUnlockTimes = cast.supporterStakeUnlockTimes || [];
+  const supporterStakeUnlocked = cast.supporterStakeUnlocked || [];
+
   const supporterStakes = cast.supporterStakeLockupIds
     .map((lockupId, index) => ({
       lockupId: lockupId.toString(),
       amount: cast.supporterStakeAmounts[index] || '0',
       fid: cast.supporterStakeFids[index] || 0,
+      unlockTime: supporterStakeUnlockTimes[index] || 0,
+      unlocked: supporterStakeUnlocked[index] || false,
     }))
-    .filter((_, index) => {
-      // Note: We'd need to store unlock times for supporter stakes to properly filter
-      // Supporter stakes are only valid if unlockTime > min caster stake unlockTime
-      // For now, we'll include all supporter stakes since unlock times aren't stored
-      // This should be enhanced when we add supporter_stake_unlock_times column
-      return true;
+    .filter((stake, index) => {
+      // Supporter stakes are valid if:
+      // 1. Not unlocked
+      // 2. Not expired (currentTime < unlockTime)
+      // 3. Unlocks after min caster stake unlockTime
+      return !stake.unlocked && stake.unlockTime > currentTime && stake.unlockTime > minCasterUnlockTime;
     });
 
   return { casterStakes, supporterStakes };

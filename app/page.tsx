@@ -123,47 +123,77 @@ export default function HigherSteakMenu() {
     };
   }, [showFidSwitcher]);
   
-  // Extract staking details and calculate staked balance from balance data (single source of truth)
-  const updateStakingDetailsFromBalance = (balanceData: TokenBalance) => {
-    if (balanceData.lockups && balanceData.wallets) {
-      console.log('[Staking Details Update] Updating with lockups:', {
-        lockupCount: balanceData.lockups.length,
-        lockupIds: balanceData.lockups.map(l => l.lockupId),
-        walletCount: balanceData.wallets.length
-      });
-      
-      setStakingDetails({
-        lockups: balanceData.lockups,
-        wallets: balanceData.wallets,
-      });
+  // Fetch staking details from /api/user/stakes endpoint
+  const fetchStakingDetails = async (fid: number) => {
+    console.log('[Staking Details] Fetching from /api/user/stakes for fid:', fid);
+    setLoadingStakingDetails(true);
+    try {
+      const response = await fetch(`/api/user/stakes?fid=${fid}`);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[Staking Details] Received lockups:', {
+          lockupCount: data.lockups?.length || 0,
+          lockupIds: data.lockups?.map((l: LockupDetail) => l.lockupId) || []
+        });
+        
+        // Calculate total staked balance from lockups (sum of all locked amounts)
+        const totalStaked = (data.lockups || []).reduce((sum: number, lockup: LockupDetail) => {
+          const amountWei = BigInt(lockup.amount || '0');
+          const divisor = BigInt(10 ** 18);
+          const wholePart = Number(amountWei / divisor);
+          const fractionalPart = Number(amountWei % divisor) / Number(divisor);
+          return sum + wholePart + fractionalPart;
+        }, 0);
+        
+        setStakingBalance({
+          totalStakedFormatted: totalStaked.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }),
+        });
+        
+        // Note: wallets are still fetched from /api/user/balance
+        // We only get lockups from /api/user/stakes
+        setStakingDetails({
+          lockups: data.lockups || [],
+          wallets: [], // Will be set from balance data
+        });
+      } else {
+        console.error('[Staking Details] Failed to fetch stakes, status:', response.status);
+        setStakingDetails({ lockups: [], wallets: [] });
+      }
+    } catch (error) {
+      console.error('[Staking Details] Error:', error);
+      setStakingDetails({ lockups: [], wallets: [] });
+    } finally {
       setLoadingStakingDetails(false);
-      
-      // Calculate total staked balance from lockups (sum of all locked amounts)
-      // Use the raw amount string (in wei) for precision
-      const totalStaked = balanceData.lockups.reduce((sum, lockup) => {
-        const amountWei = BigInt(lockup.amount || '0');
-        const divisor = BigInt(10 ** 18);
-        const wholePart = Number(amountWei / divisor);
-        const fractionalPart = Number(amountWei % divisor) / Number(divisor);
-        return sum + wholePart + fractionalPart;
-      }, 0);
-      
-      setStakingBalance({
-        totalStakedFormatted: totalStaked.toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }),
-      });
     }
   };
   
-  // Handle stake success: refresh balance to get the new lockup
+  // Extract staking details and calculate staked balance from balance data (single source of truth)
+  // Updated to only extract wallets, lockups come from /api/user/stakes
+  const updateStakingDetailsFromBalance = (balanceData: TokenBalance) => {
+    if (balanceData.wallets) {
+      console.log('[Staking Details Update] Updating wallets:', {
+        walletCount: balanceData.wallets.length
+      });
+      
+      // Update wallets, keep existing lockups from /api/user/stakes
+      setStakingDetails(prev => ({
+        lockups: prev?.lockups || [],
+        wallets: balanceData.wallets || [],
+      }));
+    }
+  };
+  
+  // Handle stake success: refresh balance and staking details to get the new lockup
   const handleStakeSuccess = useCallback(() => {
     console.log('[Stake Success] Refreshing balance and staking details');
     
     // Refresh balance and staking details from API to get the new lockup
     if (user?.fid) {
       fetchTokenBalance(user.fid);
+      fetchStakingDetails(user.fid);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.fid]);
@@ -171,7 +201,6 @@ export default function HigherSteakMenu() {
   const fetchTokenBalance = async (fid: number) => {
     console.log('[fetchTokenBalance] Called for fid:', fid);
     setLoadingBalance(true);
-    setLoadingStakingDetails(true);
     setBalanceError(null);
     try {
       const response = await fetch(`/api/user/balance?fid=${fid}`);
@@ -183,7 +212,7 @@ export default function HigherSteakMenu() {
           higherLogoUrl: balanceData.higherLogoUrl
         });
         setBalance(balanceData);
-        // Extract staking details from the same response (single source of truth)
+        // Extract wallets from balance response (lockups come from /api/user/stakes)
         updateStakingDetailsFromBalance(balanceData);
       } else {
         console.error('[fetchTokenBalance] Failed to fetch balance, status:', response.status);
@@ -310,10 +339,10 @@ export default function HigherSteakMenu() {
           console.log('Profile data:', profileData);
           setUser(profileData);
           
-          // Fetch token balance and cast data after getting user profile
-          // Balance API now includes lockups and wallets (single source of truth)
-          // Staking balance is calculated from lockups in the response
+          // Fetch token balance, staking details, and cast data after getting user profile
+          // Staking details come from /api/user/stakes, wallets from /api/user/balance
           fetchTokenBalance(fid);
+          fetchStakingDetails(fid);
           fetchCastData(fid);
         } else {
           console.error('Failed to fetch profile');
@@ -480,8 +509,9 @@ export default function HigherSteakMenu() {
       if (isRelevant) {
         console.log('[Event] Lockup involves current user, refreshing balance and leaderboard');
         
-        // Refresh balance
+        // Refresh balance and staking details
         fetchTokenBalance(user.fid);
+        fetchStakingDetails(user.fid);
         
         // Refresh leaderboard
         fetch('/api/leaderboard/refresh', {
@@ -558,8 +588,9 @@ export default function HigherSteakMenu() {
       if (isRelevant) {
         console.log('[Event] Unlock involves current user, refreshing balance');
         
-        // Refresh balance (unlock doesn't affect leaderboard, only individual balance)
+        // Refresh balance and staking details (unlock doesn't affect leaderboard, only individual balance)
         fetchTokenBalance(user.fid);
+        fetchStakingDetails(user.fid);
       } else {
         console.log('[Unlock Event] Event not relevant to current user');
       }
@@ -629,6 +660,7 @@ export default function HigherSteakMenu() {
           onRefresh={() => {
             if (user?.fid) {
               fetchTokenBalance(user.fid);
+              fetchStakingDetails(user.fid);
             }
           }}
         />
@@ -645,9 +677,10 @@ export default function HigherSteakMenu() {
           userFid={simulatedFid !== null ? simulatedFid : (user?.fid || null)}
           walletBalance={getWalletBalance()}
           onStakeSuccess={() => {
-            // Refresh balance and leaderboard
+            // Refresh balance, staking details, and leaderboard
             if (user?.fid) {
               fetchTokenBalance(user.fid);
+              fetchStakingDetails(user.fid);
             }
             // Refresh leaderboard
             fetch('/api/leaderboard/refresh', {

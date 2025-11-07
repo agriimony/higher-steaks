@@ -15,10 +15,13 @@ export interface HigherCastData {
   casterStakeLockupIds: number[];
   casterStakeAmounts: string[];
   casterStakeUnlockTimes: number[];
+  casterStakeUnlocked: boolean[];
   supporterStakeLockupIds: number[];
   supporterStakeAmounts: string[];
   supporterStakeFids: number[];
   supporterStakePfps: string[];
+  supporterStakeUnlockTimes: number[];
+  supporterStakeUnlocked: boolean[];
   castState: 'invalid' | 'valid' | 'higher' | 'expired';
 }
 
@@ -43,10 +46,13 @@ export async function getHigherCast(hash: string): Promise<HigherCastData | null
         caster_stake_lockup_ids,
         caster_stake_amounts,
         caster_stake_unlock_times,
+        caster_stake_unlocked,
         supporter_stake_lockup_ids,
         supporter_stake_amounts,
         supporter_stake_fids,
         supporter_stake_pfps,
+        supporter_stake_unlock_times,
+        supporter_stake_unlocked,
         cast_state
       FROM leaderboard_entries
       WHERE cast_hash = ${hash}
@@ -73,10 +79,13 @@ export async function getHigherCast(hash: string): Promise<HigherCastData | null
       casterStakeLockupIds: row.caster_stake_lockup_ids || [],
       casterStakeAmounts: row.caster_stake_amounts?.map((a: any) => a.toString()) || [],
       casterStakeUnlockTimes: row.caster_stake_unlock_times || [],
+      casterStakeUnlocked: row.caster_stake_unlocked || [],
       supporterStakeLockupIds: row.supporter_stake_lockup_ids || [],
       supporterStakeAmounts: row.supporter_stake_amounts?.map((a: any) => a.toString()) || [],
       supporterStakeFids: row.supporter_stake_fids || [],
       supporterStakePfps: row.supporter_stake_pfps || [],
+      supporterStakeUnlockTimes: row.supporter_stake_unlock_times || [],
+      supporterStakeUnlocked: row.supporter_stake_unlocked || [],
       castState: (row.cast_state || 'higher') as 'invalid' | 'valid' | 'higher' | 'expired',
     };
   } catch (error) {
@@ -125,10 +134,13 @@ export async function upsertHigherCast(data: {
   casterStakeLockupIds?: number[];
   casterStakeAmounts?: string[];
   casterStakeUnlockTimes?: number[];
+  casterStakeUnlocked?: boolean[];
   supporterStakeLockupIds?: number[];
   supporterStakeAmounts?: string[];
   supporterStakeFids?: number[];
   supporterStakePfps?: string[]; // Array of PFP URLs corresponding to supporter_stake_fids (same order)
+  supporterStakeUnlockTimes?: number[];
+  supporterStakeUnlocked?: boolean[];
   stakerFids?: number[]; // For backward compatibility: [creator_fid, ...supporter_stake_fids]
   castState?: 'invalid' | 'valid' | 'higher' | 'expired';
 }): Promise<void> {
@@ -156,10 +168,13 @@ export async function upsertHigherCast(data: {
         caster_stake_lockup_ids,
         caster_stake_amounts,
         caster_stake_unlock_times,
+        caster_stake_unlocked,
         supporter_stake_lockup_ids,
         supporter_stake_amounts,
         supporter_stake_fids,
         supporter_stake_pfps,
+        supporter_stake_unlock_times,
+        supporter_stake_unlocked,
         cast_state,
         updated_at
       ) VALUES (
@@ -178,10 +193,13 @@ export async function upsertHigherCast(data: {
         ${(data.casterStakeLockupIds || []) as any},
         ${(data.casterStakeAmounts || []) as any},
         ${(data.casterStakeUnlockTimes || []) as any},
+        ${(data.casterStakeUnlocked || []) as any},
         ${(data.supporterStakeLockupIds || []) as any},
         ${(data.supporterStakeAmounts || []) as any},
         ${(data.supporterStakeFids || []) as any},
         ${(data.supporterStakePfps || []) as any},
+        ${(data.supporterStakeUnlockTimes || []) as any},
+        ${(data.supporterStakeUnlocked || []) as any},
         ${data.castState || 'higher'},
         NOW()
       )
@@ -200,10 +218,13 @@ export async function upsertHigherCast(data: {
         caster_stake_lockup_ids = EXCLUDED.caster_stake_lockup_ids,
         caster_stake_amounts = EXCLUDED.caster_stake_amounts,
         caster_stake_unlock_times = EXCLUDED.caster_stake_unlock_times,
+        caster_stake_unlocked = EXCLUDED.caster_stake_unlocked,
         supporter_stake_lockup_ids = EXCLUDED.supporter_stake_lockup_ids,
         supporter_stake_amounts = EXCLUDED.supporter_stake_amounts,
         supporter_stake_fids = EXCLUDED.supporter_stake_fids,
         supporter_stake_pfps = EXCLUDED.supporter_stake_pfps,
+        supporter_stake_unlock_times = EXCLUDED.supporter_stake_unlock_times,
+        supporter_stake_unlocked = EXCLUDED.supporter_stake_unlocked,
         cast_state = EXCLUDED.cast_state,
         updated_at = NOW()
     `;

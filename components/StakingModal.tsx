@@ -125,13 +125,73 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   }, [onClose]);
 
   // Fetch cast text for all lockups when lockups change
+  // Updated validation logic: check DB first, then Neynar, show Invalid cast if both fail
   useEffect(() => {
     lockups.forEach(async (lockup) => {
       if (isValidCastHash(lockup.title)) {
-        const castData = await fetchValidCast(lockup.title);
+        const castHash = lockup.title;
+        
+        // Step 1: Check if cast exists in database
+        try {
+          const dbResponse = await fetch(`/api/cast/${castHash}`);
+          if (dbResponse.ok) {
+            const dbData = await dbResponse.json();
+            
+            // If cast_state is 'higher' or 'expired', use DB data
+            if (dbData.state === 'higher' || dbData.state === 'expired') {
+              setCastTexts(prev => ({
+                ...prev,
+                [lockup.lockupId]: dbData.description ? truncateCastText(dbData.description) : null,
+              }));
+              return;
+            }
+            
+            // If cast_state is 'valid' or 'invalid', fallback to Neynar validation
+            if (dbData.state === 'valid' || dbData.state === 'invalid') {
+              const neynarResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
+              if (neynarResponse.ok) {
+                const neynarData = await neynarResponse.json();
+                if (neynarData.valid && neynarData.description) {
+                  setCastTexts(prev => ({
+                    ...prev,
+                    [lockup.lockupId]: truncateCastText(neynarData.description),
+                  }));
+                  return;
+                }
+              }
+              // Neynar validation failed, show Invalid cast
+              setCastTexts(prev => ({
+                ...prev,
+                [lockup.lockupId]: 'Invalid cast',
+              }));
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('[StakingModal] Error checking DB for cast:', error);
+        }
+        
+        // Step 2: If not found in DB, call /api/validate-cast (Neynar fallback)
+        try {
+          const validateResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
+          if (validateResponse.ok) {
+            const validateData = await validateResponse.json();
+            if (validateData.valid && validateData.description) {
+              setCastTexts(prev => ({
+                ...prev,
+                [lockup.lockupId]: truncateCastText(validateData.description),
+              }));
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('[StakingModal] Error validating cast via Neynar:', error);
+        }
+        
+        // Step 3: If both fail, display "Invalid cast"
         setCastTexts(prev => ({
           ...prev,
-          [lockup.lockupId]: castData ? truncateCastText(castData.description) : null,
+          [lockup.lockupId]: 'Invalid cast',
         }));
       }
     });
