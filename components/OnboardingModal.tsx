@@ -97,6 +97,15 @@ function calculateStakeTotals(
 }
 
 export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSuccess }: OnboardingModalProps) {
+  // Helper function to normalize hash format (ensure 0x prefix and lowercase)
+  const normalizeHash = useCallback((hash: string): string => {
+    if (!hash) return hash;
+    if (!hash.startsWith('0x') && /^[a-fA-F0-9]+$/.test(hash)) {
+      return '0x' + hash;
+    }
+    return hash.toLowerCase();
+  }, []);
+
   // Cast cards state
   const [casts, setCasts] = useState<CastCard[]>([]);
   const [loadingCasts, setLoadingCasts] = useState(true);
@@ -402,6 +411,9 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       // If result contains cast hash, create temporary cast card
       if (result?.cast?.hash && result?.cast?.text) {
         
+        // Normalize hash format (ensure 0x prefix)
+        const castHash = normalizeHash(result.cast.hash);
+        
         // Extract description from cast text
         const keyphraseMatch = result.cast.text.match(/started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i);
         const description = keyphraseMatch && keyphraseMatch[1] 
@@ -410,7 +422,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         
         // Create temporary cast card
         const newCast: CastCard = {
-          hash: result.cast.hash,
+          hash: castHash,
           text: result.cast.text,
           description: description,
           timestamp: new Date().toISOString(),
@@ -522,9 +534,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setUrlValidationError(null);
         setCastUrl('');
         
+        // Normalize hash format (ensure 0x prefix)
+        const castHash = normalizeHash(data.hash);
+        
         // Create temporary cast card from validation response
         const newCast: CastCard = {
-          hash: data.hash,
+          hash: castHash,
           text: data.castText || '',
           description: data.description || '',
           timestamp: data.timestamp || new Date().toISOString(),
@@ -577,26 +592,65 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       return;
     }
 
-    // Validate that cast exists and belongs to user (caster-only staking)
+    // Normalize hash format for comparison
+    const normalizedCastHash = normalizeHash(castHash);
+    console.log('[handleStake] Validating cast:', { castHash, normalizedCastHash, userFid });
+
+    // Check if cast exists in local state (for reference, but we'll still validate via Neynar)
+    const localCast = casts.find(c => normalizeHash(c.hash) === normalizedCastHash);
+    console.log('[handleStake] Local cast found:', !!localCast);
+    
+    // Always validate via Neynar to ensure cast exists, belongs to user, and is valid
     try {
-      const castResponse = await fetch(`/api/cast/${castHash}`);
-      if (castResponse.ok) {
-        const castInfo = await castResponse.json();
-        if (castInfo.fid !== userFid) {
-          setStakeError('Only the caster can stake on their own cast');
-          return;
-        }
-        // Check cast state - must be 'valid' or 'higher' (expired casts can be re-staked)
-        if (castInfo.state && castInfo.state !== 'valid' && castInfo.state !== 'higher' && castInfo.state !== 'expired') {
-          setStakeError('Cast is not valid for staking');
-          return;
-        }
-      } else if (castResponse.status === 404) {
+      const validateResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(normalizedCastHash)}&isUrl=false`);
+      
+      if (!validateResponse.ok) {
+        console.error('[handleStake] Validation request failed:', validateResponse.status, validateResponse.statusText);
+        setStakeError('Failed to validate cast. Please try again.');
+        return;
+      }
+
+      const validateData = await validateResponse.json();
+      console.log('[handleStake] Validation response:', { 
+        valid: validateData.valid, 
+        fid: validateData.fid, 
+        state: validateData.state,
+        hash: validateData.hash 
+      });
+      
+      if (!validateData.valid) {
         setStakeError('Higher cast not found. Please create a valid cast first.');
         return;
       }
+
+      // Validate ownership - only the caster can stake on their own cast
+      if (validateData.fid !== userFid) {
+        console.warn('[handleStake] Ownership mismatch:', { validateFid: validateData.fid, userFid });
+        setStakeError('Only the caster can stake on their own cast');
+        return;
+      }
+
+      // Check cast state - must be 'valid' or 'higher' (expired casts can be re-staked)
+      // Note: Neynar-validated casts will have state 'valid' since they're not in DB yet
+      if (validateData.state && validateData.state !== 'valid' && validateData.state !== 'higher' && validateData.state !== 'expired') {
+        setStakeError('Cast is not valid for staking');
+        return;
+      }
+
+      // If we have local cast state, sync it with the validated state from Neynar/DB
+      // This ensures local state stays in sync with the source of truth
+      if (localCast && localCast.castState !== validateData.state) {
+        setCasts(prevCasts => 
+          prevCasts.map(c => 
+            normalizeHash(c.hash) === normalizedCastHash 
+              ? { ...c, castState: validateData.state as 'valid' | 'higher' | 'expired' }
+              : c
+          )
+        );
+      }
     } catch (error) {
-      setStakeError('Failed to validate cast ownership');
+      console.error('[handleStake] Validation error:', error);
+      setStakeError('Failed to validate cast ownership. Please try again.');
       return;
     }
 
@@ -638,7 +692,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
       // Store params for createLockUp (will be called after approve succeeds or if already approved)
       setCreateLockUpParams({ amountWei, unlockTime });
-      setSelectedCastHash(castHash);
+      setSelectedCastHash(normalizedCastHash);
 
       // Step 1: Check if we need to approve (only approve if current allowance is insufficient)
       const allowance = currentAllowance || BigInt(0);
@@ -661,7 +715,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
                 amountWei,
                 unlockTime,
                 wagmiAddress,
-                castHash // Use cast hash as title
+                normalizedCastHash // Use normalized cast hash as title
               ],
             });
           } catch (error: any) {
@@ -815,8 +869,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   const handleOpenStakeForm = useCallback((index: number, hash: string) => {
     setSelectedCastIndex(index);
-    setSelectedCastHash(hash);
-  }, []);
+    setSelectedCastHash(normalizeHash(hash));
+  }, [normalizeHash]);
 
 
   // Separate StakingForm component - memoized to prevent remounting
