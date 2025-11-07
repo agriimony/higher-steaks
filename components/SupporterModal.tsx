@@ -129,24 +129,105 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
   }, [onClose]);
 
   // Fetch cast data on mount
+  // Updated validation logic: check DB first, then Neynar, show error if both fail
   useEffect(() => {
     const fetchCastData = async () => {
       setLoading(true);
       setError(null);
+      
       try {
-        const url = `/api/cast/${castHash}${userFid ? `?userFid=${userFid}` : ''}`;
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error('Failed to fetch cast data');
+        // Step 1: Check if cast exists in database
+        const dbUrl = `/api/cast/${castHash}${userFid ? `?userFid=${userFid}` : ''}`;
+        const dbResponse = await fetch(dbUrl);
+        
+        if (dbResponse.ok) {
+          const dbData = await dbResponse.json();
+          
+          // If cast_state is 'higher' or 'expired', use DB data directly
+          if (dbData.state === 'higher' || dbData.state === 'expired') {
+            setCastData(dbData);
+            setLoading(false);
+            return;
+          }
+          
+          // If cast_state is 'valid' or 'invalid', fallback to Neynar validation
+          if (dbData.state === 'valid' || dbData.state === 'invalid') {
+            try {
+              const neynarResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
+              if (neynarResponse.ok) {
+                const neynarData = await neynarResponse.json();
+                if (neynarData.valid) {
+                  // Merge Neynar data with DB data (prefer DB for stake info, Neynar for cast text)
+                  setCastData({
+                    ...dbData,
+                    castText: neynarData.castText || dbData.castText,
+                    description: neynarData.description || dbData.description,
+                    username: neynarData.author?.username || dbData.username,
+                    displayName: neynarData.author?.display_name || dbData.displayName,
+                    pfpUrl: neynarData.author?.pfp_url || dbData.pfpUrl,
+                  });
+                  setLoading(false);
+                  return;
+                }
+              }
+            } catch (neynarError) {
+              console.error('[SupporterModal] Error validating cast via Neynar:', neynarError);
+            }
+            
+            // Neynar validation failed, but we have DB data - use it anyway
+            setCastData(dbData);
+            setLoading(false);
+            return;
+          }
+          
+          // If we got DB data but state is unexpected, use it
+          setCastData(dbData);
+          setLoading(false);
+          return;
         }
-        const data = await response.json();
-        setCastData(data);
-      } catch (err: any) {
-        console.error('[SupporterModal] Error fetching cast data:', err);
-        setError(err.message || 'Failed to load cast data');
-      } finally {
-        setLoading(false);
+      } catch (dbError) {
+        console.error('[SupporterModal] Error checking DB for cast:', dbError);
       }
+      
+      // Step 2: If not found in DB, call /api/validate-cast (Neynar fallback)
+      try {
+        const validateResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
+        if (validateResponse.ok) {
+          const validateData = await validateResponse.json();
+          if (validateData.valid) {
+            // Convert Neynar response to CastData format
+            setCastData({
+              hash: validateData.hash,
+              fid: validateData.fid,
+              username: validateData.author?.username || 'unknown',
+              displayName: validateData.author?.display_name || 'unknown',
+              pfpUrl: validateData.author?.pfp_url || '',
+              castText: validateData.castText || '',
+              description: validateData.description || '',
+              timestamp: validateData.timestamp || '',
+              state: validateData.state || 'valid',
+              totalHigherStaked: '0',
+              usdValue: null,
+              rank: null,
+              maxCasterUnlockTime: 0,
+              minCasterUnlockTime: 0,
+              totalCasterStaked: '0',
+              totalSupporterStaked: '0',
+              casterStakes: [],
+              supporterStakes: [],
+              connectedUserStake: undefined,
+            });
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (validateError) {
+        console.error('[SupporterModal] Error validating cast via Neynar:', validateError);
+      }
+      
+      // Step 3: If both fail, show error
+      setError('Cast not found or invalid. Please check the cast hash and try again.');
+      setLoading(false);
     };
 
     if (castHash) {
@@ -254,17 +335,57 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
       if (isRelevant) {
         console.log('[SupporterModal] Lockup involves current user, refreshing cast data');
         
-        // Refresh cast data
+        // Refresh cast data using same validation logic as initial fetch
         const fetchCastData = async () => {
           try {
-            const url = `/api/cast/${castHash}${userFid ? `?userFid=${userFid}` : ''}`;
-            const response = await fetch(url);
-            if (response.ok) {
-              const data = await response.json();
-              setCastData(data);
+            // Step 1: Check DB first
+            const dbUrl = `/api/cast/${castHash}${userFid ? `?userFid=${userFid}` : ''}`;
+            const dbResponse = await fetch(dbUrl);
+            
+            if (dbResponse.ok) {
+              const dbData = await dbResponse.json();
+              
+              // If cast_state is 'higher' or 'expired', use DB data directly
+              if (dbData.state === 'higher' || dbData.state === 'expired') {
+                setCastData(dbData);
+                return;
+              }
+              
+              // If cast_state is 'valid' or 'invalid', try Neynar fallback
+              if (dbData.state === 'valid' || dbData.state === 'invalid') {
+                try {
+                  const neynarResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
+                  if (neynarResponse.ok) {
+                    const neynarData = await neynarResponse.json();
+                    if (neynarData.valid) {
+                      // Merge Neynar data with DB data
+                      setCastData({
+                        ...dbData,
+                        castText: neynarData.castText || dbData.castText,
+                        description: neynarData.description || dbData.description,
+                        username: neynarData.author?.username || dbData.username,
+                        displayName: neynarData.author?.display_name || dbData.displayName,
+                        pfpUrl: neynarData.author?.pfp_url || dbData.pfpUrl,
+                      });
+                      return;
+                    }
+                  }
+                } catch (neynarError) {
+                  console.error('[SupporterModal] Error validating cast via Neynar:', neynarError);
+                }
+                
+                // Use DB data even if Neynar failed
+                setCastData(dbData);
+                return;
+              }
+              
+              // Use DB data for any other state
+              setCastData(dbData);
+              return;
             }
           } catch (err) {
             console.error('[SupporterModal] Error refreshing cast data:', err);
+            // Don't show error on refresh - just log it
           }
         };
         

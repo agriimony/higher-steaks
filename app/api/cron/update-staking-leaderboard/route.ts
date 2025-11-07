@@ -410,10 +410,13 @@ export async function GET(request: NextRequest) {
       casterStakeLockupIds: number[];
       casterStakeAmounts: string[];
       casterStakeUnlockTimes: number[];
+      casterStakeUnlocked: boolean[]; // Add unlocked flags for caster stakes
       supporterStakeLockupIds: number[];
       supporterStakeAmounts: string[];
       supporterStakeFids: number[];
       supporterStakePfps: string[]; // PFP URLs corresponding to supporter_stake_fids (same order)
+      supporterStakeUnlockTimes: number[]; // Add unlock times for supporter stakes
+      supporterStakeUnlocked: boolean[]; // Add unlocked flags for supporter stakes
       stakerFids: number[]; // For backward compatibility: [creator_fid, ...supporter_stake_fids]
       totalStaked: bigint;
       castState: 'higher' | 'expired';
@@ -497,10 +500,13 @@ export async function GET(request: NextRequest) {
         casterStakeLockupIds: allCasterStakes.map(s => Number(s.lockupId)),
         casterStakeAmounts: allCasterStakes.map(s => s.amount.toString()),
         casterStakeUnlockTimes: allCasterStakes.map(s => s.unlockTime),
+        casterStakeUnlocked: allCasterStakes.map(s => s.unlocked), // Add unlocked flags for caster stakes
         supporterStakeLockupIds: allSupporterStakes.map(s => Number(s.lockupId)),
         supporterStakeAmounts: allSupporterStakes.map(s => s.amount.toString()),
         supporterStakeFids: allSupporterStakes.map(s => s.fid),
         supporterStakePfps: allSupporterStakes.map(s => fidToPfp.get(s.fid) || ''), // Fetch PFP for each supporter FID
+        supporterStakeUnlockTimes: allSupporterStakes.map(s => s.unlockTime), // Add unlock times for supporter stakes
+        supporterStakeUnlocked: allSupporterStakes.map(s => s.unlocked), // Add unlocked flags for supporter stakes
         stakerFids: Array.from(stakerFids), // For backward compatibility
         totalStaked,
         castState,
@@ -568,10 +574,13 @@ export async function GET(request: NextRequest) {
           casterStakeLockupIds: entry.casterStakeLockupIds, // ALL caster stakes (including expired/unlocked)
           casterStakeAmounts: entry.casterStakeAmounts, // ALL caster stakes
           casterStakeUnlockTimes: entry.casterStakeUnlockTimes, // ALL caster stakes
+          casterStakeUnlocked: entry.casterStakeUnlocked, // ALL caster stakes unlocked flags
           supporterStakeLockupIds: entry.supporterStakeLockupIds, // ALL supporter stakes (including expired/unlocked)
           supporterStakeAmounts: entry.supporterStakeAmounts, // ALL supporter stakes
           supporterStakeFids: entry.supporterStakeFids, // ALL supporter stakes
           supporterStakePfps: entry.supporterStakePfps, // ALL supporter stakes
+          supporterStakeUnlockTimes: entry.supporterStakeUnlockTimes, // ALL supporter stakes unlock times
+          supporterStakeUnlocked: entry.supporterStakeUnlocked, // ALL supporter stakes unlocked flags
           stakerFids: entry.stakerFids, // For backward compatibility
           castState: entry.castState,
         });
