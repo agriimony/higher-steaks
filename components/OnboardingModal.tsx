@@ -134,6 +134,25 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
   
+  // Read balance from connected wallet address
+  const { data: walletBalanceRaw } = useReadContract({
+    address: HIGHER_TOKEN_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: wagmiAddress ? [wagmiAddress] : undefined,
+    query: {
+      enabled: !!wagmiAddress,
+      refetchInterval: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    },
+  });
+  
+  // Convert balance from wei to number (18 decimals)
+  const connectedWalletBalance = walletBalanceRaw 
+    ? parseFloat(formatUnits(walletBalanceRaw, 18))
+    : walletBalance; // Fallback to prop if no wallet connected
+  
   // Read current allowance to avoid unnecessary approvals
   // Only read when we're in staking mode (not create cast flow)
   const { data: currentAllowance } = useReadContract({
@@ -229,12 +248,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           });
           
           setTemporaryNewCast(null); // Clear temporary cast flag when API data is loaded
-        } else {
-          console.error('Failed to fetch casts');
-          // Keep existing casts if API fails
         }
       } catch (error) {
-        console.error('Error fetching casts:', error);
         // Keep existing casts if API fails
       } finally {
         setLoadingCasts(false);
@@ -323,7 +338,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           ],
         });
       } catch (error: any) {
-        console.error('[Onboarding] CreateLockUp error:', error);
         setStakeError(error?.message || 'Failed to create lockup');
         setPendingCreateLockUp(false);
         hasScheduledCreateLockUp.current = false;
@@ -362,7 +376,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       setSelectedCastHash(null);
       hasScheduledCreateLockUp.current = false;
       
-      console.log('[Onboarding] Stake transaction successful - Parent component will handle updates');
       
       // Call parent callback - let the parent/staking modal handle real-time updates
       onStakeSuccess?.();
@@ -380,17 +393,14 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   const handleQuickCast = useCallback(async () => {
     try {
-      console.log('Opening cast composer...');
       const fullMessage = "started aiming higher and it worked out! " + customMessage;
       const result = await sdk.actions.composeCast({
         text: fullMessage,
         channelKey: "higher"
       });
-      console.log('Compose cast result:', result);
       
       // If result contains cast hash, create temporary cast card
       if (result?.cast?.hash && result?.cast?.text) {
-        console.log('Got cast hash from composeCast:', result.cast.hash);
         
         // Extract description from cast text
         const keyphraseMatch = result.cast.text.match(/started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i);
@@ -437,7 +447,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setCustomMessage('');
       }
     } catch (error) {
-      console.error("Failed to open cast composer:", error);
+      // Silent fail - user can try again
     }
   }, [customMessage, userFid]);
 
@@ -445,24 +455,16 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     try {
       const buyToken = "eip155:8453/erc20:0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe";
       
-      console.log('[OnboardingModal] Opening swap for HIGHER token:', buyToken);
       await new Promise(resolve => setTimeout(resolve, 100));
       
       const result = await sdk.actions.swapToken({
         buyToken,
       });
       
-      console.log('[OnboardingModal] Swap result:', result);
-      
-      if (result.success) {
-        console.log('[OnboardingModal] Swap successful, transactions:', result.swap.transactions);
-        // Optionally refresh balance after successful swap
-        // The user can manually refresh or we can trigger a refresh here
-      } else if (result.reason !== 'rejected_by_user') {
+      if (!result.success && result.reason !== 'rejected_by_user') {
         alert('Swap failed. Please try again.');
       }
     } catch (error) {
-      console.error('[OnboardingModal] Failed to open swap:', error);
       alert('Failed to open swap. Please try again.');
     }
   }, []);
@@ -472,8 +474,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     setValidatingUrl(true);
     
     try {
-      console.log('[Onboarding] Validating cast URL:', castUrl);
-      
       let identifierToLookup = castUrl.trim();
       let isFullUrl = false;
       
@@ -484,24 +484,20 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           identifierToLookup = 'https://' + identifierToLookup;
         }
         isFullUrl = true;
-        console.log('[Onboarding] Using full farcaster.xyz URL:', identifierToLookup);
       } else if (identifierToLookup.includes('warpcast.com')) {
         // Ensure it's a full URL
         if (!identifierToLookup.startsWith('http://') && !identifierToLookup.startsWith('https://')) {
           identifierToLookup = 'https://' + identifierToLookup;
         }
         isFullUrl = true;
-        console.log('[Onboarding] Using full warpcast.com URL:', identifierToLookup);
       } else if (identifierToLookup.startsWith('http://') || identifierToLookup.startsWith('https://')) {
         // Generic URL - try as-is
         isFullUrl = true;
-        console.log('[Onboarding] Using generic URL:', identifierToLookup);
       } else {
         // Assume it's a hash - normalize format
         if (!identifierToLookup.startsWith('0x') && /^[a-fA-F0-9]+$/.test(identifierToLookup)) {
           identifierToLookup = '0x' + identifierToLookup;
         }
-        console.log('[Onboarding] Using as hash:', identifierToLookup);
       }
       
       if (!identifierToLookup) {
@@ -511,7 +507,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       }
       
       // Validate the cast using API - pass URL directly for better handling
-      console.log('[Onboarding] Calling validation API with:', identifierToLookup, 'isUrl:', isFullUrl);
       const response = await fetch(`/api/validate-cast?hash=${encodeURIComponent(identifierToLookup)}&isUrl=${isFullUrl}`);
       
       if (!response.ok) {
@@ -522,10 +517,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       }
       
       const data = await response.json();
-      console.log('[Onboarding] Validation response:', data);
       
       if (data.valid && data.fid === userFid) {
-        console.log('[Onboarding] Cast is valid');
         setUrlValidationError(null);
         setCastUrl('');
         
@@ -566,14 +559,11 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         setTemporaryNewCast(newCast);
         setShowCreateCast(false);
       } else if (data.valid && data.fid !== userFid) {
-        console.log('[Onboarding] Cast belongs to different user:', data.fid, 'vs', userFid);
         setUrlValidationError('This cast belongs to a different user');
       } else {
-        console.log('[Onboarding] Cast invalid, reason:', data.reason || 'unknown');
         setUrlValidationError(data.reason || 'Cast not found or invalid');
       }
     } catch (error) {
-      console.error('Error validating cast URL:', error);
       setUrlValidationError('Failed to validate cast URL. Please check the URL format and try again.');
     } finally {
       setValidatingUrl(false);
@@ -606,7 +596,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         return;
       }
     } catch (error) {
-      console.error('[Onboarding] Error validating cast ownership:', error);
       setStakeError('Failed to validate cast ownership');
       return;
     }
@@ -626,7 +615,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     }
 
     // Check balance
-    if (amountNum > walletBalance) {
+    if (amountNum > connectedWalletBalance) {
       setStakeError('Amount exceeds wallet balance');
       return;
     }
@@ -655,7 +644,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       const allowance = currentAllowance || BigInt(0);
       
       if (allowance >= amountWei) {
-        console.log('[Onboarding] Sufficient allowance exists, skipping approve');
         // Sufficient allowance - simulate approve success to trigger createLockUp
         hasScheduledCreateLockUp.current = true;
         setPendingCreateLockUp(true);
@@ -677,7 +665,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               ],
             });
           } catch (error: any) {
-            console.error('[Onboarding] CreateLockUp error:', error);
             setStakeError(error?.message || 'Failed to create lockup');
             setPendingCreateLockUp(false);
             hasScheduledCreateLockUp.current = false;
@@ -687,7 +674,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         createLockUpTimeoutRef.current = delay;
         setCreateLockUpParams(null);
       } else {
-        console.log('[Onboarding] Insufficient allowance, calling approve');
         // Step 1: Approve the lockup contract to spend tokens
         writeContractApprove({
           address: HIGHER_TOKEN_ADDRESS,
@@ -698,7 +684,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       }
     } catch (error: any) {
       setStakeError(error?.message || 'Failed to initiate stake');
-      console.error('Stake error:', error);
     }
   };
 
@@ -811,13 +796,13 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   }, []);
 
   const handleSetAmount = useCallback((percentage: number) => {
-    const amount = percentage === 1 ? walletBalance : walletBalance * percentage;
+    const amount = percentage === 1 ? connectedWalletBalance : connectedWalletBalance * percentage;
     setStakeAmount(amount.toFixed(2));
     // Use setTimeout to ensure state update completes before focusing
     setTimeout(() => {
       stakeAmountInputRef.current?.focus();
     }, 0);
-  }, [walletBalance]);
+  }, [connectedWalletBalance]);
 
   const handleCancelStake = useCallback(() => {
     setSelectedCastIndex(null);
@@ -833,92 +818,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     setSelectedCastHash(hash);
   }, []);
 
-  // Track component renders and input lifecycle
-  const renderCountRef = useRef(0);
-  const stakeInputMountCountRef = useRef(0);
-  const durationInputMountCountRef = useRef(0);
-  const prevPropsRef = useRef<{
-    casts: CastCard[];
-    activeCardIndex: number;
-    selectedCastIndex: number | null;
-    stakeAmount: string;
-    lockupDuration: string;
-    lockupDurationUnit: string;
-    showCreateCast: boolean;
-    loadingCasts: boolean;
-    walletBalance: number;
-  } | null>(null);
-  
-  useEffect(() => {
-    renderCountRef.current += 1;
-    const currentProps = {
-      casts,
-      activeCardIndex,
-      selectedCastIndex,
-      stakeAmount,
-      lockupDuration,
-      lockupDurationUnit,
-      showCreateCast,
-      loadingCasts,
-      walletBalance,
-    };
-    
-    if (prevPropsRef.current) {
-      const changed: string[] = [];
-      if (prevPropsRef.current.casts.length !== currentProps.casts.length) {
-        changed.push(`casts.length: ${prevPropsRef.current.casts.length} → ${currentProps.casts.length}`);
-      }
-      if (prevPropsRef.current.casts.map(c => c.hash).join(',') !== currentProps.casts.map(c => c.hash).join(',')) {
-        changed.push('casts.hashes changed');
-      }
-      if (prevPropsRef.current.activeCardIndex !== currentProps.activeCardIndex) {
-        changed.push(`activeCardIndex: ${prevPropsRef.current.activeCardIndex} → ${currentProps.activeCardIndex}`);
-      }
-      if (prevPropsRef.current.selectedCastIndex !== currentProps.selectedCastIndex) {
-        changed.push(`selectedCastIndex: ${prevPropsRef.current.selectedCastIndex} → ${currentProps.selectedCastIndex}`);
-      }
-      if (prevPropsRef.current.stakeAmount !== currentProps.stakeAmount) {
-        changed.push(`stakeAmount: "${prevPropsRef.current.stakeAmount}" → "${currentProps.stakeAmount}"`);
-      }
-      if (prevPropsRef.current.lockupDuration !== currentProps.lockupDuration) {
-        changed.push(`lockupDuration: "${prevPropsRef.current.lockupDuration}" → "${currentProps.lockupDuration}"`);
-      }
-      if (prevPropsRef.current.lockupDurationUnit !== currentProps.lockupDurationUnit) {
-        changed.push(`lockupDurationUnit: ${prevPropsRef.current.lockupDurationUnit} → ${currentProps.lockupDurationUnit}`);
-      }
-      if (prevPropsRef.current.showCreateCast !== currentProps.showCreateCast) {
-        changed.push(`showCreateCast: ${prevPropsRef.current.showCreateCast} → ${currentProps.showCreateCast}`);
-      }
-      if (prevPropsRef.current.loadingCasts !== currentProps.loadingCasts) {
-        changed.push(`loadingCasts: ${prevPropsRef.current.loadingCasts} → ${currentProps.loadingCasts}`);
-      }
-      if (prevPropsRef.current.walletBalance !== currentProps.walletBalance) {
-        changed.push(`walletBalance: ${prevPropsRef.current.walletBalance} → ${currentProps.walletBalance}`);
-      }
-      
-      console.log(`[OnboardingModal] Render #${renderCountRef.current} - Changed:`, changed.length > 0 ? changed.join(', ') : 'none');
-    } else {
-      console.log(`[OnboardingModal] Render #${renderCountRef.current} - Initial render`);
-    }
-    
-    prevPropsRef.current = currentProps;
-  });
-  
-  useEffect(() => {
-    console.log('[OnboardingModal] stakeAmount changed:', stakeAmount);
-  }, [stakeAmount]);
-  
-  useEffect(() => {
-    console.log('[OnboardingModal] lockupDuration changed:', lockupDuration);
-  }, [lockupDuration]);
-  
-  useEffect(() => {
-    console.log('[OnboardingModal] selectedCastIndex changed:', selectedCastIndex);
-  }, [selectedCastIndex]);
-  
-  useEffect(() => {
-    console.log('[OnboardingModal] activeCardIndex changed:', activeCardIndex);
-  }, [activeCardIndex]);
 
   // Separate StakingForm component - memoized to prevent remounting
   const StakingForm = React.memo(({
@@ -927,12 +826,10 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     lockupDurationUnit,
     stakeError,
     isLoadingTransaction,
-    walletBalance,
+    connectedWalletBalance,
     castHash,
     stakeAmountInputRef,
     lockupDurationInputRef,
-    stakeInputMountCountRef,
-    durationInputMountCountRef,
     onStakeAmountChange,
     onLockupDurationChange,
     onLockupDurationUnitChange,
@@ -945,12 +842,10 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     lockupDurationUnit: 'minute' | 'day' | 'week' | 'month' | 'year';
     stakeError: string | null;
     isLoadingTransaction: boolean;
-    walletBalance: number;
+    connectedWalletBalance: number;
     castHash: string;
     stakeAmountInputRef: React.RefObject<HTMLInputElement>;
     lockupDurationInputRef: React.RefObject<HTMLInputElement>;
-    stakeInputMountCountRef: React.MutableRefObject<number>;
-    durationInputMountCountRef: React.MutableRefObject<number>;
     onStakeAmountChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onLockupDurationChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onLockupDurationUnitChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
@@ -958,34 +853,16 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     onStake: (hash: string) => void;
     onCancel: () => void;
   }) => {
-    console.log('[StakingForm] Rendering with stakeAmount:', stakeAmount, 'lockupDuration:', lockupDuration);
-    
     return (
       <div className="mb-4">
         <div className="mb-3">
           <label className="text-xs text-black/70 mb-1 block">Amount (HIGHER)</label>
           <div className="flex gap-2">
             <input
-              ref={(node) => {
-                if (node) {
-                  stakeInputMountCountRef.current += 1;
-                  console.log('[StakingForm] Stake amount input MOUNTED, count:', stakeInputMountCountRef.current, 'focused:', document.activeElement === node);
-                  if (stakeAmountInputRef) {
-                    (stakeAmountInputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
-                  }
-                } else {
-                  console.log('[StakingForm] Stake amount input UNMOUNTED');
-                }
-              }}
+              ref={stakeAmountInputRef}
               type="text"
               value={stakeAmount}
               onChange={onStakeAmountChange}
-              onFocus={(e) => {
-                console.log('[StakingForm] Stake amount input FOCUSED');
-              }}
-              onBlur={(e) => {
-                console.log('[StakingForm] Stake amount input BLURRED');
-              }}
               placeholder="0.00"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
             />
@@ -1014,7 +891,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             </div>
           </div>
           <div className="text-xs text-black/50 mt-1">
-            Available: {walletBalance.toFixed(2)} HIGHER
+            Available: {connectedWalletBalance.toFixed(2)} HIGHER
           </div>
         </div>
 
@@ -1022,26 +899,10 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           <label className="text-xs text-black/70 mb-1 block">Duration</label>
           <div className="flex gap-2">
             <input
-              ref={(node) => {
-                if (node) {
-                  durationInputMountCountRef.current += 1;
-                  console.log('[StakingForm] Duration input MOUNTED, count:', durationInputMountCountRef.current, 'focused:', document.activeElement === node);
-                  if (lockupDurationInputRef) {
-                    (lockupDurationInputRef as React.MutableRefObject<HTMLInputElement | null>).current = node;
-                  }
-                } else {
-                  console.log('[StakingForm] Duration input UNMOUNTED');
-                }
-              }}
+              ref={lockupDurationInputRef}
               type="number"
               value={lockupDuration}
               onChange={onLockupDurationChange}
-              onFocus={(e) => {
-                console.log('[StakingForm] Duration input FOCUSED');
-              }}
-              onBlur={(e) => {
-                console.log('[StakingForm] Duration input BLURRED');
-              }}
               placeholder="1"
               min="1"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
@@ -1049,12 +910,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             <select
               value={lockupDurationUnit}
               onChange={onLockupDurationUnitChange}
-              onFocus={(e) => {
-                console.log('[StakingForm] Duration unit select FOCUSED');
-              }}
-              onBlur={(e) => {
-                console.log('[StakingForm] Duration unit select BLURRED');
-              }}
               className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
             >
               <option value="minute">Minute(s)</option>
@@ -1099,35 +954,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   }, (prevProps, nextProps) => {
     // Custom comparison - we want to update when values change, but refs and callbacks should be stable
     // The key is that React should UPDATE the inputs (change value prop) not REMOUNT them
-    const valuePropsChanged = 
-      prevProps.stakeAmount !== nextProps.stakeAmount ||
-      prevProps.lockupDuration !== nextProps.lockupDuration ||
-      prevProps.lockupDurationUnit !== nextProps.lockupDurationUnit ||
-      prevProps.stakeError !== nextProps.stakeError ||
-      prevProps.isLoadingTransaction !== nextProps.isLoadingTransaction ||
-      prevProps.walletBalance !== nextProps.walletBalance ||
-      prevProps.castHash !== nextProps.castHash;
-    
-    // Check if callbacks changed (they shouldn't if memoized properly)
-    const callbacksChanged = 
-      prevProps.onStakeAmountChange !== nextProps.onStakeAmountChange ||
-      prevProps.onLockupDurationChange !== nextProps.onLockupDurationChange ||
-      prevProps.onLockupDurationUnitChange !== nextProps.onLockupDurationUnitChange ||
-      prevProps.onSetAmount !== nextProps.onSetAmount ||
-      prevProps.onStake !== nextProps.onStake ||
-      prevProps.onCancel !== nextProps.onCancel;
-    
-    console.log('[StakingForm] Memo comparison:', {
-      valuePropsChanged,
-      callbacksChanged,
-      stakeAmount: prevProps.stakeAmount !== nextProps.stakeAmount,
-      lockupDuration: prevProps.lockupDuration !== nextProps.lockupDuration,
-      'prev stakeAmount': prevProps.stakeAmount,
-      'next stakeAmount': nextProps.stakeAmount
-    });
-    
     // Always allow updates - React should reconcile, not remount
-    // The issue is likely elsewhere (refs or component structure)
     return false; // false = allow update (React will reconcile)
   });
 
@@ -1228,7 +1055,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           )}
         </div>
         
-        {/* Add stake button - below the card (StakingForm rendered separately outside CastCardsView) */}
+        {/* Add stake button - shown when staking form is not open */}
         {selectedCastIndex !== activeCardIndex && (
           <div className="mb-4 flex gap-3">
             <button
@@ -1244,6 +1071,27 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               Buy HIGHER
             </button>
           </div>
+        )}
+        
+        {/* Staking Form - rendered below card, above card indicator */}
+        {selectedCastIndex === activeCardIndex && (
+          <StakingForm
+            stakeAmount={stakeAmount}
+            lockupDuration={lockupDuration}
+            lockupDurationUnit={lockupDurationUnit}
+            stakeError={stakeError}
+            isLoadingTransaction={isLoadingTransaction}
+            connectedWalletBalance={connectedWalletBalance}
+            castHash={currentCast.hash}
+            stakeAmountInputRef={stakeAmountInputRef}
+            lockupDurationInputRef={lockupDurationInputRef}
+            onStakeAmountChange={handleStakeAmountChange}
+            onLockupDurationChange={handleLockupDurationChange}
+            onLockupDurationUnitChange={handleLockupDurationUnitChange}
+            onSetAmount={handleSetAmount}
+            onStake={handleStake}
+            onCancel={handleCancelStake}
+          />
         )}
         
         {/* Card indicator (e.g., "1 of 3") */}
@@ -1268,10 +1116,12 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     casts,
     activeCardIndex,
     selectedCastIndex,
-    // Don't include stakeAmount, lockupDuration here - they're only used in StakingForm which is memoized
+    stakeAmount,
+    lockupDuration,
+    lockupDurationUnit,
     stakeError,
     isLoadingTransaction,
-    walletBalance,
+    connectedWalletBalance,
     handleStakeAmountChange,
     handleLockupDurationChange,
     handleLockupDurationUnitChange,
@@ -1285,9 +1135,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     showCreateCast,
     formatTimestamp,
     stakeAmountInputRef,
-    lockupDurationInputRef,
-    stakeInputMountCountRef,
-    durationInputMountCountRef
+    lockupDurationInputRef
   ]);
 
   return (
@@ -1342,31 +1190,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         ) : showCreateCast || casts.length === 0 ? (
           CreateCastFlow
         ) : (
-          <>
-            {CastCardsView}
-            {/* Render StakingForm outside CastCardsView to prevent remounting when CastCardsView re-renders */}
-            {selectedCastIndex === activeCardIndex && casts[activeCardIndex] && (
-              <StakingForm
-                stakeAmount={stakeAmount}
-                lockupDuration={lockupDuration}
-                lockupDurationUnit={lockupDurationUnit}
-                stakeError={stakeError}
-                isLoadingTransaction={isLoadingTransaction}
-                walletBalance={walletBalance}
-                castHash={casts[activeCardIndex].hash}
-                stakeAmountInputRef={stakeAmountInputRef}
-                lockupDurationInputRef={lockupDurationInputRef}
-                stakeInputMountCountRef={stakeInputMountCountRef}
-                durationInputMountCountRef={durationInputMountCountRef}
-                onStakeAmountChange={handleStakeAmountChange}
-                onLockupDurationChange={handleLockupDurationChange}
-                onLockupDurationUnitChange={handleLockupDurationUnitChange}
-                onSetAmount={handleSetAmount}
-                onStake={handleStake}
-                onCancel={handleCancelStake}
-              />
-            )}
-          </>
+          CastCardsView
         )}
         </div>
       </div>
