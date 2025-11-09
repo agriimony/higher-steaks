@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
       address: LOCKUP_CONTRACT,
       abi: LOCKUP_ABI,
       functionName: 'lockUpCount',
-      blockNumber: currentBlock,
+      blockTag: 'latest',
     });
     
     console.log(`[Balance API] Total lockup count: ${lockUpCount.toString()}`);
@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
 
     const balanceResults = await client.multicall({
       contracts: balanceCalls,
-      blockNumber: currentBlock,
+      blockTag: 'latest',
     });
 
     const addressBalances = verifiedAddresses.map((address, index) => {
@@ -292,7 +292,7 @@ export async function GET(request: NextRequest) {
             abi: LOCKUP_ABI,
             functionName: 'getLockUpIdsByReceiver',
             args: [normalizedAddress, BigInt(0), lockUpCount],
-            blockNumber: currentBlock, // Use consistent block number
+            blockTag: 'latest',
           }) as bigint[];
 
           console.log(`[Balance API] getLockUpIdsByReceiver returned ${lockUpIds.length} IDs for normalized address ${normalizedAddress}`);
@@ -305,7 +305,7 @@ export async function GET(request: NextRequest) {
               abi: LOCKUP_ABI,
               functionName: 'getLockUpIdsByReceiver',
               args: [address as `0x${string}`, BigInt(0), lockUpCount],
-              blockNumber: currentBlock,
+              blockTag: 'latest',
             }) as bigint[];
             if (lockUpIds.length > 0) {
               workingAddressFormat = address;
@@ -324,7 +324,7 @@ export async function GET(request: NextRequest) {
               abi: LOCKUP_ABI,
               functionName: 'getLockUpIdsByReceiver',
               args: [lowercaseAddress, BigInt(0), lockUpCount],
-              blockNumber: currentBlock,
+              blockTag: 'latest',
             }) as bigint[];
             if (lockUpIds.length > 0) {
               workingAddressFormat = lowercaseAddress;
@@ -368,7 +368,7 @@ export async function GET(request: NextRequest) {
             const batch = lockUpDetailCalls.slice(i, i + BATCH_SIZE);
             const batchResults = await client.multicall({
               contracts: batch,
-              blockNumber: currentBlock,
+              blockTag: 'latest',
             });
 
             batchResults.forEach((result: { status: 'success' | 'failure'; result?: any; error?: Error }, batchIndex: number) => {
