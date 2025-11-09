@@ -420,13 +420,10 @@ export async function GET(request: NextRequest) {
               const amountBigInt = amount as bigint;
 
               // Calculate totals (for balance pill)
-              if (currentTime >= unlockTimeNum && !unlockedBool) {
-                unlockedBalance += amountBigInt;
-                console.log(`[Balance API] Added to unlocked balance: ${amountBigInt.toString()}`);
-              } else if (currentTime < unlockTimeNum) {
+              if (!unlockedBool) {
                 lockedBalance += amountBigInt;
                 console.log(`[Balance API] Added to locked balance: ${amountBigInt.toString()}`);
-              } else if (unlockedBool) {
+              } else {
                 console.log(`[Balance API] Lockup ${id.toString()} is unlocked - not counting in balance`);
               }
 
