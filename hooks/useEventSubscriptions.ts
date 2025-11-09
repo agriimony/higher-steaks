@@ -13,6 +13,7 @@ export interface EventSubscriptionState {
     from?: string;
     to?: string;
     value?: string;
+    transactionHash?: string;
   } | null;
   unlockEvent: {
     lockUpId?: string;
@@ -21,11 +22,13 @@ export interface EventSubscriptionState {
     from?: string;
     to?: string;
     value?: string;
+    transactionHash?: string;
   } | null;
   transferEvent: {
     from: string;
     to: string;
     value: string;
+    transactionHash?: string;
   } | null;
   isConnected: boolean;
   error: string | null;

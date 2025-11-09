@@ -129,6 +129,7 @@ function parseCDPEvent(body: any): { type: string; data: any } | null {
     const contractAddress = body.contract_address?.toLowerCase();
     const eventName = body.event_name;
     const parameters = body.parameters || {};
+    const transactionHash = body.transaction_hash;
     
     console.log('[CDP Webhook] Received event:', {
       contractAddress,
@@ -147,6 +148,7 @@ function parseCDPEvent(body: any): { type: string; data: any } | null {
           amount: parameters.amount,
           unlockTime: parameters.unlockTime || parameters.unlock_time,
           title: parameters.title,
+          transactionHash,
         },
       };
     }
@@ -159,6 +161,7 @@ function parseCDPEvent(body: any): { type: string; data: any } | null {
           lockUpId: parameters.lockUpId || parameters.lockup_id,
           token: parameters.token,
           receiver: parameters.receiver,
+          transactionHash,
         },
       };
     }
@@ -188,6 +191,7 @@ function parseCDPEvent(body: any): { type: string; data: any } | null {
           from: parameters.from,
           to: parameters.to,
           value: parameters.value,
+          transactionHash,
           // For lockup_created and unlock, we won't have lockUpId from Transfer events
           // The frontend will need to refetch lockup details
         },

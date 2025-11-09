@@ -407,12 +407,12 @@ export default function HigherSteakMenu() {
   // Handle lockup events (via CDP webhooks)
   useEffect(() => {
     if (ws.newLockupEvent && user?.fid && wagmiAddress) {
-      // Generate event ID based on what data is available
-      // For Transfer-based events: use from/to/value
-      // For native LockUpCreated events: use lockUpId/receiver
-      const eventId = ws.newLockupEvent.from && ws.newLockupEvent.to 
-        ? `lockup-transfer-${ws.newLockupEvent.from}-${ws.newLockupEvent.to}-${ws.newLockupEvent.value}`
-        : `${ws.newLockupEvent.lockUpId}-${ws.newLockupEvent.receiver}`;
+      // Prefer transaction hash for deduping; fall back to legacy identifiers
+      const eventId = ws.newLockupEvent.transactionHash
+        ? `lockup-tx-${ws.newLockupEvent.transactionHash}`
+        : ws.newLockupEvent.from && ws.newLockupEvent.to
+          ? `lockup-transfer-${ws.newLockupEvent.from}-${ws.newLockupEvent.to}-${ws.newLockupEvent.value}`
+          : `${ws.newLockupEvent.lockUpId}-${ws.newLockupEvent.receiver}`;
       
       // Avoid processing duplicate events
       if (eventId === lastEventRef.current) {
@@ -472,9 +472,11 @@ export default function HigherSteakMenu() {
       // Generate event ID based on what data is available
       // For Transfer-based events: use from/to/value
       // For native Unlock events: use lockUpId/receiver
-      const eventId = ws.unlockEvent.from && ws.unlockEvent.to 
-        ? `unlock-transfer-${ws.unlockEvent.from}-${ws.unlockEvent.to}-${ws.unlockEvent.value}`
-        : `unlock-${ws.unlockEvent.lockUpId}-${ws.unlockEvent.receiver}`;
+      const eventId = ws.unlockEvent.transactionHash
+        ? `unlock-tx-${ws.unlockEvent.transactionHash}`
+        : ws.unlockEvent.from && ws.unlockEvent.to 
+          ? `unlock-transfer-${ws.unlockEvent.from}-${ws.unlockEvent.to}-${ws.unlockEvent.value}`
+          : `unlock-${ws.unlockEvent.lockUpId}-${ws.unlockEvent.receiver}`;
       
       console.log('[Unlock Event] Event received:', {
         eventId,
@@ -535,7 +537,9 @@ export default function HigherSteakMenu() {
   // Handle transfer events (via CDP webhooks)
   useEffect(() => {
     if (ws.transferEvent && user?.fid && wagmiAddress) {
-      const eventId = `transfer-${ws.transferEvent.from}-${ws.transferEvent.to}`;
+      const eventId = ws.transferEvent.transactionHash
+        ? `transfer-tx-${ws.transferEvent.transactionHash}`
+        : `transfer-${ws.transferEvent.from}-${ws.transferEvent.to}`;
       
       // Avoid processing duplicate events
       if (eventId === lastEventRef.current) {
