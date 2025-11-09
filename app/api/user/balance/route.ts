@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  */
 function createCDPClient() {
   const clientKey =
-    process.env.CDP_API_KEY_ID ||
+    process.env.CDP_API_KEY_SECRET ||
     process.env.CDP_RPC_CLIENT_KEY ||
     process.env.CDP_RPC_API_KEY ||
     '';
