@@ -7,30 +7,29 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Creates an Alchemy RPC client for Base network
- * Alchemy URL format: https://base-mainnet.g.alchemy.com/v2/{API_KEY}
+ * Creates a CDP (Coinbase Developer Platform) RPC client for Base network
+ * Client key format: https://api.developer.coinbase.com/rpc/v1/base/{CLIENT_KEY}
  */
-function createAlchemyClient() {
-  const alchemyApiKey = process.env.ALCHEMY_API_KEY;
-  
-  if (!alchemyApiKey) {
-    console.warn('[Alchemy] ALCHEMY_API_KEY not set, falling back to BASE_RPC_URL or public RPC');
-    const fallbackUrl = process.env.BASE_RPC_URL || 'https://mainnet.base.org';
-    return createPublicClient({
-      chain: base,
-      transport: http(fallbackUrl),
-    });
+function createCDPClient() {
+  const clientKey =
+    process.env.CDP_CLIENT_API_KEY ||
+    process.env.CDP_RPC_CLIENT_KEY ||
+    process.env.CDP_RPC_API_KEY ||
+    '';
+
+  const rpcUrl = clientKey
+    ? `https://api.developer.coinbase.com/rpc/v1/base/${clientKey}`
+    : process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+
+  if (!clientKey) {
+    console.warn('[CDP] CDP client key not set, falling back to BASE_RPC_URL or public RPC');
   }
 
-  // Alchemy Base Mainnet endpoint
-  const alchemyUrl = `https://base-mainnet.g.alchemy.com/v2/${alchemyApiKey}`;
-  
   return createPublicClient({
     chain: base,
-    transport: http(alchemyUrl, {
-      // Enable batch requests for efficiency
+    transport: http(rpcUrl, {
       batch: {
-        wait: 10, // Wait 10ms to batch requests
+        wait: 10,
       },
     }),
   });
@@ -120,7 +119,7 @@ export async function GET(request: NextRequest) {
     if (!fidParam) {
       return NextResponse.json(
         { error: 'FID is required' },
-        { status: 400 }
+        { status: 400, headers: { 'Cache-Control': 'no-store' } }
       );
     }
 
@@ -129,7 +128,7 @@ export async function GET(request: NextRequest) {
     if (isNaN(fid)) {
       return NextResponse.json(
         { error: 'Invalid FID' },
-        { status: 400 }
+        { status: 400, headers: { 'Cache-Control': 'no-store' } }
       );
     }
 
@@ -138,17 +137,20 @@ export async function GET(request: NextRequest) {
 
     if (!neynarApiKey || neynarApiKey === 'your_neynar_api_key_here') {
       console.warn('Neynar API key not configured');
-      return NextResponse.json({
-        totalBalance: '0',
-        totalBalanceFormatted: '0.00',
-        lockedBalance: '0',
-        lockedBalanceFormatted: '0.00',
-        usdValue: '$0.00',
-        pricePerToken: 0,
-        higherLogoUrl: '/higher-logo.png',
-        addresses: [],
-        error: 'Neynar API key not configured',
-      });
+      return NextResponse.json(
+        {
+          totalBalance: '0',
+          totalBalanceFormatted: '0.00',
+          lockedBalance: '0',
+          lockedBalanceFormatted: '0.00',
+          usdValue: '$0.00',
+          pricePerToken: 0,
+          higherLogoUrl: '/higher-logo.png',
+          addresses: [],
+          error: 'Neynar API key not configured',
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
     // Lazy import Neynar SDK
@@ -161,7 +163,7 @@ export async function GET(request: NextRequest) {
     if (!user) {
       return NextResponse.json(
         { error: 'User not found' },
-        { status: 404 }
+        { status: 404, headers: { 'Cache-Control': 'no-store' } }
       );
     }
 
@@ -171,21 +173,24 @@ export async function GET(request: NextRequest) {
     console.log(`[Balance API] User ${fid} has ${verifiedAddresses.length} verified addresses:`, verifiedAddresses);
     
     if (verifiedAddresses.length === 0) {
-      return NextResponse.json({
-        totalBalance: '0',
-        totalBalanceFormatted: '0.00',
-        lockedBalance: '0',
-        lockedBalanceFormatted: '0.00',
-        usdValue: '$0.00',
-        pricePerToken: 0,
-        higherLogoUrl: '/higher-logo.png',
-        addresses: [],
-        message: 'No verified addresses found',
-      });
+      return NextResponse.json(
+        {
+          totalBalance: '0',
+          totalBalanceFormatted: '0.00',
+          lockedBalance: '0',
+          lockedBalanceFormatted: '0.00',
+          usdValue: '$0.00',
+          pricePerToken: 0,
+          higherLogoUrl: '/higher-logo.png',
+          addresses: [],
+          message: 'No verified addresses found',
+        },
+        { headers: { 'Cache-Control': 'no-store' } }
+      );
     }
 
-    // Create Alchemy RPC client (optimized for concurrent requests)
-    const client = createAlchemyClient();
+    // Create CDP RPC client (optimized for concurrent requests)
+    const client = createCDPClient();
 
     // Get current block number and timestamp once - use this same block for all contract calls to ensure consistency
     const currentBlock = await client.getBlockNumber();
@@ -195,6 +200,12 @@ export async function GET(request: NextRequest) {
     });
     const currentTime = Number(block.timestamp);
     const blockAge = Math.floor(Date.now() / 1000) - currentTime;
+    const blockInfo = {
+      number: currentBlock.toString(),
+      timestamp: currentTime,
+      iso: new Date(currentTime * 1000).toISOString(),
+      ageSeconds: blockAge,
+    };
     
     console.log(`[Balance API] Using block ${currentBlock.toString()} at timestamp ${currentTime} (${new Date(currentTime * 1000).toISOString()}), age: ${blockAge}s for all contract calls`);
 
@@ -550,33 +561,37 @@ export async function GET(request: NextRequest) {
     }
 
 
-    return NextResponse.json({
-      totalBalance: totalBalance.toString(),
-      totalBalanceFormatted,
-      lockedBalance: lockedLockupsBalance.toString(),
-      lockedBalanceFormatted,
-      usdValue,
-      pricePerToken,
-      higherLogoUrl: '/higher-logo.png',
-      addresses: addressBalances,
-      lockups: allLockupsFlat,
-      wallets: addressBalances.filter(w => BigInt(w.balance) > BigInt(0)).map(w => ({
-        address: w.address,
-        balance: w.balance,
-        balanceFormatted: w.balanceFormatted,
-      })),
-      debug: {
-        verifiedAddresses,
-        totalLockupIdsFound: totalIdsFound,
-        totalLockupsIncluded: totalLockupsFound,
-        perAddress: debugInfo,
+    return NextResponse.json(
+      {
+        totalBalance: totalBalance.toString(),
+        totalBalanceFormatted,
+        lockedBalance: lockedLockupsBalance.toString(),
+        lockedBalanceFormatted,
+        usdValue,
+        pricePerToken,
+        higherLogoUrl: '/higher-logo.png',
+        addresses: addressBalances,
+        lockups: allLockupsFlat,
+        wallets: addressBalances.filter(w => BigInt(w.balance) > BigInt(0)).map(w => ({
+          address: w.address,
+          balance: w.balance,
+          balanceFormatted: w.balanceFormatted,
+        })),
+        block: blockInfo,
+        debug: {
+          verifiedAddresses,
+          totalLockupIdsFound: totalIdsFound,
+          totalLockupsIncluded: totalLockupsFound,
+          perAddress: debugInfo,
+        },
       },
-    });
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
   } catch (error) {
     console.error('Balance API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 }

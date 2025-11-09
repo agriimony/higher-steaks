@@ -20,18 +20,24 @@ interface User {
   bio?: string;
 }
 
+interface BlockInfo {
+  number: string;
+  timestamp: number;
+  iso: string;
+  ageSeconds: number;
+}
+
 interface TokenBalance {
+  totalBalance?: string;
   totalBalanceFormatted: string;
+  lockedBalance?: string;
   lockedBalanceFormatted: string;
   usdValue: string;
   pricePerToken: number;
   higherLogoUrl?: string;
   lockups?: LockupDetail[];
   wallets?: WalletDetail[];
-}
-
-interface StakingBalance {
-  totalStakedFormatted: string;
+  block?: BlockInfo;
 }
 
 interface LeaderboardEntry {
@@ -71,7 +77,6 @@ export default function HigherSteakMenu() {
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
-  const [stakingBalance, setStakingBalance] = useState<StakingBalance | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -90,11 +95,6 @@ export default function HigherSteakMenu() {
   const [simulatedFid, setSimulatedFid] = useState<number | null>(null); // For testing supporter vs caster view
   const [showFidSwitcher, setShowFidSwitcher] = useState(false);
   const fidSwitcherRef = useRef<HTMLDivElement>(null);
-  const [stakingDetails, setStakingDetails] = useState<{
-    lockups: LockupDetail[];
-    wallets: WalletDetail[];
-  } | null>(null);
-  const [loadingStakingDetails, setLoadingStakingDetails] = useState(false);
   
   // Detect pixel density for ASCII art scaling
   const [pixelDensity, setPixelDensity] = useState(1);
@@ -123,77 +123,12 @@ export default function HigherSteakMenu() {
     };
   }, [showFidSwitcher]);
   
-  // Fetch staking details from /api/user/stakes endpoint
-  const fetchStakingDetails = async (fid: number) => {
-    console.log('[Staking Details] Fetching from /api/user/stakes for fid:', fid);
-    setLoadingStakingDetails(true);
-    try {
-      const response = await fetch(`/api/user/stakes?fid=${fid}`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log('[Staking Details] Received lockups:', {
-          lockupCount: data.lockups?.length || 0,
-          lockupIds: data.lockups?.map((l: LockupDetail) => l.lockupId) || []
-        });
-        
-        // Calculate total staked balance from lockups (sum of all locked amounts)
-        const totalStaked = (data.lockups || []).reduce((sum: number, lockup: LockupDetail) => {
-          const amountWei = BigInt(lockup.amount || '0');
-          const divisor = BigInt(10 ** 18);
-          const wholePart = Number(amountWei / divisor);
-          const fractionalPart = Number(amountWei % divisor) / Number(divisor);
-          return sum + wholePart + fractionalPart;
-        }, 0);
-        
-        setStakingBalance({
-          totalStakedFormatted: totalStaked.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }),
-        });
-        
-        // Note: wallets are still fetched from /api/user/balance
-        // We only get lockups from /api/user/stakes
-        setStakingDetails({
-          lockups: data.lockups || [],
-          wallets: [], // Will be set from balance data
-        });
-      } else {
-        console.error('[Staking Details] Failed to fetch stakes, status:', response.status);
-        setStakingDetails({ lockups: [], wallets: [] });
-      }
-    } catch (error) {
-      console.error('[Staking Details] Error:', error);
-      setStakingDetails({ lockups: [], wallets: [] });
-    } finally {
-      setLoadingStakingDetails(false);
-    }
-  };
-  
-  // Extract staking details and calculate staked balance from balance data (single source of truth)
-  // Updated to only extract wallets, lockups come from /api/user/stakes
-  const updateStakingDetailsFromBalance = (balanceData: TokenBalance) => {
-    if (balanceData.wallets) {
-      console.log('[Staking Details Update] Updating wallets:', {
-        walletCount: balanceData.wallets.length
-      });
-      
-      // Update wallets, keep existing lockups from /api/user/stakes
-      setStakingDetails(prev => ({
-        lockups: prev?.lockups || [],
-        wallets: balanceData.wallets || [],
-      }));
-    }
-  };
-  
   // Handle stake success: refresh balance and staking details to get the new lockup
   const handleStakeSuccess = useCallback(() => {
-    console.log('[Stake Success] Refreshing balance and staking details');
-    
-    // Refresh balance and staking details from API to get the new lockup
+    console.log('[Stake Success] Refreshing balance');
+
     if (user?.fid) {
       fetchTokenBalance(user.fid);
-      fetchStakingDetails(user.fid);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.fid]);
@@ -205,28 +140,23 @@ export default function HigherSteakMenu() {
     try {
       const response = await fetch(`/api/user/balance?fid=${fid}`);
       if (response.ok) {
-        const balanceData = await response.json();
+        const balanceData: TokenBalance = await response.json();
         console.log('[fetchTokenBalance] Balance data received:', {
           hasLockups: !!balanceData.lockups,
           lockupCount: balanceData.lockups?.length,
-          higherLogoUrl: balanceData.higherLogoUrl
+          higherLogoUrl: balanceData.higherLogoUrl,
+          blockNumber: balanceData.block?.number,
         });
         setBalance(balanceData);
-        // Extract wallets from balance response (lockups come from /api/user/stakes)
-        updateStakingDetailsFromBalance(balanceData);
       } else {
         console.error('[fetchTokenBalance] Failed to fetch balance, status:', response.status);
-        setBalanceError(null);
+        setBalanceError('Failed to fetch balance');
         setBalance(null);
-        setStakingDetails({ lockups: [], wallets: [] });
-        setLoadingStakingDetails(false);
       }
     } catch (error) {
       console.error('[fetchTokenBalance] Error:', error);
-      setBalanceError(null);
+      setBalanceError('Unexpected error');
       setBalance(null);
-      setStakingDetails({ lockups: [], wallets: [] });
-      setLoadingStakingDetails(false);
     } finally {
       setLoadingBalance(false);
     }
@@ -338,11 +268,8 @@ export default function HigherSteakMenu() {
           const profileData = await response.json();
           console.log('Profile data:', profileData);
           setUser(profileData);
-          
-          // Fetch token balance, staking details, and cast data after getting user profile
-          // Staking details come from /api/user/stakes, wallets from /api/user/balance
+          // Fetch token balance and cast data after getting user profile
           fetchTokenBalance(fid);
-          fetchStakingDetails(fid);
           fetchCastData(fid);
         } else {
           console.error('Failed to fetch profile');
@@ -407,16 +334,20 @@ export default function HigherSteakMenu() {
       });
       
       // Set simulated balance
+      const now = Math.floor(Date.now() / 1000);
       setBalance({
         totalBalanceFormatted: simulatedProfile.walletBalance,
         lockedBalanceFormatted: '0.00',
         usdValue: '$0.00',
         pricePerToken: 0,
-      });
-      
-      // Set simulated staking balance
-      setStakingBalance({
-        totalStakedFormatted: simulatedProfile.stakedBalance,
+        lockups: [],
+        wallets: [],
+        block: {
+          number: 'simulated',
+          timestamp: now,
+          iso: new Date(now * 1000).toISOString(),
+          ageSeconds: 0,
+        },
       });
       
       setLoadingBalance(false);
@@ -426,9 +357,9 @@ export default function HigherSteakMenu() {
 
   // Handle balance pill click
   const handleBalancePillClick = () => {
-    if (user?.fid && balance) {
+    if (user?.fid) {
+      fetchTokenBalance(user.fid);
       setShowStakingModal(true);
-      // Staking details are already loaded on initial connection, no need to fetch again
     }
   };
 
@@ -446,7 +377,10 @@ export default function HigherSteakMenu() {
 
   const getWalletBalance = (): number => {
     if (!balance?.wallets || balance.wallets.length === 0) return 0;
-    return parseFloat(balance.wallets[0].balanceFormatted.replace(/,/g, ''));
+    return balance.wallets.reduce((acc, wallet) => {
+      const numeric = parseFloat(wallet.balanceFormatted.replace(/,/g, ''));
+      return acc + (Number.isFinite(numeric) ? numeric : 0);
+    }, 0);
   };
 
   // Filter leaderboard to show only one cast per creator (first/highest ranked)
@@ -465,13 +399,10 @@ export default function HigherSteakMenu() {
 
   // Check if there are any unstakeable positions (unlockTime <= currentTime)
   const hasUnstakeablePositions = useMemo(() => {
-    if (!stakingDetails?.lockups) return false;
+    if (!balance?.lockups || balance.lockups.length === 0) return false;
     const currentTime = Math.floor(Date.now() / 1000);
-    return stakingDetails.lockups.some(lockup => {
-      const timeRemaining = lockup.unlockTime - currentTime;
-      return timeRemaining <= 0;
-    });
-  }, [stakingDetails?.lockups]);
+    return balance.lockups.some((lockup) => lockup.unlockTime <= currentTime);
+  }, [balance?.lockups]);
 
   // Handle lockup events (via CDP webhooks)
   useEffect(() => {
@@ -509,9 +440,8 @@ export default function HigherSteakMenu() {
       if (isRelevant) {
         console.log('[Event] Lockup involves current user, refreshing balance and leaderboard');
         
-        // Refresh balance and staking details
+        // Refresh balance
         fetchTokenBalance(user.fid);
-        fetchStakingDetails(user.fid);
         
         // Refresh leaderboard
         fetch('/api/leaderboard/refresh', {
@@ -588,9 +518,8 @@ export default function HigherSteakMenu() {
       if (isRelevant) {
         console.log('[Event] Unlock involves current user, refreshing balance');
         
-        // Refresh balance and staking details (unlock doesn't affect leaderboard, only individual balance)
+        // Refresh balance (unlock doesn't affect leaderboard, only individual balance)
         fetchTokenBalance(user.fid);
-        fetchStakingDetails(user.fid);
       } else {
         console.log('[Unlock Event] Event not relevant to current user');
       }
@@ -631,8 +560,6 @@ export default function HigherSteakMenu() {
     }
   }, [ws.transferEvent, user?.fid, wagmiAddress]);
 
-  // Block freshness indicator removed - no longer needed with webhooks
-
   return (
     <>
       {/* Onboarding Modal */}
@@ -650,9 +577,9 @@ export default function HigherSteakMenu() {
         <StakingModal
           onClose={() => setShowStakingModal(false)}
           balance={balance}
-          lockups={stakingDetails?.lockups || []}
-          wallets={stakingDetails?.wallets || []}
-          loading={loadingStakingDetails || !stakingDetails}
+          lockups={balance.lockups || []}
+          wallets={balance.wallets || []}
+          loading={loadingBalance}
           onTransactionSuccess={async () => {
             // CDP webhook will automatically detect the transaction and refresh the balance
             // No manual refresh needed
@@ -660,7 +587,6 @@ export default function HigherSteakMenu() {
           onRefresh={() => {
             if (user?.fid) {
               fetchTokenBalance(user.fid);
-              fetchStakingDetails(user.fid);
             }
           }}
         />
@@ -677,10 +603,9 @@ export default function HigherSteakMenu() {
           userFid={simulatedFid !== null ? simulatedFid : (user?.fid || null)}
           walletBalance={getWalletBalance()}
           onStakeSuccess={() => {
-            // Refresh balance, staking details, and leaderboard
+            // Refresh balance and leaderboard
             if (user?.fid) {
               fetchTokenBalance(user.fid);
-              fetchStakingDetails(user.fid);
             }
             // Refresh leaderboard
             fetch('/api/leaderboard/refresh', {
@@ -731,6 +656,20 @@ export default function HigherSteakMenu() {
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue}
                 </span>
+                <span className="text-gray-400">•</span>
+                <div className="flex items-center gap-1">
+                  <BlockLivenessIndicator
+                    blockNumber={balance.block?.number}
+                    blockTimestamp={balance.block?.timestamp}
+                  />
+                  {typeof balance.block?.ageSeconds === 'number' && (
+                    <span className="text-[0.55rem] text-gray-500 hidden sm:inline">
+                      {balance.block.ageSeconds < 60
+                        ? `${balance.block.ageSeconds}s ago`
+                        : `${Math.floor(balance.block.ageSeconds / 60)}m ago`}
+                    </span>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
@@ -772,7 +711,6 @@ export default function HigherSteakMenu() {
                       <span className="text-purple-600 ml-1">(FID: {simulatedFid})</span>
                     )}
                   </span>
-                  <BlockLivenessIndicator />
                   {showFidSwitcher && (
                     <div 
                       className="absolute top-full mt-2 right-0 bg-white border border-black/20 rounded-lg shadow-lg z-[100] min-w-[200px] p-3"
