@@ -84,6 +84,7 @@ export function SupporterModal({
   const [stakeAmount, setStakeAmount] = useState('');
   const [lockupDuration, setLockupDuration] = useState<string>('');
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
+  const [stakeError, setStakeError] = useState<string | null>(null);
   
   // Staking transaction state
   const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
@@ -119,8 +120,12 @@ export function SupporterModal({
   // Use ref to track if we've already processed this transaction success
   const processedTxHash = useRef<string | null>(null);
   const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reportStakeError = useCallback(
-    (message: string) => {
+  const reportStakeError = useCallback((message: string) => {
+    setStakeError(message);
+  }, []);
+
+  const reportTransactionFailure = useCallback(
+    (message?: string) => {
       onTransactionFailure?.(message);
     },
     [onTransactionFailure]
@@ -278,7 +283,9 @@ export function SupporterModal({
         });
       } catch (error: any) {
         console.error('[SupporterModal] CreateLockUp error:', error);
-        reportStakeError(error?.message || 'Failed to create lockup');
+        const message = error?.message || 'Failed to create lockup';
+        reportStakeError(message);
+        reportTransactionFailure(message);
         setPendingCreateLockUp(false);
         hasScheduledCreateLockUp.current = false;
       }
@@ -311,6 +318,7 @@ export function SupporterModal({
       setCreateLockUpParams(null);
       setShowStakingForm(false);
       setStakeAmount('');
+      setStakeError(null);
       
       // Call success callback
       onLockSuccess?.(createLockUpHash, castHash);
@@ -321,13 +329,13 @@ export function SupporterModal({
   // Handle transaction errors
   useEffect(() => {
     if (approveError || createLockUpError) {
-      reportStakeError(
-        (approveError || createLockUpError)?.message || 'Transaction failed'
-      );
+      const message = (approveError || createLockUpError)?.message || 'Transaction failed';
+      reportStakeError(message);
+      reportTransactionFailure(message);
       setPendingCreateLockUp(false);
       hasScheduledCreateLockUp.current = false;
     }
-  }, [approveError, createLockUpError, reportStakeError]);
+  }, [approveError, createLockUpError, reportStakeError, reportTransactionFailure]);
 
   // Listen for webhook events to refresh cast data
   useEffect(() => {
@@ -444,6 +452,8 @@ export function SupporterModal({
     }
 
 
+    setStakeError(null);
+
     try {
       // Convert amount to wei (18 decimals)
       const amountWei = parseUnits(stakeAmount.replace(/,/g, ''), 18);
@@ -507,7 +517,9 @@ export function SupporterModal({
             });
           } catch (error: any) {
             console.error('[SupporterModal] CreateLockUp error:', error);
-            reportStakeError(error?.message || 'Failed to create lockup');
+            const message = error?.message || 'Failed to create lockup';
+            reportStakeError(message);
+            reportTransactionFailure(message);
             setPendingCreateLockUp(false);
             hasScheduledCreateLockUp.current = false;
           }
@@ -527,7 +539,9 @@ export function SupporterModal({
       }
     } catch (error: any) {
       console.error('[SupporterModal] Stake error:', error);
-      reportStakeError(error?.message || 'Failed to stake');
+      const message = error?.message || 'Failed to stake';
+      reportStakeError(message);
+      reportTransactionFailure(message);
       setPendingCreateLockUp(false);
       hasScheduledCreateLockUp.current = false;
     }
@@ -778,6 +792,7 @@ export function SupporterModal({
                 value={stakeAmount}
                 onChange={(e) => {
                   setStakeAmount(e.target.value);
+                  setStakeError(null);
                 }}
                 placeholder="0.00"
                 className="w-full text-sm font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
@@ -793,14 +808,20 @@ export function SupporterModal({
                   <input
                     type="number"
                     value={lockupDuration}
-                    onChange={(e) => setLockupDuration(e.target.value)}
+                    onChange={(e) => {
+                      setLockupDuration(e.target.value);
+                      setStakeError(null);
+                    }}
                     placeholder="1"
                     min="1"
                     className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
                   />
                   <select
                     value={lockupDurationUnit}
-                    onChange={(e) => setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year')}
+                    onChange={(e) => {
+                      setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year');
+                      setStakeError(null);
+                    }}
                     className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
                   >
                     <option value="minute">Minute(s)</option>
@@ -831,6 +852,11 @@ export function SupporterModal({
                 </div>
               </div>
             )}
+            {stakeError && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
+                {stakeError}
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -838,6 +864,7 @@ export function SupporterModal({
                   setStakeAmount('');
                   setLockupDuration('');
                   setLockupDurationUnit('day');
+                  setStakeError(null);
                 }}
                 className="flex-1 px-4 py-2 bg-white text-black font-bold border-2 border-black hover:bg-black hover:text-white transition text-sm"
               >
@@ -862,7 +889,10 @@ export function SupporterModal({
             {isCaster ? (
               /* Caster: Show "Add Stake" button */
               <button
-                onClick={() => setShowStakingForm(true)}
+                onClick={() => {
+                  setShowStakingForm(true);
+                  setStakeError(null);
+                }}
                 className="flex-1 px-4 py-2 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
               >
                 Add Stake
@@ -870,7 +900,10 @@ export function SupporterModal({
             ) : castData.maxCasterUnlockTime > 0 ? (
               /* Supporter: Show "Add Support" button if not expired */
               <button
-                onClick={() => setShowStakingForm(true)}
+                onClick={() => {
+                  setShowStakingForm(true);
+                  setStakeError(null);
+                }}
                 className="flex-1 px-4 py-2 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm"
               >
                 Add Support

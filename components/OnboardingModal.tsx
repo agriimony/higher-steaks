@@ -133,6 +133,7 @@ export function OnboardingModal({
   const [stakeAmount, setStakeAmount] = useState('');
   const [lockupDuration, setLockupDuration] = useState<string>('');
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
+  const [stakeError, setStakeError] = useState<string | null>(null);
   
   // Staking transaction state
   const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
@@ -202,8 +203,12 @@ export function OnboardingModal({
   const processedTxHash = useRef<string | null>(null);
   const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const reportStakeError = useCallback(
-    (message: string) => {
+  const reportStakeError = useCallback((message: string) => {
+    setStakeError(message);
+  }, []);
+
+  const reportTransactionFailure = useCallback(
+    (message?: string) => {
       onTransactionFailure?.(message);
     },
     [onTransactionFailure]
@@ -360,7 +365,9 @@ export function OnboardingModal({
           ],
         });
       } catch (error: any) {
-        reportStakeError(error?.message || 'Failed to create lockup');
+        const message = error?.message || 'Failed to create lockup';
+        reportStakeError(message);
+        reportTransactionFailure(message);
         setPendingCreateLockUp(false);
         hasScheduledCreateLockUp.current = false;
       }
@@ -416,13 +423,13 @@ export function OnboardingModal({
   // Error handling
   useEffect(() => {
     if (approveError || createLockUpError) {
-      reportStakeError(
-        (approveError || createLockUpError)?.message || 'Transaction failed'
-      );
+      const message = (approveError || createLockUpError)?.message || 'Transaction failed';
+      reportStakeError(message);
+      reportTransactionFailure(message);
       setPendingCreateLockUp(false);
       hasScheduledCreateLockUp.current = false;
     }
-  }, [approveError, createLockUpError, reportStakeError]);
+  }, [approveError, createLockUpError, reportStakeError, reportTransactionFailure]);
 
   const handleQuickCast = useCallback(async () => {
     try {
@@ -699,6 +706,8 @@ export function OnboardingModal({
     }
 
 
+    setStakeError(null);
+
     try {
       // Convert amount to wei (18 decimals)
       const amountWei = parseUnits(stakeAmount.replace(/,/g, ''), 18);
@@ -742,7 +751,9 @@ export function OnboardingModal({
               ],
             });
           } catch (error: any) {
-            reportStakeError(error?.message || 'Failed to create lockup');
+            const message = error?.message || 'Failed to create lockup';
+            reportStakeError(message);
+            reportTransactionFailure(message);
             setPendingCreateLockUp(false);
             hasScheduledCreateLockUp.current = false;
           }
@@ -760,7 +771,9 @@ export function OnboardingModal({
         });
       }
     } catch (error: any) {
-      reportStakeError(error?.message || 'Failed to initiate stake');
+      const message = error?.message || 'Failed to initiate stake';
+      reportStakeError(message);
+      reportTransactionFailure(message);
     }
   };
 
@@ -862,19 +875,23 @@ export function OnboardingModal({
   // Memoized handlers for staking form to prevent re-renders
   const handleStakeAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setStakeAmount(e.target.value);
+    setStakeError(null);
   }, []);
 
   const handleLockupDurationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLockupDuration(e.target.value);
+    setStakeError(null);
   }, []);
 
   const handleLockupDurationUnitChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year');
+    setStakeError(null);
   }, []);
 
   const handleSetAmount = useCallback((percentage: number) => {
     const amount = percentage === 1 ? connectedWalletBalance : connectedWalletBalance * percentage;
     setStakeAmount(amount.toFixed(2));
+    setStakeError(null);
     // Use setTimeout to ensure state update completes before focusing
     setTimeout(() => {
       stakeAmountInputRef.current?.focus();
@@ -887,11 +904,13 @@ export function OnboardingModal({
     setLockupDuration('');
     setLockupDurationUnit('day');
     setSelectedCastHash(null);
+    setStakeError(null);
   }, []);
 
   const handleOpenStakeForm = useCallback((index: number, hash: string) => {
     setSelectedCastIndex(index);
     setSelectedCastHash(normalizeHash(hash));
+    setStakeError(null);
   }, [normalizeHash]);
 
 
@@ -910,7 +929,8 @@ export function OnboardingModal({
     onLockupDurationUnitChange,
     onSetAmount,
     onStake,
-    onCancel
+    onCancel,
+    errorMessage
   }: {
     stakeAmount: string;
     lockupDuration: string;
@@ -926,6 +946,7 @@ export function OnboardingModal({
     onSetAmount: (percentage: number) => void;
     onStake: (hash: string) => void;
     onCancel: () => void;
+    errorMessage: string | null;
   }) => {
     return (
       <div className="mb-4">
@@ -995,6 +1016,11 @@ export function OnboardingModal({
           </div>
         </div>
 
+        {errorMessage && (
+          <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
+            {errorMessage}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button
@@ -1020,12 +1046,15 @@ export function OnboardingModal({
         </div>
       </div>
     );
-  }, (prevProps, nextProps) => {
-    // Custom comparison - we want to update when values change, but refs and callbacks should be stable
-    // The key is that React should UPDATE the inputs (change value prop) not REMOUNT them
-    // Always allow updates - React should reconcile, not remount
-    return false; // false = allow update (React will reconcile)
-  });
+  }, (prevProps, nextProps) =>
+    prevProps.stakeAmount === nextProps.stakeAmount &&
+    prevProps.lockupDuration === nextProps.lockupDuration &&
+    prevProps.lockupDurationUnit === nextProps.lockupDurationUnit &&
+    prevProps.isLoadingTransaction === nextProps.isLoadingTransaction &&
+    prevProps.connectedWalletBalance === nextProps.connectedWalletBalance &&
+    prevProps.castHash === nextProps.castHash &&
+    prevProps.errorMessage === nextProps.errorMessage
+  );
 
   // Cast Cards View Component - memoized to prevent recreation on every render
   const CastCardsView = useMemo(() => {
@@ -1158,7 +1187,8 @@ export function OnboardingModal({
             onLockupDurationUnitChange={handleLockupDurationUnitChange}
             onSetAmount={handleSetAmount}
             onStake={handleStake}
-            onCancel={handleCancelStake}
+          onCancel={handleCancelStake}
+          errorMessage={stakeError}
           />
         )}
         
