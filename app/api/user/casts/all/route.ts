@@ -4,6 +4,12 @@ import { sql } from '@vercel/postgres';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const noCacheHeaders = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+  Pragma: 'no-cache',
+  Expires: '0',
+};
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -12,7 +18,10 @@ export async function GET(request: NextRequest) {
     if (!fidParam) {
       return NextResponse.json(
         { error: 'FID is required' },
-        { status: 400 }
+        {
+          status: 400,
+          headers: noCacheHeaders,
+        }
       );
     }
 
@@ -21,7 +30,10 @@ export async function GET(request: NextRequest) {
     if (isNaN(fid)) {
       return NextResponse.json(
         { error: 'Invalid FID' },
-        { status: 400 }
+        {
+          status: 400,
+          headers: noCacheHeaders,
+        }
       );
     }
 
@@ -59,33 +71,41 @@ export async function GET(request: NextRequest) {
 
         console.log(`[User Casts All API] Found ${casts.length} casts in database`);
         
-        return NextResponse.json({
-          casts,
-        });
+        return NextResponse.json(
+          { casts },
+          { headers: noCacheHeaders }
+        );
       }
 
       console.log(`[User Casts All API] No casts found in database`);
-      return NextResponse.json({
-        casts: [],
-      });
+      return NextResponse.json(
+        { casts: [] },
+        { headers: noCacheHeaders }
+      );
     } catch (dbError: any) {
       console.error(`[User Casts All API] Database query failed:`, dbError.message);
       return NextResponse.json(
-        { 
+        {
           error: 'Database query failed',
-          message: dbError.message 
+          message: dbError.message,
         },
-        { status: 500 }
+        {
+          status: 500,
+          headers: noCacheHeaders,
+        }
       );
     }
   } catch (error: any) {
     console.error('[User Casts All API] Error:', error);
     return NextResponse.json(
-      { 
-        error: 'Internal server error', 
+      {
+        error: 'Internal server error',
         message: error.message || String(error),
       },
-      { status: 500 }
+      {
+        status: 500,
+        headers: noCacheHeaders,
+      }
     );
   }
 }
