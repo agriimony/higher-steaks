@@ -5,6 +5,7 @@ import { sdk } from '@farcaster/miniapp-sdk';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { StakingModal } from '@/components/StakingModal';
 import { SupporterModal } from '@/components/SupporterModal';
+import { TransactionModal } from '@/components/TransactionModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 import { BlockLivenessIndicator } from '@/components/BlockLivenessIndicator';
 import { useEventSubscriptions } from '@/hooks/useEventSubscriptions';
@@ -95,6 +96,12 @@ export default function HigherSteakMenu() {
   const [simulatedFid, setSimulatedFid] = useState<number | null>(null); // For testing supporter vs caster view
   const [showFidSwitcher, setShowFidSwitcher] = useState(false);
   const fidSwitcherRef = useRef<HTMLDivElement>(null);
+  const [transactionModal, setTransactionModal] = useState<{
+    variant: 'failure' | 'lock-success' | 'unlock-success';
+    errorMessage?: string;
+    txHash?: string;
+    castHash?: string;
+  } | null>(null);
   
   // Detect pixel density for ASCII art scaling
   const [pixelDensity, setPixelDensity] = useState(1);
@@ -132,6 +139,32 @@ export default function HigherSteakMenu() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.fid]);
+
+  const closeTransactionModal = useCallback(() => {
+    setTransactionModal(null);
+  }, []);
+
+  const showTransactionFailure = useCallback((message?: string) => {
+    setTransactionModal({
+      variant: 'failure',
+      errorMessage: message,
+    });
+  }, []);
+
+  const showLockSuccess = useCallback((txHash?: string, castHash?: string) => {
+    setTransactionModal({
+      variant: 'lock-success',
+      txHash,
+      castHash,
+    });
+  }, []);
+
+  const showUnlockSuccess = useCallback((txHash?: string) => {
+    setTransactionModal({
+      variant: 'unlock-success',
+      txHash,
+    });
+  }, []);
 
   const fetchTokenBalance = async (fid: number) => {
     console.log('[fetchTokenBalance] Called for fid:', fid);
@@ -566,6 +599,16 @@ export default function HigherSteakMenu() {
 
   return (
     <>
+      {transactionModal && (
+        <TransactionModal
+          variant={transactionModal.variant}
+          errorMessage={transactionModal.errorMessage}
+          txHash={transactionModal.txHash}
+          castHash={transactionModal.castHash}
+          onClose={closeTransactionModal}
+        />
+      )}
+
       {/* Onboarding Modal */}
       {showOnboardingModal && user && (
         <OnboardingModal
@@ -573,6 +616,8 @@ export default function HigherSteakMenu() {
           userFid={user.fid}
           walletBalance={getWalletBalance()}
           onStakeSuccess={handleStakeSuccess}
+          onTransactionFailure={showTransactionFailure}
+          onLockSuccess={showLockSuccess}
         />
       )}
 
@@ -593,6 +638,8 @@ export default function HigherSteakMenu() {
               fetchTokenBalance(user.fid);
             }
           }}
+          onTransactionFailure={showTransactionFailure}
+          onUnlockSuccess={showUnlockSuccess}
         />
       )}
 
@@ -621,6 +668,8 @@ export default function HigherSteakMenu() {
               console.error('[SupporterModal] Error refreshing leaderboard:', err);
             });
           }}
+          onTransactionFailure={showTransactionFailure}
+          onLockSuccess={showLockSuccess}
         />
       )}
 

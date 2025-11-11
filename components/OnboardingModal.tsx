@@ -29,6 +29,8 @@ interface OnboardingModalProps {
   userFid: number;
   walletBalance?: number;
   onStakeSuccess?: () => void;
+  onTransactionFailure?: (message?: string) => void;
+  onLockSuccess?: (txHash?: string, castHash?: string) => void;
 }
 
 // Format timestamp to readable date
@@ -96,7 +98,14 @@ function calculateStakeTotals(
   };
 }
 
-export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSuccess }: OnboardingModalProps) {
+export function OnboardingModal({
+  onClose,
+  userFid,
+  walletBalance = 0,
+  onStakeSuccess,
+  onTransactionFailure,
+  onLockSuccess,
+}: OnboardingModalProps) {
   // Helper function to normalize hash format (ensure 0x prefix and lowercase)
   const normalizeHash = useCallback((hash: string): string => {
     if (!hash) return hash;
@@ -126,7 +135,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   
   // Staking transaction state
-  const [stakeError, setStakeError] = useState<string | null>(null);
   const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
   const [createLockUpParams, setCreateLockUpParams] = useState<{
     amountWei: bigint;
@@ -193,6 +201,13 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
   // Use ref to track if we've already processed this transaction success
   const processedTxHash = useRef<string | null>(null);
   const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const reportStakeError = useCallback(
+    (message: string) => {
+      onTransactionFailure?.(message);
+    },
+    [onTransactionFailure]
+  );
 
   // Fetch all casts on mount
   useEffect(() => {
@@ -281,7 +296,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       if (prev > 0) {
         // Reset staking form when changing cards
         setSelectedCastIndex(null);
-        setStakeError(null);
         setStakeAmount('');
         setLockupDuration('');
         setLockupDurationUnit('day');
@@ -298,7 +312,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       if (prev < casts.length - 1) {
         // Reset staking form when changing cards
         setSelectedCastIndex(null);
-        setStakeError(null);
         setStakeAmount('');
         setLockupDuration('');
         setLockupDurationUnit('day');
@@ -347,7 +360,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           ],
         });
       } catch (error: any) {
-        setStakeError(error?.message || 'Failed to create lockup');
+        reportStakeError(error?.message || 'Failed to create lockup');
         setPendingCreateLockUp(false);
         hasScheduledCreateLockUp.current = false;
       }
@@ -376,6 +389,8 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       // Mark this transaction as processed
       processedTxHash.current = createLockUpHash;
       
+      const castHashForCallback = selectedCastHash || undefined;
+
       setPendingCreateLockUp(false);
       setCreateLockUpParams(null);
       setSelectedCastIndex(null);
@@ -387,18 +402,27 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       
       
       // Call parent callback - let the parent/staking modal handle real-time updates
+      onLockSuccess?.(createLockUpHash, castHashForCallback);
       onStakeSuccess?.();
     }
-  }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess]);
+  }, [
+    isCreateLockUpSuccess,
+    createLockUpHash,
+    onStakeSuccess,
+    onLockSuccess,
+    selectedCastHash,
+  ]);
 
   // Error handling
   useEffect(() => {
     if (approveError || createLockUpError) {
-      setStakeError((approveError || createLockUpError)?.message || 'Transaction failed');
+      reportStakeError(
+        (approveError || createLockUpError)?.message || 'Transaction failed'
+      );
       setPendingCreateLockUp(false);
       hasScheduledCreateLockUp.current = false;
     }
-  }, [approveError, createLockUpError]);
+  }, [approveError, createLockUpError, reportStakeError]);
 
   const handleQuickCast = useCallback(async () => {
     try {
@@ -588,7 +612,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   const handleStake = async (castHash: string) => {
     if (!wagmiAddress) {
-      setStakeError('No wallet connected');
+      reportStakeError('No wallet connected');
       return;
     }
 
@@ -606,7 +630,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       
       if (!validateResponse.ok) {
         console.error('[handleStake] Validation request failed:', validateResponse.status, validateResponse.statusText);
-        setStakeError('Failed to validate cast. Please try again.');
+        reportStakeError('Failed to validate cast. Please try again.');
         return;
       }
 
@@ -619,21 +643,21 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       });
       
       if (!validateData.valid) {
-        setStakeError('Higher cast not found. Please create a valid cast first.');
+        reportStakeError('Higher cast not found. Please create a valid cast first.');
         return;
       }
 
       // Validate ownership - only the caster can stake on their own cast
       if (validateData.fid !== userFid) {
         console.warn('[handleStake] Ownership mismatch:', { validateFid: validateData.fid, userFid });
-        setStakeError('Only the caster can stake on their own cast');
+        reportStakeError('Only the caster can stake on their own cast');
         return;
       }
 
       // Check cast state - must be 'valid' or 'higher' (expired casts can be re-staked)
       // Note: Neynar-validated casts will have state 'valid' since they're not in DB yet
       if (validateData.state && validateData.state !== 'valid' && validateData.state !== 'higher' && validateData.state !== 'expired') {
-        setStakeError('Cast is not valid for staking');
+        reportStakeError('Cast is not valid for staking');
         return;
       }
 
@@ -650,7 +674,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       }
     } catch (error) {
       console.error('[handleStake] Validation error:', error);
-      setStakeError('Failed to validate cast ownership. Please try again.');
+      reportStakeError('Failed to validate cast ownership. Please try again.');
       return;
     }
 
@@ -659,22 +683,21 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     const durationNum = parseFloat(lockupDuration);
     
     if (isNaN(amountNum) || amountNum <= 0) {
-      setStakeError('Please enter a valid stake amount');
+      reportStakeError('Please enter a valid stake amount');
       return;
     }
     
     if (isNaN(durationNum) || durationNum <= 0) {
-      setStakeError('Please enter a valid duration');
+      reportStakeError('Please enter a valid duration');
       return;
     }
 
     // Check balance
     if (amountNum > connectedWalletBalance) {
-      setStakeError('Amount exceeds wallet balance');
+      reportStakeError('Amount exceeds wallet balance');
       return;
     }
 
-    setStakeError(null);
 
     try {
       // Convert amount to wei (18 decimals)
@@ -686,7 +709,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
       
       // Validate unlockTime fits in uint40
       if (unlockTime > 0xFFFFFFFF) {
-        setStakeError('Duration too long (exceeds maximum)');
+        reportStakeError('Duration too long (exceeds maximum)');
         return;
       }
 
@@ -719,7 +742,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
               ],
             });
           } catch (error: any) {
-            setStakeError(error?.message || 'Failed to create lockup');
+            reportStakeError(error?.message || 'Failed to create lockup');
             setPendingCreateLockUp(false);
             hasScheduledCreateLockUp.current = false;
           }
@@ -737,7 +760,7 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
         });
       }
     } catch (error: any) {
-      setStakeError(error?.message || 'Failed to initiate stake');
+      reportStakeError(error?.message || 'Failed to initiate stake');
     }
   };
 
@@ -860,7 +883,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
 
   const handleCancelStake = useCallback(() => {
     setSelectedCastIndex(null);
-    setStakeError(null);
     setStakeAmount('');
     setLockupDuration('');
     setLockupDurationUnit('day');
@@ -878,7 +900,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     stakeAmount,
     lockupDuration,
     lockupDurationUnit,
-    stakeError,
     isLoadingTransaction,
     connectedWalletBalance,
     castHash,
@@ -894,7 +915,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     stakeAmount: string;
     lockupDuration: string;
     lockupDurationUnit: 'minute' | 'day' | 'week' | 'month' | 'year';
-    stakeError: string | null;
     isLoadingTransaction: boolean;
     connectedWalletBalance: number;
     castHash: string;
@@ -975,11 +995,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
           </div>
         </div>
 
-        {stakeError && (
-          <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
-            {stakeError}
-          </div>
-        )}
 
         <div className="flex gap-3">
           <button
@@ -1133,7 +1148,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
             stakeAmount={stakeAmount}
             lockupDuration={lockupDuration}
             lockupDurationUnit={lockupDurationUnit}
-            stakeError={stakeError}
             isLoadingTransaction={isLoadingTransaction}
             connectedWalletBalance={connectedWalletBalance}
             castHash={currentCast.hash}
@@ -1173,7 +1187,6 @@ export function OnboardingModal({ onClose, userFid, walletBalance = 0, onStakeSu
     stakeAmount,
     lockupDuration,
     lockupDurationUnit,
-    stakeError,
     isLoadingTransaction,
     connectedWalletBalance,
     handleStakeAmountChange,

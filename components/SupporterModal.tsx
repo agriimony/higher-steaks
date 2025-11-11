@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAccount } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
@@ -14,6 +14,8 @@ interface SupporterModalProps {
   userFid: number | null;
   walletBalance?: number;
   onStakeSuccess?: () => void;
+  onTransactionFailure?: (message?: string) => void;
+  onLockSuccess?: (txHash?: string, castHash?: string) => void;
 }
 
 interface CastData {
@@ -66,7 +68,15 @@ function durationToSeconds(duration: number, unit: 'minute' | 'day' | 'week' | '
   }
 }
 
-export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, onStakeSuccess }: SupporterModalProps) {
+export function SupporterModal({
+  castHash,
+  onClose,
+  userFid,
+  walletBalance = 0,
+  onStakeSuccess,
+  onTransactionFailure,
+  onLockSuccess,
+}: SupporterModalProps) {
   const [castData, setCastData] = useState<CastData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +86,6 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   
   // Staking transaction state
-  const [stakeError, setStakeError] = useState<string | null>(null);
   const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
   const [createLockUpParams, setCreateLockUpParams] = useState<{
     amountWei: bigint;
@@ -110,6 +119,12 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
   // Use ref to track if we've already processed this transaction success
   const processedTxHash = useRef<string | null>(null);
   const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reportStakeError = useCallback(
+    (message: string) => {
+      onTransactionFailure?.(message);
+    },
+    [onTransactionFailure]
+  );
 
   // Webhook listeners
   const wsEnabled = userFid !== null;
@@ -263,7 +278,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
         });
       } catch (error: any) {
         console.error('[SupporterModal] CreateLockUp error:', error);
-        setStakeError(error?.message || 'Failed to create lockup');
+        reportStakeError(error?.message || 'Failed to create lockup');
         setPendingCreateLockUp(false);
         hasScheduledCreateLockUp.current = false;
       }
@@ -298,18 +313,21 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
       setStakeAmount('');
       
       // Call success callback
+      onLockSuccess?.(createLockUpHash, castHash);
       onStakeSuccess?.();
     }
-  }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess]);
+  }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess, onLockSuccess, castHash]);
 
   // Handle transaction errors
   useEffect(() => {
     if (approveError || createLockUpError) {
-      setStakeError((approveError || createLockUpError)?.message || 'Transaction failed');
+      reportStakeError(
+        (approveError || createLockUpError)?.message || 'Transaction failed'
+      );
       setPendingCreateLockUp(false);
       hasScheduledCreateLockUp.current = false;
     }
-  }, [approveError, createLockUpError]);
+  }, [approveError, createLockUpError, reportStakeError]);
 
   // Listen for webhook events to refresh cast data
   useEffect(() => {
@@ -399,12 +417,12 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
 
   const handleStake = async () => {
     if (!wagmiAddress || !isConnected) {
-      setStakeError('No wallet connected');
+      reportStakeError('No wallet connected');
       return;
     }
 
     if (!castData) {
-      setStakeError('No valid cast found');
+      reportStakeError('No valid cast found');
       return;
     }
 
@@ -415,17 +433,16 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
     const amountNum = parseFloat(stakeAmount.replace(/,/g, ''));
     
     if (isNaN(amountNum) || amountNum <= 0) {
-      setStakeError('Please enter a valid stake amount');
+      reportStakeError('Please enter a valid stake amount');
       return;
     }
 
     // Check balance
     if (amountNum > walletBalance) {
-      setStakeError('Amount exceeds wallet balance');
+      reportStakeError('Amount exceeds wallet balance');
       return;
     }
 
-    setStakeError(null);
 
     try {
       // Convert amount to wei (18 decimals)
@@ -438,7 +455,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
         const durationNum = parseFloat(lockupDuration);
         
         if (isNaN(durationNum) || durationNum <= 0) {
-          setStakeError('Please enter a valid duration');
+          reportStakeError('Please enter a valid duration');
           return;
         }
         
@@ -448,7 +465,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
       } else {
         // Supporter: use max caster unlock time
         if (!castData.maxCasterUnlockTime || castData.maxCasterUnlockTime <= 0) {
-          setStakeError('No valid caster stake found');
+          reportStakeError('No valid caster stake found');
           return;
         }
         unlockTime = castData.maxCasterUnlockTime;
@@ -456,7 +473,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
       
       // Validate unlockTime fits in uint40
       if (unlockTime > 0xFFFFFFFF) {
-        setStakeError('Duration too long (exceeds maximum)');
+        reportStakeError('Duration too long (exceeds maximum)');
         return;
       }
 
@@ -490,7 +507,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
             });
           } catch (error: any) {
             console.error('[SupporterModal] CreateLockUp error:', error);
-            setStakeError(error?.message || 'Failed to create lockup');
+            reportStakeError(error?.message || 'Failed to create lockup');
             setPendingCreateLockUp(false);
             hasScheduledCreateLockUp.current = false;
           }
@@ -510,7 +527,7 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
       }
     } catch (error: any) {
       console.error('[SupporterModal] Stake error:', error);
-      setStakeError(error?.message || 'Failed to stake');
+      reportStakeError(error?.message || 'Failed to stake');
       setPendingCreateLockUp(false);
       hasScheduledCreateLockUp.current = false;
     }
@@ -761,7 +778,6 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 value={stakeAmount}
                 onChange={(e) => {
                   setStakeAmount(e.target.value);
-                  setStakeError(null);
                 }}
                 placeholder="0.00"
                 className="w-full text-sm font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
@@ -815,14 +831,10 @@ export function SupporterModal({ castHash, onClose, userFid, walletBalance = 0, 
                 </div>
               </div>
             )}
-            {stakeError && (
-              <div className="mb-3 text-xs text-red-600">{stakeError}</div>
-            )}
             <div className="flex gap-2">
               <button
                 onClick={() => {
                   setShowStakingForm(false);
-                  setStakeError(null);
                   setStakeAmount('');
                   setLockupDuration('');
                   setLockupDurationUnit('day');

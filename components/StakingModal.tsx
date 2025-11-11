@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { LOCKUP_CONTRACT, LOCKUP_ABI } from '@/lib/contracts';
 import { fetchValidCast, truncateCastText, isValidCastHash } from '@/lib/cast-helpers';
@@ -35,6 +35,8 @@ interface StakingModalProps {
   loading?: boolean;
   onTransactionSuccess?: () => void;
   onRefresh?: () => void;
+  onTransactionFailure?: (message?: string) => void;
+  onUnlockSuccess?: (txHash?: string) => void;
 }
 
 // Format time remaining to show only largest unit
@@ -83,12 +85,27 @@ function formatTokenAmount(amount: string): string {
   }
 }
 
-export function StakingModal({ onClose, balance, lockups, wallets, loading = false, onTransactionSuccess, onRefresh }: StakingModalProps) {
+export function StakingModal({
+  onClose,
+  balance,
+  lockups,
+  wallets,
+  loading = false,
+  onTransactionSuccess,
+  onRefresh,
+  onTransactionFailure,
+  onUnlockSuccess,
+}: StakingModalProps) {
   // Transaction state
   const [unstakeLockupId, setUnstakeLockupId] = useState<string | null>(null);
-  const [unstakeError, setUnstakeError] = useState<string | null>(null);
   // Use ref to track if we've already processed this transaction success
   const processedUnstakeTxHash = useRef<string | null>(null);
+  const reportUnstakeError = useCallback(
+    (message: string) => {
+      onTransactionFailure?.(message);
+    },
+    [onTransactionFailure]
+  );
   
   // Cast text state
   const [castTexts, setCastTexts] = useState<Record<string, string | null>>({});
@@ -239,7 +256,6 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
   // Handle Unstake
   const handleUnstake = (lockupId: string) => {
     setUnstakeLockupId(lockupId);
-    setUnstakeError(null);
     
     try {
       writeContractUnstake({
@@ -249,7 +265,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         args: [BigInt(lockupId)],
       });
     } catch (error: any) {
-      setUnstakeError(error?.message || 'Failed to initiate unstake');
+      reportUnstakeError(error?.message || 'Failed to initiate unstake');
       console.error('Unstake error:', error);
     }
   };
@@ -269,6 +285,7 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
       setUnstakeLockupId(null);
       
       console.log('[Staking Modal] Unstake transaction successful - Webhook will refresh UI');
+      onUnlockSuccess?.(unstakeHash);
       
       // Call refresh callback
       if (onTransactionSuccess) {
@@ -277,14 +294,14 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
         }, 1000); // Wait a bit for blockchain to update
       }
     }
-  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess]);
+  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess, onUnlockSuccess]);
 
   // Update error states
   useEffect(() => {
     if (unstakeWriteError) {
-      setUnstakeError(unstakeWriteError.message || 'Transaction failed');
+      reportUnstakeError(unstakeWriteError.message || 'Transaction failed');
     }
-  }, [unstakeWriteError]);
+  }, [unstakeWriteError, reportUnstakeError]);
 
   return (
     <div 
@@ -528,13 +545,6 @@ export function StakingModal({ onClose, balance, lockups, wallets, loading = fal
                 </ul>
               )}
             </div>
-          </div>
-        )}
-        
-        {/* Error display */}
-        {unstakeError && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs">
-            {unstakeError}
           </div>
         )}
         
