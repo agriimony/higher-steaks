@@ -202,6 +202,7 @@ export function OnboardingModal({
   // Use ref to track if we've already processed this transaction success
   const processedTxHash = useRef<string | null>(null);
   const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const transactionErrorReportedRef = useRef(false);
 
   const reportStakeError = useCallback((message: string) => {
     setStakeError(message);
@@ -406,6 +407,8 @@ export function OnboardingModal({
       setLockupDurationUnit('day');
       setSelectedCastHash(null);
       hasScheduledCreateLockUp.current = false;
+      setStakeError(null);
+      transactionErrorReportedRef.current = false;
       
       
       // Call parent callback - let the parent/staking modal handle real-time updates
@@ -425,11 +428,31 @@ export function OnboardingModal({
     if (approveError || createLockUpError) {
       const message = (approveError || createLockUpError)?.message || 'Transaction failed';
       reportStakeError(message);
-      reportTransactionFailure(message);
+
+      // Only surface the transaction modal when the contract interaction has already started.
+      if (pendingCreateLockUp || createLockUpParams) {
+        if (!transactionErrorReportedRef.current) {
+          reportTransactionFailure(message);
+          transactionErrorReportedRef.current = true;
+        }
+      }
+
       setPendingCreateLockUp(false);
       hasScheduledCreateLockUp.current = false;
+      setCreateLockUpParams(null);
+      setSelectedCastHash(null);
+    } else {
+      transactionErrorReportedRef.current = false;
     }
-  }, [approveError, createLockUpError, reportStakeError, reportTransactionFailure]);
+  }, [
+    approveError,
+    createLockUpError,
+    reportStakeError,
+    reportTransactionFailure,
+    pendingCreateLockUp,
+    createLockUpParams,
+    setSelectedCastHash,
+  ]);
 
   const handleQuickCast = useCallback(async () => {
     try {
@@ -691,22 +714,26 @@ export function OnboardingModal({
     
     if (isNaN(amountNum) || amountNum <= 0) {
       reportStakeError('Please enter a valid stake amount');
+      transactionErrorReportedRef.current = false;
       return;
     }
     
     if (isNaN(durationNum) || durationNum <= 0) {
       reportStakeError('Please enter a valid duration');
+      transactionErrorReportedRef.current = false;
       return;
     }
 
     // Check balance
     if (amountNum > connectedWalletBalance) {
       reportStakeError('Amount exceeds wallet balance');
+      transactionErrorReportedRef.current = false;
       return;
     }
 
 
     setStakeError(null);
+    transactionErrorReportedRef.current = false;
 
     try {
       // Convert amount to wei (18 decimals)
@@ -733,6 +760,7 @@ export function OnboardingModal({
         // Sufficient allowance - simulate approve success to trigger createLockUp
         hasScheduledCreateLockUp.current = true;
         setPendingCreateLockUp(true);
+        transactionErrorReportedRef.current = false;
         
         // Call createLockUp directly after a short delay
         const delay = setTimeout(() => {
@@ -763,6 +791,7 @@ export function OnboardingModal({
         setCreateLockUpParams(null);
       } else {
         // Step 1: Approve the lockup contract to spend tokens
+        transactionErrorReportedRef.current = false;
         writeContractApprove({
           address: HIGHER_TOKEN_ADDRESS,
           abi: ERC20_ABI,
@@ -773,7 +802,10 @@ export function OnboardingModal({
     } catch (error: any) {
       const message = error?.message || 'Failed to initiate stake';
       reportStakeError(message);
-      reportTransactionFailure(message);
+      if (!transactionErrorReportedRef.current) {
+        reportTransactionFailure(message);
+        transactionErrorReportedRef.current = true;
+      }
     }
   };
 
@@ -876,22 +908,26 @@ export function OnboardingModal({
   const handleStakeAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setStakeAmount(e.target.value);
     setStakeError(null);
+    transactionErrorReportedRef.current = false;
   }, []);
 
   const handleLockupDurationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLockupDuration(e.target.value);
     setStakeError(null);
+    transactionErrorReportedRef.current = false;
   }, []);
 
   const handleLockupDurationUnitChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setLockupDurationUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year');
     setStakeError(null);
+    transactionErrorReportedRef.current = false;
   }, []);
 
   const handleSetAmount = useCallback((percentage: number) => {
     const amount = percentage === 1 ? connectedWalletBalance : connectedWalletBalance * percentage;
     setStakeAmount(amount.toFixed(2));
     setStakeError(null);
+    transactionErrorReportedRef.current = false;
     // Use setTimeout to ensure state update completes before focusing
     setTimeout(() => {
       stakeAmountInputRef.current?.focus();
@@ -905,12 +941,14 @@ export function OnboardingModal({
     setLockupDurationUnit('day');
     setSelectedCastHash(null);
     setStakeError(null);
+    transactionErrorReportedRef.current = false;
   }, []);
 
   const handleOpenStakeForm = useCallback((index: number, hash: string) => {
     setSelectedCastIndex(index);
     setSelectedCastHash(normalizeHash(hash));
     setStakeError(null);
+    transactionErrorReportedRef.current = false;
   }, [normalizeHash]);
 
 
