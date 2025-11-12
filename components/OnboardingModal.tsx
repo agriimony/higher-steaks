@@ -135,8 +135,21 @@ export function OnboardingModal({
   const [lockupDuration, setLockupDuration] = useState<string>('');
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   const [stakeError, setStakeError] = useState<string | null>(null);
+  
+  // Staking transaction state
+  const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
+  const [createLockUpParams, setCreateLockUpParams] = useState<{
+    amountWei: bigint;
+    unlockTime: number;
+  } | null>(null);
+  
+  // Card navigation state
+  const castUrlInputRef = useRef<HTMLInputElement>(null);
+  const stakeAmountInputRef = useRef<HTMLInputElement>(null);
+  const lockupDurationInputRef = useRef<HTMLInputElement>(null);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
 
-  // Debug: Log state changes that might cause re-renders
+  // Debug: Log state changes that might cause re-renders (after all state declarations)
   useEffect(() => {
     console.log('[OnboardingModal] State change - customMessage:', customMessage);
   }, [customMessage]);
@@ -168,19 +181,6 @@ export function OnboardingModal({
   useEffect(() => {
     console.log('[OnboardingModal] State change - showCreateCast:', showCreateCast);
   }, [showCreateCast]);
-  
-  // Staking transaction state
-  const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
-  const [createLockUpParams, setCreateLockUpParams] = useState<{
-    amountWei: bigint;
-    unlockTime: number;
-  } | null>(null);
-  
-  // Card navigation state
-  const castUrlInputRef = useRef<HTMLInputElement>(null);
-  const stakeAmountInputRef = useRef<HTMLInputElement>(null);
-  const lockupDurationInputRef = useRef<HTMLInputElement>(null);
-  const [activeCardIndex, setActiveCardIndex] = useState(0);
 
   // Debug: Track focus changes globally (after refs are declared)
   useEffect(() => {
@@ -510,6 +510,7 @@ export function OnboardingModal({
     setSelectedCastHash,
   ]);
 
+  // Define handlers before useMemo that depends on them
   const handleQuickCast = useCallback(async () => {
     try {
       const fullMessage = "started aiming higher and it worked out! " + customMessage;
@@ -914,10 +915,7 @@ export function OnboardingModal({
 
         <div className="mb-4">
           <input
-            ref={(el) => {
-              console.log('[OnboardingModal] castUrlInputRef set', { el, currentValue: el?.value, isFocused: document.activeElement === el });
-              castUrlInputRef.current = el;
-            }}
+            ref={castUrlInputRef}
             key="cast-url-input"
             type="text"
             value={castUrl}
@@ -979,7 +977,8 @@ export function OnboardingModal({
         </button>
       </div>
     </>
-  ), [customMessage, castUrl, urlValidationError, validatingUrl, showCreateCast, handleQuickCast, handleValidateAndUseCastUrl]);
+    );
+  }, [customMessage, castUrl, urlValidationError, validatingUrl, showCreateCast, handleQuickCast, handleValidateAndUseCastUrl]);
 
   // Memoized handlers for staking form to prevent re-renders
   const handleStakeAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1082,12 +1081,7 @@ export function OnboardingModal({
           <label className="text-xs text-black/70 mb-1 block">Amount (HIGHER)</label>
           <div className="flex gap-2">
             <input
-              ref={(el) => {
-                console.log('[OnboardingModal] stakeAmountInputRef set', { el, currentValue: el?.value, isFocused: document.activeElement === el });
-                if (stakeAmountInputRef) {
-                  (stakeAmountInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
-                }
-              }}
+              ref={stakeAmountInputRef}
               type="text"
               value={stakeAmount}
               onChange={onStakeAmountChange}
@@ -1133,12 +1127,7 @@ export function OnboardingModal({
           <label className="text-xs text-black/70 mb-1 block">Duration</label>
           <div className="flex gap-2">
             <input
-              ref={(el) => {
-                console.log('[OnboardingModal] lockupDurationInputRef set', { el, currentValue: el?.value, isFocused: document.activeElement === el });
-                if (lockupDurationInputRef) {
-                  (lockupDurationInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
-                }
-              }}
+              ref={lockupDurationInputRef}
               type="number"
               value={lockupDuration}
               onChange={onLockupDurationChange}
