@@ -936,12 +936,12 @@ export function OnboardingModal({
             className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
             autoFocus={showCreateCast}
           />
-        {urlValidationError && (
-          <div className="mt-2 text-xs text-red-600">
-            {urlValidationError}
-          </div>
-        )}
-      </div>
+          {urlValidationError && (
+            <div className="mt-2 text-xs text-red-600">
+              {urlValidationError}
+            </div>
+          )}
+        </div>
       
       <div className="flex gap-3 border-t border-black/20 pt-4">
         <button
