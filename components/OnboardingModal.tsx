@@ -106,6 +106,7 @@ export function OnboardingModal({
   onTransactionFailure,
   onLockSuccess,
 }: OnboardingModalProps) {
+  console.log('[OnboardingModal] Component render', { userFid, walletBalance });
   // Helper function to normalize hash format (ensure 0x prefix and lowercase)
   const normalizeHash = useCallback((hash: string): string => {
     if (!hash) return hash;
@@ -134,6 +135,39 @@ export function OnboardingModal({
   const [lockupDuration, setLockupDuration] = useState<string>('');
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   const [stakeError, setStakeError] = useState<string | null>(null);
+
+  // Debug: Log state changes that might cause re-renders
+  useEffect(() => {
+    console.log('[OnboardingModal] State change - customMessage:', customMessage);
+  }, [customMessage]);
+
+  useEffect(() => {
+    console.log('[OnboardingModal] State change - castUrl:', castUrl);
+  }, [castUrl]);
+
+  useEffect(() => {
+    console.log('[OnboardingModal] State change - stakeAmount:', stakeAmount);
+  }, [stakeAmount]);
+
+  useEffect(() => {
+    console.log('[OnboardingModal] State change - lockupDuration:', lockupDuration);
+  }, [lockupDuration]);
+
+  useEffect(() => {
+    console.log('[OnboardingModal] State change - casts:', casts.length);
+  }, [casts.length]);
+
+  useEffect(() => {
+    console.log('[OnboardingModal] State change - activeCardIndex:', activeCardIndex);
+  }, [activeCardIndex]);
+
+  useEffect(() => {
+    console.log('[OnboardingModal] State change - selectedCastIndex:', selectedCastIndex);
+  }, [selectedCastIndex]);
+
+  useEffect(() => {
+    console.log('[OnboardingModal] State change - showCreateCast:', showCreateCast);
+  }, [showCreateCast]);
   
   // Staking transaction state
   const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
@@ -147,6 +181,28 @@ export function OnboardingModal({
   const stakeAmountInputRef = useRef<HTMLInputElement>(null);
   const lockupDurationInputRef = useRef<HTMLInputElement>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
+
+  // Debug: Track focus changes globally (after refs are declared)
+  useEffect(() => {
+    const handleFocusChange = () => {
+      console.log('[OnboardingModal] Focus changed', { 
+        activeElement: document.activeElement?.tagName,
+        activeElementId: (document.activeElement as HTMLElement)?.id,
+        activeElementValue: (document.activeElement as HTMLInputElement)?.value,
+        activeElementRef: document.activeElement === castUrlInputRef.current || 
+                         document.activeElement === stakeAmountInputRef.current || 
+                         document.activeElement === lockupDurationInputRef.current
+      });
+    };
+
+    document.addEventListener('focusin', handleFocusChange);
+    document.addEventListener('focusout', handleFocusChange);
+    
+    return () => {
+      document.removeEventListener('focusin', handleFocusChange);
+      document.removeEventListener('focusout', handleFocusChange);
+    };
+  }, []);
   
   
   // Wagmi hooks
@@ -812,53 +868,74 @@ export function OnboardingModal({
   const isLoadingTransaction = isApprovePending || isApproveConfirming || isCreateLockUpPending || isCreateLockUpConfirming || pendingCreateLockUp;
 
   // Create Cast Flow Component - memoized to prevent re-renders that cause focus loss
-  const CreateCastFlow = useMemo(() => (
-    <>
-      <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
-        Are you aiming higher today?
-      </h2>
-      
-      <p className="mb-3 text-black text-sm">
-        Start your journey with /higher:
-      </p>
-      
-      <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
-        <div className="text-xs text-black font-mono mb-2">
-          <strong>started aiming higher and it worked out!</strong>
+  const CreateCastFlow = useMemo(() => {
+    console.log('[OnboardingModal] CreateCastFlow render', { customMessage, castUrl, showCreateCast });
+    return (
+      <>
+        <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
+          Are you aiming higher today?
+        </h2>
+        
+        <p className="mb-3 text-black text-sm">
+          Start your journey with /higher:
+        </p>
+        
+        <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
+          <div className="text-xs text-black font-mono mb-2">
+            <strong>started aiming higher and it worked out!</strong>
+          </div>
+          <textarea
+            key="custom-message-textarea"
+            value={customMessage}
+            onChange={(e) => {
+              console.log('[OnboardingModal] customMessage onChange', { value: e.target.value, isFocused: document.activeElement === e.target });
+              setCustomMessage(e.target.value);
+            }}
+            onFocus={(e) => {
+              console.log('[OnboardingModal] customMessage onFocus', { value: e.target.value });
+            }}
+            onBlur={(e) => {
+              console.log('[OnboardingModal] customMessage onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
+            }}
+            placeholder="[your message here]"
+            className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black resize-none"
+            rows={3}
+          />
         </div>
-        <textarea
-          key="custom-message-textarea"
-          value={customMessage}
-          onChange={(e) => setCustomMessage(e.target.value)}
-          placeholder="[your message here]"
-          className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black resize-none"
-          rows={3}
-        />
-      </div>
 
-      <div className="relative mb-4">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-black/20"></div>
+        <div className="relative mb-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-black/20"></div>
+          </div>
+          <div className="relative flex justify-center text-xs uppercase">
+            <span className="bg-[#fefdfb] px-2 text-black/60">Or</span>
+          </div>
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-[#fefdfb] px-2 text-black/60">Or</span>
-        </div>
-      </div>
 
-      <div className="mb-4">
-        <input
-          ref={castUrlInputRef}
-          key="cast-url-input"
-          type="text"
-          value={castUrl}
-          onChange={(e) => {
-            setCastUrl(e.target.value);
-            setUrlValidationError(null);
-          }}
-          placeholder="Paste your cast URL here..."
-          className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
-          autoFocus={showCreateCast}
-        />
+        <div className="mb-4">
+          <input
+            ref={(el) => {
+              console.log('[OnboardingModal] castUrlInputRef set', { el, currentValue: el?.value, isFocused: document.activeElement === el });
+              castUrlInputRef.current = el;
+            }}
+            key="cast-url-input"
+            type="text"
+            value={castUrl}
+            onChange={(e) => {
+              console.log('[OnboardingModal] castUrl onChange', { value: e.target.value, isFocused: document.activeElement === e.target });
+              setCastUrl(e.target.value);
+              setUrlValidationError(null);
+            }}
+            onFocus={(e) => {
+              console.log('[OnboardingModal] castUrl onFocus', { value: e.target.value });
+            }}
+            onBlur={(e) => {
+              console.log('[OnboardingModal] castUrl onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
+            }}
+            placeholder="Paste your cast URL here..."
+            className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
+            autoFocus={showCreateCast}
+          />
         {urlValidationError && (
           <div className="mt-2 text-xs text-red-600">
             {urlValidationError}
@@ -906,12 +983,24 @@ export function OnboardingModal({
 
   // Memoized handlers for staking form to prevent re-renders
   const handleStakeAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[OnboardingModal] handleStakeAmountChange', { 
+      value: e.target.value, 
+      isFocused: document.activeElement === e.target,
+      activeElement: document.activeElement?.tagName,
+      activeElementId: (document.activeElement as HTMLElement)?.id
+    });
     setStakeAmount(e.target.value);
     setStakeError(null);
     transactionErrorReportedRef.current = false;
   }, []);
 
   const handleLockupDurationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('[OnboardingModal] handleLockupDurationChange', { 
+      value: e.target.value, 
+      isFocused: document.activeElement === e.target,
+      activeElement: document.activeElement?.tagName,
+      activeElementId: (document.activeElement as HTMLElement)?.id
+    });
     setLockupDuration(e.target.value);
     setStakeError(null);
     transactionErrorReportedRef.current = false;
@@ -986,16 +1075,28 @@ export function OnboardingModal({
     onCancel: () => void;
     errorMessage: string | null;
   }) => {
+    console.log('[OnboardingModal] StakingForm render', { stakeAmount, lockupDuration, castHash });
     return (
       <div className="mb-4">
         <div className="mb-3">
           <label className="text-xs text-black/70 mb-1 block">Amount (HIGHER)</label>
           <div className="flex gap-2">
             <input
-              ref={stakeAmountInputRef}
+              ref={(el) => {
+                console.log('[OnboardingModal] stakeAmountInputRef set', { el, currentValue: el?.value, isFocused: document.activeElement === el });
+                if (stakeAmountInputRef) {
+                  (stakeAmountInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+                }
+              }}
               type="text"
               value={stakeAmount}
               onChange={onStakeAmountChange}
+              onFocus={(e) => {
+                console.log('[OnboardingModal] stakeAmount onFocus', { value: e.target.value });
+              }}
+              onBlur={(e) => {
+                console.log('[OnboardingModal] stakeAmount onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
+              }}
               placeholder="0.00"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
             />
@@ -1032,10 +1133,21 @@ export function OnboardingModal({
           <label className="text-xs text-black/70 mb-1 block">Duration</label>
           <div className="flex gap-2">
             <input
-              ref={lockupDurationInputRef}
+              ref={(el) => {
+                console.log('[OnboardingModal] lockupDurationInputRef set', { el, currentValue: el?.value, isFocused: document.activeElement === el });
+                if (lockupDurationInputRef) {
+                  (lockupDurationInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el;
+                }
+              }}
               type="number"
               value={lockupDuration}
               onChange={onLockupDurationChange}
+              onFocus={(e) => {
+                console.log('[OnboardingModal] lockupDuration onFocus', { value: e.target.value });
+              }}
+              onBlur={(e) => {
+                console.log('[OnboardingModal] lockupDuration onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
+              }}
               placeholder="1"
               min="1"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
@@ -1096,6 +1208,13 @@ export function OnboardingModal({
 
   // Cast Cards View Component - memoized to prevent recreation on every render
   const CastCardsView = useMemo(() => {
+    console.log('[OnboardingModal] CastCardsView render', { 
+      castsLength: casts.length, 
+      activeCardIndex, 
+      selectedCastIndex,
+      stakeAmount,
+      lockupDuration
+    });
     const currentCast = casts[activeCardIndex];
     
     if (!currentCast) {
