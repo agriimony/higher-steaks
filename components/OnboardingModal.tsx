@@ -1200,9 +1200,7 @@ export function OnboardingModal({
     console.log('[OnboardingModal] CastCardsView render', { 
       castsLength: casts.length, 
       activeCardIndex, 
-      selectedCastIndex,
-      stakeAmount,
-      lockupDuration
+      selectedCastIndex
     });
     const currentCast = casts[activeCardIndex];
     
@@ -1317,68 +1315,18 @@ export function OnboardingModal({
           </div>
         )}
         
-        {/* Staking Form - rendered below card, above card indicator */}
-        {selectedCastIndex === activeCardIndex && (
-          <StakingForm
-            stakeAmount={stakeAmount}
-            lockupDuration={lockupDuration}
-            lockupDurationUnit={lockupDurationUnit}
-            isLoadingTransaction={isLoadingTransaction}
-            connectedWalletBalance={connectedWalletBalance}
-            castHash={currentCast.hash}
-            stakeAmountInputRef={stakeAmountInputRef}
-            lockupDurationInputRef={lockupDurationInputRef}
-            onStakeAmountChange={handleStakeAmountChange}
-            onLockupDurationChange={handleLockupDurationChange}
-            onLockupDurationUnitChange={handleLockupDurationUnitChange}
-            onSetAmount={handleSetAmount}
-            onStake={handleStake}
-          onCancel={handleCancelStake}
-          errorMessage={stakeError}
-          />
-        )}
-        
-        {/* Card indicator (e.g., "1 of 3") */}
-        {casts.length > 1 && (
-          <div className="flex justify-center mt-2 text-xs text-black/60 mb-4">
-            {activeCardIndex + 1} of {casts.length}
-          </div>
-        )}
-        
-        {/* Create new cast link */}
-        <div className="mt-3 text-center">
-          <button
-            onClick={() => setShowCreateCast(true)}
-            className="text-xs text-black/60 hover:text-black underline"
-          >
-            Or.. Create new cast
-          </button>
-        </div>
       </>
     );
   }, [
     casts,
     activeCardIndex,
     selectedCastIndex,
-    stakeAmount,
-    lockupDuration,
-    lockupDurationUnit,
-    isLoadingTransaction,
-    connectedWalletBalance,
-    handleStakeAmountChange,
-    handleLockupDurationChange,
-    handleLockupDurationUnitChange,
-    handleSetAmount,
-    handleCancelStake,
     handleOpenStakeForm,
-    handleStake,
     handleBuyHigher,
     scrollToPrevious,
     scrollToNext,
     showCreateCast,
-    formatTimestamp,
-    stakeAmountInputRef,
-    lockupDurationInputRef
+    formatTimestamp
   ]);
 
   return (
@@ -1433,7 +1381,45 @@ export function OnboardingModal({
         ) : showCreateCast || casts.length === 0 ? (
           CreateCastFlow
         ) : (
-          CastCardsView
+          <>
+            {CastCardsView}
+            {/* Staking Form - rendered outside CastCardsView to prevent re-renders when form state changes */}
+            {selectedCastIndex === activeCardIndex && casts[activeCardIndex] && (
+              <StakingForm
+                key={`staking-form-${casts[activeCardIndex].hash}-${selectedCastIndex}`}
+                stakeAmount={stakeAmount}
+                lockupDuration={lockupDuration}
+                lockupDurationUnit={lockupDurationUnit}
+                isLoadingTransaction={isLoadingTransaction}
+                connectedWalletBalance={connectedWalletBalance}
+                castHash={casts[activeCardIndex].hash}
+                stakeAmountInputRef={stakeAmountInputRef}
+                lockupDurationInputRef={lockupDurationInputRef}
+                onStakeAmountChange={handleStakeAmountChange}
+                onLockupDurationChange={handleLockupDurationChange}
+                onLockupDurationUnitChange={handleLockupDurationUnitChange}
+                onSetAmount={handleSetAmount}
+                onStake={handleStake}
+                onCancel={handleCancelStake}
+                errorMessage={stakeError}
+              />
+            )}
+            {/* Card indicator (e.g., "1 of 3") - rendered outside CastCardsView */}
+            {casts.length > 1 && (
+              <div className="flex justify-center mt-2 text-xs text-black/60 mb-4">
+                {activeCardIndex + 1} of {casts.length}
+              </div>
+            )}
+            {/* Create new cast link - rendered outside CastCardsView */}
+            <div className="mt-3 text-center">
+              <button
+                onClick={() => setShowCreateCast(true)}
+                className="text-xs text-black/60 hover:text-black underline"
+              >
+                Or.. Create new cast
+              </button>
+            </div>
+          </>
         )}
         </div>
       </div>
