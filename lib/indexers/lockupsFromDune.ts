@@ -2,6 +2,8 @@ import { fetchAllLatestResults, DuneRow } from '../dune';
 import { formatUnits } from 'viem';
 import { upsertHigherCast, getHigherCast } from '../services/db-service';
 import { getCastByHash } from '../services/cast-service';
+import { getFidsFromAddresses } from '../services/stake-service';
+import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 
 // Query and columns per plan
 const DUNE_QUERY_ID = 6214515;
@@ -36,13 +38,31 @@ async function resolveCastOwnerAndWallets(castHash: string): Promise<{ ownerFid:
 			return { ownerFid: null, ownerWallets: new Set() };
 		}
 		const ownerFid = cast.fid;
-		// For now, assume the creator's wallets are not stored; hydrate via internal endpoint if available later.
-		// As a minimal implementation, we treat only the creator's immediate onchain wallet unknown, so classification will default to supporter unless we enrich in DB later.
-		// You can enhance this with a dedicated wallet lookup and cache.
-		return { ownerFid, ownerWallets: new Set() };
+		// Hydrate owner wallets (custody + verified) via Neynar
+		const wallets = await fetchWalletsForFid(ownerFid);
+		return { ownerFid, ownerWallets: wallets };
 	} catch (err) {
 		// If lookup fails (e.g., 404 from Neynar), treat as unresolved and skip later
 		return { ownerFid: null, ownerWallets: new Set() };
+	}
+}
+
+async function fetchWalletsForFid(fid: number): Promise<Set<string>> {
+	try {
+		const apiKey = process.env.NEYNAR_API_KEY;
+		if (!apiKey) return new Set();
+		const client = new NeynarAPIClient({ apiKey });
+		const res = await client.fetchBulkUsers({ fids: [fid] });
+		const u = res.users?.[0];
+		if (!u) return new Set();
+		const addrs = new Set<string>();
+		if (u.custody_address) addrs.add(String(u.custody_address).toLowerCase());
+		for (const v of (u.verified_addresses?.eth_addresses ?? [])) {
+			addrs.add(String(v).toLowerCase());
+		}
+		return addrs;
+	} catch {
+		return new Set();
 	}
 }
 
@@ -113,6 +133,10 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			continue;
 		}
 
+		// Batch map unique senders to FIDs for this cast
+		const uniqueSenders = Array.from(new Set(castRows.map(r => String(r.sender || '').toLowerCase()).filter(Boolean)));
+		const senderToFid = uniqueSenders.length > 0 ? await getFidsFromAddresses(uniqueSenders) : new Map<string, number>();
+
 		const casterStakeLockupIds: number[] = [];
 		const casterStakeAmounts: string[] = [];
 		const casterStakeUnlockTimes: number[] = [];
@@ -142,6 +166,7 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			totalHigherStaked += isFinite(amountNum) ? amountNum : 0;
 
 			const sender = String(r.sender || '').toLowerCase();
+			const senderFid = senderToFid.get(sender) || 0;
 			const lockUpId = toInt(r.lockUpId);
 			const unlockTime = toInt(r.unlockTime);
 			const lockTime = toInt(r.lockTime);
@@ -158,8 +183,8 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			} else {
 				supporterStakeLockupIds.push(lockUpId);
 				supporterStakeAmounts.push(amount);
-				// supporter FIDs unknown here; optional enrichment step could fill
-				supporterStakeFids.push(0);
+				// Map sender to FID (0 if unknown)
+				supporterStakeFids.push(senderFid);
 				supporterStakeUnlockTimes.push(unlockTime);
 				supporterStakeLockTimes.push(lockTime);
 				supporterStakeUnlocked.push(unlocked);
