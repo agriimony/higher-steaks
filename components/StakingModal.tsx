@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { LOCKUP_CONTRACT, LOCKUP_ABI } from '@/lib/contracts';
 import { fetchValidCast, truncateCastText, isValidCastHash } from '@/lib/cast-helpers';
+import { formatUnits } from 'viem';
 
 interface LockupDetail {
   lockupId: string;
@@ -12,6 +13,7 @@ interface LockupDetail {
   unlockTime: number;
   receiver: string;
   title: string;
+  unlocked?: boolean;
 }
 
 interface WalletDetail {
@@ -151,14 +153,26 @@ export function StakingModal({
         return;
       }
       const data = await res.json();
-      const newItems: LockupDetail[] = (data.items || []).map((it: any) => ({
-        lockupId: String(it.lockUpId),
-        amount: String(it.amount),
-        amountFormatted: String(it.amount), // already token units per our Dune mapping; format downstream
-        unlockTime: Number(it.unlockTime || 0),
-        receiver: String(it.receiver || ''),
-        title: String(it.title || ''),
-      }));
+      const newItems: LockupDetail[] = (data.items || []).map((it: any) => {
+        const rawAmount = String(it.amount ?? '0');
+        let amountToken = '0';
+        try {
+          // Prefer interpreting as wei (18 decimals)
+          amountToken = formatUnits(BigInt(rawAmount), 18);
+        } catch {
+          // Fallback: assume already token units
+          amountToken = String(Number(rawAmount) || 0);
+        }
+        return {
+          lockupId: String(it.lockUpId),
+          amount: amountToken,
+          amountFormatted: amountToken,
+          unlockTime: Number(it.unlockTime || 0),
+          receiver: String(it.receiver || ''),
+          title: String(it.title || ''),
+          unlocked: Boolean(it.unlocked),
+        };
+      });
       setDuneItems(prev => nextOffset === 0 ? newItems : [...prev, ...newItems]);
       setDuneNextOffset(data.nextOffset ?? null);
       setDuneLoading(false);
@@ -296,7 +310,8 @@ export function StakingModal({
 
   // Sort lockups: (1) connected wallet first, (2) expired first, then by time remaining
   // (3) then by amount descending
-  const sourceLockups = duneItems;
+  // Hide locally-unstaked rows; show only not unlocked
+  const sourceLockups = duneItems.filter(l => !l.unlocked);
   const sortedLockups = [...sourceLockups].sort((a, b) => {
     // Calculate time remaining for sorting
     const aTimeRemaining = a.unlockTime - currentTime;
@@ -365,8 +380,17 @@ export function StakingModal({
           onTransactionSuccess();
         }, 1000); // Wait a bit for blockchain to update
       }
+
+      // Optimistically update local list: mark the unstaked item as unlocked and remove it
+      // Then attempt to load the next page from Dune (if available) to fill the gap
+      if (unstakeLockupId) {
+        setDuneItems(prev => prev.map(i => i.lockupId === unstakeLockupId ? { ...i, unlocked: true } : i));
+        if (duneNextOffset !== null) {
+          fetchDunePage(duneNextOffset);
+        }
+      }
     }
-  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess, onUnlockSuccess]);
+  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess, onUnlockSuccess, unstakeLockupId, duneNextOffset, fetchDunePage]);
 
   // Update error states
   useEffect(() => {
