@@ -17,6 +17,8 @@ export interface FetchQueryOptions {
 	limit?: number; // rows per page
 	startOffset?: number; // starting offset
 	allowPartialResults?: boolean;
+	filters?: string; // SQL-like filtering per Dune docs
+	sort_by?: string; // SQL-like ORDER BY expression per Dune docs
 }
 
 function getApiKey(): string {
@@ -28,7 +30,7 @@ function getApiKey(): string {
 }
 
 async function fetchPage(queryId: number, opts: FetchQueryOptions = {}): Promise<{ page: DuneResultsPage; raw: any }> {
-	const { columns, limit = 1000, startOffset = 0, allowPartialResults = false } = opts;
+	const { columns, limit = 1000, startOffset = 0, allowPartialResults = false, filters, sort_by } = opts;
 	const params = new URLSearchParams();
 	params.set('limit', String(limit));
 	params.set('offset', String(startOffset));
@@ -37,6 +39,12 @@ async function fetchPage(queryId: number, opts: FetchQueryOptions = {}): Promise
 	}
 	if (allowPartialResults) {
 		params.set('allow_partial_results', 'true');
+	}
+	if (filters && filters.length > 0) {
+		params.set('filters', filters);
+	}
+	if (sort_by && sort_by.length > 0) {
+		params.set('sort_by', sort_by);
 	}
 
 	const res = await fetch(`${DUNE_API_BASE}/query/${queryId}/results?${params.toString()}`, {

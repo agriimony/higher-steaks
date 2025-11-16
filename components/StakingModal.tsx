@@ -33,6 +33,7 @@ interface StakingModalProps {
   lockups: LockupDetail[];
   wallets: WalletDetail[];
   loading?: boolean;
+  userFid?: number; // Optional: enable Dune-backed fetching when provided
   onTransactionSuccess?: () => void;
   onRefresh?: () => void;
   onTransactionFailure?: (message?: string) => void;
@@ -91,6 +92,7 @@ export function StakingModal({
   lockups,
   wallets,
   loading = false,
+  userFid,
   onTransactionSuccess,
   onRefresh,
   onTransactionFailure,
@@ -128,6 +130,54 @@ export function StakingModal({
   const { isLoading: isUnstakeConfirming, isSuccess: isUnstakeSuccess } = useWaitForTransactionReceipt({
     hash: unstakeHash,
   });
+
+  // Dune-backed lockups (optional mode when userFid is provided)
+  const [duneItems, setDuneItems] = useState<LockupDetail[]>([]);
+  const [duneNextOffset, setDuneNextOffset] = useState<number | null>(0);
+  const [duneLoading, setDuneLoading] = useState(false);
+
+  const fetchDunePage = useCallback(async (nextOffset: number | null) => {
+    if (nextOffset === null || !userFid) return;
+    if (!wagmiAddress) return; // need connectedAddress for server-side sorting priority
+    try {
+      setDuneLoading(true);
+      const res = await fetch(`/api/user/stakes?fid=${userFid}&connectedAddress=${wagmiAddress}&offset=${nextOffset}`, {
+        cache: 'no-store'
+      });
+      if (!res.ok) {
+        setDuneLoading(false);
+        return;
+      }
+      const data = await res.json();
+      const newItems: LockupDetail[] = (data.items || []).map((it: any) => ({
+        lockupId: String(it.lockUpId),
+        amount: String(it.amount),
+        amountFormatted: String(it.amount), // already token units per our Dune mapping; format downstream
+        unlockTime: Number(it.unlockTime || 0),
+        receiver: String(it.receiver || ''),
+        title: String(it.title || ''),
+      }));
+      setDuneItems(prev => nextOffset === 0 ? newItems : [...prev, ...newItems]);
+      setDuneNextOffset(data.nextOffset ?? null);
+      setDuneLoading(false);
+    } catch {
+      setDuneLoading(false);
+    }
+  }, [userFid, wagmiAddress]);
+
+  useEffect(() => {
+    // Initial fetch when userFid is provided
+    if (userFid) {
+      setDuneItems([]);
+      setDuneNextOffset(0);
+    }
+  }, [userFid]);
+
+  useEffect(() => {
+    if (userFid && duneNextOffset === 0) {
+      fetchDunePage(0);
+    }
+  }, [userFid, duneNextOffset, fetchDunePage]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -225,7 +275,8 @@ export function StakingModal({
 
   // Sort lockups: (1) connected wallet first, (2) expired first, then by time remaining
   // (3) then by amount descending
-  const sortedLockups = [...lockups].sort((a, b) => {
+  const sourceLockups = userFid ? duneItems : lockups;
+  const sortedLockups = [...sourceLockups].sort((a, b) => {
     // Calculate time remaining for sorting
     const aTimeRemaining = a.unlockTime - currentTime;
     const bTimeRemaining = b.unlockTime - currentTime;
@@ -250,7 +301,7 @@ export function StakingModal({
     }
     
     // (4) Finally by amount descending (largest first)
-    return parseFloat(b.amountFormatted.replace(/,/g, '')) - parseFloat(a.amountFormatted.replace(/,/g, ''));
+    return parseFloat(String(b.amountFormatted).replace(/,/g, '')) - parseFloat(String(a.amountFormatted).replace(/,/g, ''));
   });
 
   // Handle Unstake
@@ -402,7 +453,7 @@ export function StakingModal({
                 <p className="text-sm text-gray-600 italic">No active lockups</p>
               ) : (
                 <ul className="space-y-3">
-                  {sortedLockups.slice(0, 3).map((lockup) => {
+                  {(userFid ? sortedLockups : sortedLockups.slice(0, 3)).map((lockup) => {
                     const isConnected = wagmiAddress?.toLowerCase() === lockup.receiver.toLowerCase();
                     return (
                       <li key={lockup.lockupId} className="text-sm">
@@ -486,11 +537,22 @@ export function StakingModal({
                   })}
                 </ul>
               )}
-              {sortedLockups.length > 5 && (
+              {!userFid && sortedLockups.length > 5 && (
                 <div className="mt-3 text-center">
                   <p className="text-xs text-gray-600 italic">
                     ... and {sortedLockups.length - 5} more
                   </p>
+                </div>
+              )}
+              {userFid && duneNextOffset !== null && (
+                <div className="mt-3 text-center">
+                  <button
+                    className="text-xs text-purple-600 hover:text-purple-700 underline disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => fetchDunePage(duneNextOffset)}
+                    disabled={duneLoading}
+                  >
+                    {duneLoading ? 'Loading...' : '... more'}
+                  </button>
                 </div>
               )}
             </div>

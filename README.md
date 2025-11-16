@@ -132,6 +132,12 @@ npm run build
 - `GET /api/leaderboard/top` - Get top 10 HIGHER holders from leaderboard
   - Returns: FID, username, cast text, description, HIGHER balance, USD value
 
+### User Stakes (Dune-backed)
+- `GET /api/user/stakes?fid={fid}&connectedAddress={addr}&offset={offset}`
+  - Filters Dune results server-side with `(unlocked = false) AND (receiver IN (...))`
+  - Applies modal-specific sorting rules server-side
+  - Paginates 3 items at a time; returns `{ items, nextOffset }`
+
 ### Cron Jobs
 - `GET /api/cron/update-staking-leaderboard` - Daily leaderboard update (Vercel Cron)
   - Runs every 24 hours (midnight UTC recommended)
