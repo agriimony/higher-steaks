@@ -37,6 +37,9 @@ Create a `.env.local` file in the root directory:
 # Required: Neynar API Key
 NEYNAR_API_KEY=your_neynar_api_key_here
 
+# Required: Dune API Key (off-chain indexer)
+DUNE_API_KEY=your_dune_api_key_here
+
 # Optional: Alchemy API Key (recommended for production, provides robust RPC with higher rate limits)
 ALCHEMY_API_KEY=your_alchemy_api_key_here
 
@@ -131,22 +134,39 @@ npm run build
 
 ### Cron Jobs
 - `GET /api/cron/update-staking-leaderboard` - Daily leaderboard update (Vercel Cron)
-  - Runs at midnight UTC
-  - Aggregates HIGHER token staked on casts from lockup contracts
-  - Fetches cast details from Neynar and validates keyphrase
-  - Stores top 100 entries in database
+  - Runs every 24 hours (midnight UTC recommended)
+  - Aggregates HIGHER token lockups from Dune latest query results (off-chain indexer)
+  - Fetches missing cast owners and wallet associations via Neynar when needed
+  - Stores/updates aggregated entries in database
   - Protected by `CRON_SECRET` header
-  - **Block freshness check**: Retries up to 3 minutes if latest block is >10 minutes old
 
 ### Real-time Features
 - **WebSocket Subscriptions**: Monitors Base blockchain for new lockup events and block headers
 - **Instant Updates**: UI refreshes automatically when users stake tokens (when connected via Wagmi)
-- **Block Freshness Indicator**: Visual indicator showing data synchronization status:
-  - Green: Block age < 30 seconds
-  - Yellow: Block age 30s-5min
-  - Red: Block age > 5 minutes
+- **Block Freshness Indicator**: Visual indicator showing data synchronization status
 
 ## Development
 
 See https://miniapps.farcaster.xyz for Mini App documentation.
+
+## Dune Integration (Off-chain Indexer)
+
+The backend ingests lockup data from Dune and serves the frontend from the HS database.
+
+- Dune docs: https://docs.dune.com/api-reference/overview/introduction
+- Latest query result API: https://docs.dune.com/api-reference/executions/endpoint/get-query-result
+
+### Daily Sync (24h)
+
+- The existing cron (`/api/cron/update-staking-leaderboard`) now uses Dune’s latest query results (ID: 6214515) instead of onchain reads.
+- Set your scheduler (e.g., Vercel Cron) to invoke once every 24 hours.
+
+### Data Model Updates
+
+The `leaderboard_entries` table includes lock time arrays:
+
+- `caster_stake_lock_times bigint[]`
+- `supporter_stake_lock_times bigint[]`
+
+Apply SQL migrations in `sql/` directory.
 
