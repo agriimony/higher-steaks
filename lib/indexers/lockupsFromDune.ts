@@ -30,15 +30,20 @@ function normalizeCastHash(title: string | null | undefined): string | null {
 
 // Resolve fid owner and wallet associations for caster/supporter classification
 async function resolveCastOwnerAndWallets(castHash: string): Promise<{ ownerFid: number | null; ownerWallets: Set<string> }> {
-	const cast = await getCastByHash(castHash); // may hit DB first, fallback to Neynar
-	if (!cast) {
+	try {
+		const cast = await getCastByHash(castHash); // may hit DB first, fallback to Neynar
+		if (!cast) {
+			return { ownerFid: null, ownerWallets: new Set() };
+		}
+		const ownerFid = cast.fid;
+		// For now, assume the creator's wallets are not stored; hydrate via internal endpoint if available later.
+		// As a minimal implementation, we treat only the creator's immediate onchain wallet unknown, so classification will default to supporter unless we enrich in DB later.
+		// You can enhance this with a dedicated wallet lookup and cache.
+		return { ownerFid, ownerWallets: new Set() };
+	} catch (err) {
+		// If lookup fails (e.g., 404 from Neynar), treat as unresolved and skip later
 		return { ownerFid: null, ownerWallets: new Set() };
 	}
-	const ownerFid = cast.fid;
-	// For now, assume the creator's wallets are not stored; hydrate via internal endpoint if available later.
-	// As a minimal implementation, we treat only the creator's immediate onchain wallet unknown, so classification will default to supporter unless we enrich in DB later.
-	// You can enhance this with a dedicated wallet lookup and cache.
-	return { ownerFid, ownerWallets: new Set() };
 }
 
 function isTruthyBoolean(v: any): boolean {
@@ -96,7 +101,17 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 
 	for (const [castHash, castRows] of grouped.entries()) {
 		const { ownerFid, ownerWallets } = await resolveCastOwnerAndWallets(castHash);
-		const castMeta = await getCastByHash(castHash); // for display fields if available
+		let castMeta = null as Awaited<ReturnType<typeof getCastByHash>> | null;
+		try {
+			castMeta = await getCastByHash(castHash); // for display fields if available
+		} catch {
+			castMeta = null;
+		}
+
+		// If we couldn't resolve cast owner and have no metadata, skip this cast hash
+		if (ownerFid == null && !castMeta) {
+			continue;
+		}
 
 		const casterStakeLockupIds: number[] = [];
 		const casterStakeAmounts: string[] = [];
