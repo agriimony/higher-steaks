@@ -697,7 +697,7 @@ export function OnboardingModal({
   }, [castUrl, userFid]);
 
 
-  const handleStake = async (castHash: string) => {
+  const handleStake = async (castHash: string, inputStakeAmount: string, inputLockupDuration: string) => {
     if (!wagmiAddress) {
       reportStakeError('No wallet connected');
       return;
@@ -766,8 +766,8 @@ export function OnboardingModal({
     }
 
     // Validation
-    const amountNum = parseFloat(stakeAmount.replace(/,/g, ''));
-    const durationNum = parseFloat(lockupDuration);
+    const amountNum = parseFloat(inputStakeAmount.replace(/,/g, ''));
+    const durationNum = parseFloat(inputLockupDuration);
     
     if (isNaN(amountNum) || amountNum <= 0) {
       reportStakeError('Please enter a valid stake amount');
@@ -794,7 +794,7 @@ export function OnboardingModal({
 
     try {
       // Convert amount to wei (18 decimals)
-      const amountWei = parseUnits(stakeAmount.replace(/,/g, ''), 18);
+      const amountWei = parseUnits(inputStakeAmount.replace(/,/g, ''), 18);
       
       // Calculate unlock time (current time + duration in seconds)
       const durationSeconds = durationToSeconds(durationNum, lockupDurationUnit);
@@ -980,27 +980,15 @@ export function OnboardingModal({
     );
   }, [customMessage, castUrl, urlValidationError, validatingUrl, showCreateCast, handleQuickCast, handleValidateAndUseCastUrl]);
 
-  // Memoized handlers for staking form to prevent re-renders
-  const handleStakeAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[OnboardingModal] handleStakeAmountChange', { 
-      value: e.target.value, 
-      isFocused: document.activeElement === e.target,
-      activeElement: document.activeElement?.tagName,
-      activeElementId: (document.activeElement as HTMLElement)?.id
-    });
-    setStakeAmount(e.target.value);
+  // Commit handlers: only update parent state when committing
+  const commitStakeAmount = useCallback((value: string) => {
+    setStakeAmount(value);
     setStakeError(null);
     transactionErrorReportedRef.current = false;
   }, []);
 
-  const handleLockupDurationChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('[OnboardingModal] handleLockupDurationChange', { 
-      value: e.target.value, 
-      isFocused: document.activeElement === e.target,
-      activeElement: document.activeElement?.tagName,
-      activeElementId: (document.activeElement as HTMLElement)?.id
-    });
-    setLockupDuration(e.target.value);
+  const commitLockupDuration = useCallback((value: string) => {
+    setLockupDuration(value);
     setStakeError(null);
     transactionErrorReportedRef.current = false;
   }, []);
@@ -1050,8 +1038,8 @@ export function OnboardingModal({
     castHash,
     stakeAmountInputRef,
     lockupDurationInputRef,
-    onStakeAmountChange,
-    onLockupDurationChange,
+    onCommitStakeAmount,
+    onCommitLockupDuration,
     onLockupDurationUnitChange,
     onSetAmount,
     onStake,
@@ -1066,15 +1054,27 @@ export function OnboardingModal({
     castHash: string;
     stakeAmountInputRef: React.RefObject<HTMLInputElement>;
     lockupDurationInputRef: React.RefObject<HTMLInputElement>;
-    onStakeAmountChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    onLockupDurationChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onCommitStakeAmount: (value: string) => void;
+    onCommitLockupDuration: (value: string) => void;
     onLockupDurationUnitChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
     onSetAmount: (percentage: number) => void;
-    onStake: (hash: string) => void;
+    onStake: (hash: string, amount: string, duration: string) => void;
     onCancel: () => void;
     errorMessage: string | null;
   }) => {
     console.log('[OnboardingModal] StakingForm render', { stakeAmount, lockupDuration, castHash });
+
+    const [localStakeAmount, setLocalStakeAmount] = React.useState(stakeAmount);
+    const [localLockupDuration, setLocalLockupDuration] = React.useState(lockupDuration);
+
+    // Sync local inputs when parent resets due to active cast change or success/cancel
+    useEffect(() => { setLocalStakeAmount(stakeAmount); }, [stakeAmount]);
+    useEffect(() => { setLocalLockupDuration(lockupDuration); }, [lockupDuration]);
+
+    const commitIfChanged = (prev: string, next: string, commit: (v: string) => void) => {
+      if (prev !== next) commit(next);
+    };
+
     return (
       <div className="mb-4">
         <div className="mb-3">
@@ -1083,13 +1083,14 @@ export function OnboardingModal({
             <input
               ref={stakeAmountInputRef}
               type="text"
-              value={stakeAmount}
-              onChange={onStakeAmountChange}
+              value={localStakeAmount}
+              onChange={(e) => setLocalStakeAmount(e.target.value)}
               onFocus={(e) => {
                 console.log('[OnboardingModal] stakeAmount onFocus', { value: e.target.value });
               }}
               onBlur={(e) => {
                 console.log('[OnboardingModal] stakeAmount onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
+                commitIfChanged(stakeAmount, localStakeAmount, onCommitStakeAmount);
               }}
               placeholder="0.00"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
@@ -1129,13 +1130,14 @@ export function OnboardingModal({
             <input
               ref={lockupDurationInputRef}
               type="number"
-              value={lockupDuration}
-              onChange={onLockupDurationChange}
+              value={localLockupDuration}
+              onChange={(e) => setLocalLockupDuration(e.target.value)}
               onFocus={(e) => {
                 console.log('[OnboardingModal] lockupDuration onFocus', { value: e.target.value });
               }}
               onBlur={(e) => {
                 console.log('[OnboardingModal] lockupDuration onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
+                commitIfChanged(lockupDuration, localLockupDuration, onCommitLockupDuration);
               }}
               placeholder="1"
               min="1"
@@ -1163,7 +1165,12 @@ export function OnboardingModal({
 
         <div className="flex gap-3">
           <button
-            onClick={() => onStake(castHash)}
+            onClick={() => {
+              // Ensure latest values are committed and used
+              commitIfChanged(stakeAmount, localStakeAmount, onCommitStakeAmount);
+              commitIfChanged(lockupDuration, localLockupDuration, onCommitLockupDuration);
+              onStake(castHash, localStakeAmount, localLockupDuration);
+            }}
             disabled={isLoadingTransaction}
             className="relative group flex-1 px-4 py-2.5 bg-black text-white font-bold border-2 border-black hover:bg-white hover:text-black transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -1395,8 +1402,8 @@ export function OnboardingModal({
                 castHash={casts[activeCardIndex].hash}
                 stakeAmountInputRef={stakeAmountInputRef}
                 lockupDurationInputRef={lockupDurationInputRef}
-                onStakeAmountChange={handleStakeAmountChange}
-                onLockupDurationChange={handleLockupDurationChange}
+                onCommitStakeAmount={commitStakeAmount}
+                onCommitLockupDuration={commitLockupDuration}
                 onLockupDurationUnitChange={handleLockupDurationUnitChange}
                 onSetAmount={handleSetAmount}
                 onStake={handleStake}
