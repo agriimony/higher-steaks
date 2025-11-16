@@ -33,7 +33,7 @@ interface StakingModalProps {
   lockups: LockupDetail[];
   wallets: WalletDetail[];
   loading?: boolean;
-  userFid?: number; // Optional: enable Dune-backed fetching when provided
+  userFid?: number; // If not provided, we'll resolve from connected address
   onTransactionSuccess?: () => void;
   onRefresh?: () => void;
   onTransactionFailure?: (message?: string) => void;
@@ -131,17 +131,19 @@ export function StakingModal({
     hash: unstakeHash,
   });
 
-  // Dune-backed lockups (optional mode when userFid is provided)
+  // Dune-backed lockups (always-on; we resolve fid from connected address if not provided)
   const [duneItems, setDuneItems] = useState<LockupDetail[]>([]);
   const [duneNextOffset, setDuneNextOffset] = useState<number | null>(0);
   const [duneLoading, setDuneLoading] = useState(false);
+  const [effectiveFid, setEffectiveFid] = useState<number | null>(null);
 
   const fetchDunePage = useCallback(async (nextOffset: number | null) => {
-    if (nextOffset === null || !userFid) return;
+    if (nextOffset === null) return;
     if (!wagmiAddress) return; // need connectedAddress for server-side sorting priority
+    if (effectiveFid == null) return;
     try {
       setDuneLoading(true);
-      const res = await fetch(`/api/user/stakes?fid=${userFid}&connectedAddress=${wagmiAddress}&offset=${nextOffset}`, {
+      const res = await fetch(`/api/user/stakes?fid=${effectiveFid}&connectedAddress=${wagmiAddress}&offset=${nextOffset}`, {
         cache: 'no-store'
       });
       if (!res.ok) {
@@ -163,21 +165,40 @@ export function StakingModal({
     } catch {
       setDuneLoading(false);
     }
+  }, [effectiveFid, wagmiAddress]);
+
+  useEffect(() => {
+    // Establish effective fid: prefer prop, else resolve via connected address
+    const setup = async () => {
+      if (userFid && Number.isFinite(userFid)) {
+        setEffectiveFid(userFid);
+        setDuneItems([]);
+        setDuneNextOffset(0);
+        return;
+      }
+      if (!wagmiAddress) return;
+      try {
+        const r = await fetch(`/api/user/fid-by-address?address=${wagmiAddress}`, { cache: 'no-store' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j.fid) {
+            setEffectiveFid(Number(j.fid));
+            setDuneItems([]);
+            setDuneNextOffset(0);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    setup();
   }, [userFid, wagmiAddress]);
 
   useEffect(() => {
-    // Initial fetch when userFid is provided
-    if (userFid) {
-      setDuneItems([]);
-      setDuneNextOffset(0);
-    }
-  }, [userFid]);
-
-  useEffect(() => {
-    if (userFid && duneNextOffset === 0) {
+    if (effectiveFid != null && duneNextOffset === 0) {
       fetchDunePage(0);
     }
-  }, [userFid, duneNextOffset, fetchDunePage]);
+  }, [effectiveFid, duneNextOffset, fetchDunePage]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -275,7 +296,7 @@ export function StakingModal({
 
   // Sort lockups: (1) connected wallet first, (2) expired first, then by time remaining
   // (3) then by amount descending
-  const sourceLockups = userFid ? duneItems : lockups;
+  const sourceLockups = duneItems;
   const sortedLockups = [...sourceLockups].sort((a, b) => {
     // Calculate time remaining for sorting
     const aTimeRemaining = a.unlockTime - currentTime;
@@ -453,7 +474,7 @@ export function StakingModal({
                 <p className="text-sm text-gray-600 italic">No active lockups</p>
               ) : (
                 <ul className="space-y-3">
-                  {(userFid ? sortedLockups : sortedLockups.slice(0, 3)).map((lockup) => {
+              {sortedLockups.map((lockup) => {
                     const isConnected = wagmiAddress?.toLowerCase() === lockup.receiver.toLowerCase();
                     return (
                       <li key={lockup.lockupId} className="text-sm">
@@ -537,14 +558,7 @@ export function StakingModal({
                   })}
                 </ul>
               )}
-              {!userFid && sortedLockups.length > 5 && (
-                <div className="mt-3 text-center">
-                  <p className="text-xs text-gray-600 italic">
-                    ... and {sortedLockups.length - 5} more
-                  </p>
-                </div>
-              )}
-              {userFid && duneNextOffset !== null && (
+              {duneNextOffset !== null && (
                 <div className="mt-3 text-center">
                   <button
                     className="text-xs text-purple-600 hover:text-purple-700 underline disabled:opacity-50 disabled:cursor-not-allowed"
