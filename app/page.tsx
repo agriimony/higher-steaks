@@ -7,7 +7,6 @@ import { StakingModal } from '@/components/StakingModal';
 import { SupporterModal } from '@/components/SupporterModal';
 import { TransactionModal } from '@/components/TransactionModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
-import { BlockLivenessIndicator } from '@/components/BlockLivenessIndicator';
 import { useAccount } from 'wagmi';
 import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
 
@@ -558,20 +557,14 @@ export default function HigherSteakMenu() {
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
                   {balance.usdValue || '$0.00'}
                 </span>
-                <span className="text-gray-400">•</span>
-                <div className="flex items-center gap-1">
-                  <BlockLivenessIndicator
-                    blockNumber={balance.block?.number}
-                    blockTimestamp={balance.block?.timestamp}
-                  />
-                  {typeof balance.block?.ageSeconds === 'number' && (
+                {balance.block?.iso && (
+                  <>
+                    <span className="text-gray-400">•</span>
                     <span className="text-[0.55rem] text-gray-500 hidden sm:inline">
-                      {balance.block.ageSeconds < 60
-                        ? `${balance.block.ageSeconds}s ago`
-                        : `${Math.floor(balance.block.ageSeconds / 60)}m ago`}
+                      {new Date(balance.block.iso).toLocaleString()}
                     </span>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
