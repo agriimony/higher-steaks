@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { fetchAllLatestResults } from '@/lib/dune';
+import { getHigherCast, HigherCastData } from '@/lib/services/db-service';
+import { formatUnits } from 'viem';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,7 +15,21 @@ function normalizeAddr(a: string | null | undefined): string | null {
   return String(a).toLowerCase();
 }
 
-function buildInFilter(addresses: string[]): string {
+function normalizeHash(hash: string | null | undefined): string | null {
+  if (!hash) return null;
+  let h = String(hash).trim().toLowerCase();
+  if (!h) return null;
+  if (!h.startsWith('0x')) {
+    if (/^[0-9a-f]+$/i.test(h)) {
+      h = `0x${h}`;
+    } else {
+      return null;
+    }
+  }
+  return h;
+}
+
+export function buildInFilter(addresses: string[]): string {
   // (unlocked = false) AND (receiver IN ('0x..','0x..'))
   const quoted = addresses.map(a => `'${a}'`).join(',');
   return `(unlocked = false) AND (receiver IN (${quoted}))`;
@@ -92,16 +108,74 @@ export async function GET(req: NextRequest) {
       filters,
     });
 
-    const normalized = rows.map((r: any) => ({
-      lockUpId: Number(r.lockUpId),
-      sender: String(r.sender || '').toLowerCase(),
-      receiver: String(r.receiver || '').toLowerCase(),
-      amount: r.amount, // keep as string
-      unlockTime: Number(r.unlockTime || 0),
-      lockTime: Number(r.lockTime || 0),
-      unlocked: Boolean(r.unlocked),
-      title: String(r.title || ''),
-    }));
+    const castHashes = Array.from(new Set(
+      rows
+        .map((r: any) => normalizeHash(String(r.title || '')))
+        .filter((h): h is string => Boolean(h))
+    ));
+    const castCache = new Map<string, HigherCastData | null>();
+    await Promise.all(
+      castHashes.map(async hash => {
+        const data = await getHigherCast(hash);
+        castCache.set(hash, data);
+      })
+    );
+
+    function convertAmount(raw: any): string {
+      try {
+        return formatUnits(BigInt(raw), 18);
+      } catch {
+        const num = Number(raw);
+        return Number.isFinite(num) ? num.toString() : '0';
+      }
+    }
+
+    const normalized = rows.map((r: any) => {
+      const lockUpId = Number(r.lockUpId);
+      const castHash = normalizeHash(String(r.title || ''));
+      const baseAmount = convertAmount(r.amount ?? '0');
+      let overrideAmount = baseAmount;
+      let unlocked = Boolean(r.unlocked);
+      let stakeType: 'caster' | 'supporter' | null = null;
+
+      if (castHash) {
+        const cast = castCache.get(castHash);
+        if (cast) {
+          const casterIdx = cast.casterStakeLockupIds?.findIndex((id: number) => Number(id) === lockUpId) ?? -1;
+          if (casterIdx !== -1) {
+            stakeType = 'caster';
+            unlocked = cast.casterStakeUnlocked?.[casterIdx] ?? unlocked;
+            overrideAmount = cast.casterStakeAmounts?.[casterIdx]?.toString() ?? overrideAmount;
+          } else {
+            const supporterIdx = cast.supporterStakeLockupIds?.findIndex((id: number) => Number(id) === lockUpId) ?? -1;
+            if (supporterIdx !== -1) {
+              stakeType = 'supporter';
+              unlocked = cast.supporterStakeUnlocked?.[supporterIdx] ?? unlocked;
+              overrideAmount = cast.supporterStakeAmounts?.[supporterIdx]?.toString() ?? overrideAmount;
+            }
+          }
+        }
+      }
+
+      return {
+        lockUpId,
+        castHash,
+        sender: String(r.sender || '').toLowerCase(),
+        receiver: String(r.receiver || '').toLowerCase(),
+        amount: overrideAmount,
+        unlockTime: Number(r.unlockTime || 0),
+        lockTime: Number(r.lockTime || 0),
+        unlocked,
+        title: castHash || String(r.title || ''),
+        stakeType,
+      };
+    });
+
+    const totalActiveStaked = normalized.reduce((sum, item) => {
+      if (item.unlocked) return sum;
+      const num = Number(item.amount);
+      return sum + (Number.isFinite(num) ? num : 0);
+    }, 0);
 
     const sorted = serverSort(normalized, connectedAddress);
     const paged = sorted.slice(offset, offset + pageSize);
@@ -110,6 +184,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       items: paged,
       nextOffset,
+      totals: {
+        totalStaked: totalActiveStaked.toString(),
+      },
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'failed' }, { status: 500 });

@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { LOCKUP_CONTRACT, LOCKUP_ABI } from '@/lib/contracts';
 import { fetchValidCast, truncateCastText, isValidCastHash } from '@/lib/cast-helpers';
-import { formatUnits } from 'viem';
 
 interface LockupDetail {
   lockupId: string;
@@ -13,6 +12,8 @@ interface LockupDetail {
   unlockTime: number;
   receiver: string;
   title: string;
+  castHash?: string | null;
+  stakeType?: 'caster' | 'supporter' | null;
   unlocked?: boolean;
 }
 
@@ -90,7 +91,7 @@ function formatTokenAmount(amount: string): string {
 export function StakingModal({
   onClose,
   balance,
-  lockups,
+  lockups: _legacyLockups,
   wallets,
   loading = false,
   userFid,
@@ -136,6 +137,13 @@ export function StakingModal({
   const [duneNextOffset, setDuneNextOffset] = useState<number | null>(0);
   const [duneLoading, setDuneLoading] = useState(false);
   const [effectiveFid, setEffectiveFid] = useState<number | null>(null);
+  const [duneTotals, setDuneTotals] = useState<{ totalStaked?: string } | null>(null);
+  const pendingUnstakeRef = useRef<{
+    lockupId: string;
+    castHash?: string | null;
+    stakeType?: 'caster' | 'supporter' | null;
+    amount?: string;
+  } | null>(null);
 
   const fetchDunePage = useCallback(async (nextOffset: number | null) => {
     if (nextOffset === null) return;
@@ -151,16 +159,11 @@ export function StakingModal({
         return;
       }
       const data = await res.json();
+      if (data.totals) {
+        setDuneTotals(data.totals);
+      }
       const newItems: LockupDetail[] = (data.items || []).map((it: any) => {
-        const rawAmount = String(it.amount ?? '0');
-        let amountToken = '0';
-        try {
-          // Prefer interpreting as wei (18 decimals)
-          amountToken = formatUnits(BigInt(rawAmount), 18);
-        } catch {
-          // Fallback: assume already token units
-          amountToken = String(Number(rawAmount) || 0);
-        }
+        const amountToken = String(it.amount ?? '0');
         return {
           lockupId: String(it.lockUpId),
           amount: amountToken,
@@ -168,6 +171,8 @@ export function StakingModal({
           unlockTime: Number(it.unlockTime || 0),
           receiver: String(it.receiver || ''),
           title: String(it.title || ''),
+          castHash: it.castHash || null,
+          stakeType: it.stakeType || null,
           unlocked: Boolean(it.unlocked),
         };
       });
@@ -186,6 +191,7 @@ export function StakingModal({
         setEffectiveFid(userFid);
         setDuneItems([]);
         setDuneNextOffset(0);
+        setDuneTotals(null);
         return;
       }
       if (!wagmiAddress) return;
@@ -197,6 +203,7 @@ export function StakingModal({
             setEffectiveFid(Number(j.fid));
             setDuneItems([]);
             setDuneNextOffset(0);
+            setDuneTotals(null);
           }
         }
       } catch {
@@ -224,10 +231,10 @@ export function StakingModal({
     return () => window.removeEventListener('keydown', handleEscape);
   }, [onClose]);
 
-  // Fetch cast text for all lockups when lockups change
-  // Updated validation logic: check DB first, then Neynar, show Invalid cast if both fail
+  // Fetch cast text for lockups when data changes
+  // Updated logic: check DB first, then Neynar, show Invalid cast if both fail
   useEffect(() => {
-    lockups.forEach(async (lockup) => {
+    duneItems.forEach(async (lockup) => {
       if (isValidCastHash(lockup.title)) {
         const castHash = lockup.title;
         
@@ -295,7 +302,7 @@ export function StakingModal({
         }));
       }
     });
-  }, [lockups]);
+  }, [duneItems]);
 
   // Sort wallets: connected first, then by balance descending
   const sortedWallets = [...wallets].sort((a, b) => {
@@ -339,15 +346,21 @@ export function StakingModal({
   });
 
   // Handle Unstake
-  const handleUnstake = (lockupId: string) => {
-    setUnstakeLockupId(lockupId);
+  const handleUnstake = (lockup: LockupDetail) => {
+    setUnstakeLockupId(lockup.lockupId);
+    pendingUnstakeRef.current = {
+      lockupId: lockup.lockupId,
+      castHash: lockup.castHash,
+      stakeType: lockup.stakeType,
+      amount: lockup.amount,
+    };
     
     try {
       writeContractUnstake({
         address: LOCKUP_CONTRACT,
         abi: LOCKUP_ABI,
         functionName: 'unlock',
-        args: [BigInt(lockupId)],
+        args: [BigInt(lockup.lockupId)],
       });
     } catch (error: any) {
       reportUnstakeError(error?.message || 'Failed to initiate unstake');
@@ -358,37 +371,55 @@ export function StakingModal({
   // Handle transaction success - refresh balance
   useEffect(() => {
     if (isUnstakeSuccess && unstakeHash) {
-      // Check if we've already processed this transaction
       if (processedUnstakeTxHash.current === unstakeHash) {
         return;
       }
       
-      // Mark this transaction as processed
       processedUnstakeTxHash.current = unstakeHash;
-      
-      // Reset state
+      const meta = pendingUnstakeRef.current;
+      pendingUnstakeRef.current = null;
       setUnstakeLockupId(null);
       
       console.log('[Staking Modal] Unstake transaction successful - Webhook will refresh UI');
       onUnlockSuccess?.(unstakeHash);
       
-      // Call refresh callback
       if (onTransactionSuccess) {
         setTimeout(() => {
           onTransactionSuccess();
-        }, 1000); // Wait a bit for blockchain to update
+        }, 1000);
       }
 
-      // Optimistically update local list: mark the unstaked item as unlocked and remove it
-      // Then attempt to load the next page from Dune (if available) to fill the gap
-      if (unstakeLockupId) {
-        setDuneItems(prev => prev.map(i => i.lockupId === unstakeLockupId ? { ...i, unlocked: true } : i));
+      if (meta) {
+        setDuneItems(prev => prev.map(i => i.lockupId === meta.lockupId ? { ...i, unlocked: true } : i));
+        if (meta.amount) {
+          const amtNum = parseFloat(meta.amount);
+          if (!Number.isNaN(amtNum)) {
+            setDuneTotals(prev => {
+              if (!prev?.totalStaked) return prev;
+              const current = parseFloat(prev.totalStaked);
+              if (Number.isNaN(current)) return prev;
+              const nextTotal = Math.max(0, current - amtNum);
+              return { ...prev, totalStaked: nextTotal.toString() };
+            });
+          }
+        }
         if (duneNextOffset !== null) {
           fetchDunePage(duneNextOffset);
         }
+        if (meta.castHash && meta.stakeType) {
+          fetch('/api/user/lockup/unlock', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              castHash: meta.castHash,
+              lockUpId: Number(meta.lockupId),
+              stakeType: meta.stakeType,
+            }),
+          }).catch(() => {});
+        }
       }
     }
-  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess, onUnlockSuccess, unstakeLockupId, duneNextOffset, fetchDunePage]);
+  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess, onUnlockSuccess, fetchDunePage, duneNextOffset]);
 
   // Update error states
   useEffect(() => {
@@ -441,7 +472,7 @@ export function StakingModal({
               className="w-5 h-5 rounded-full"
             />
             <span className="text-sm font-bold text-purple-700">
-              {formatTokenAmount(balance.lockedBalanceFormatted)} / {formatTokenAmount(balance.totalBalanceFormatted)}
+              {formatTokenAmount(duneTotals?.totalStaked ?? balance.lockedBalanceFormatted)} / {formatTokenAmount(balance.totalBalanceFormatted)}
             </span>
             <span className="text-sm">🥩</span>
           </div>
@@ -500,7 +531,7 @@ export function StakingModal({
                                 return (
                                   <button
                                     className="px-2 py-1 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                                    onClick={() => handleUnstake(lockup.lockupId)}
+                                    onClick={() => handleUnstake(lockup)}
                                     disabled={isUnstakePending || isUnstakeConfirming || isThisUnstaking}
                                   >
                                     {isThisUnstaking ? (

@@ -137,6 +137,9 @@ npm run build
   - Filters Dune results server-side with `(unlocked = false) AND (receiver IN (...))`
   - Applies modal-specific sorting rules server-side
   - Paginates 3 items at a time; returns `{ items, nextOffset }`
+- `POST /api/user/lockup/unlock`
+  - Body: `{ castHash, lockUpId, stakeType }`
+  - Marks the lockup’s unlocked flag in HS DB after a successful unstake
 
 ### Cron Jobs
 - `GET /api/cron/update-staking-leaderboard` - Daily leaderboard update (Vercel Cron)

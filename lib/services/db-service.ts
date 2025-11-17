@@ -252,3 +252,74 @@ export async function upsertHigherCast(data: {
 	}
 }
 
+/**
+ * Get lockup unlocked state (caster or supporter) for a given cast hash + lockupId.
+ * Returns null if not found.
+ */
+export async function getLockupUnlockedState(castHash: string, lockupId: number): Promise<{
+	type: 'caster' | 'supporter' | null;
+	unlocked: boolean | null;
+}> {
+	const cast = await getHigherCast(castHash);
+	if (!cast) {
+		return { type: null, unlocked: null };
+	}
+
+	const casterIndex = cast.casterStakeLockupIds.findIndex(id => Number(id) === Number(lockupId));
+	if (casterIndex !== -1) {
+		const unlocked = cast.casterStakeUnlocked?.[casterIndex] ?? false;
+		return { type: 'caster', unlocked };
+	}
+
+	const supporterIndex = cast.supporterStakeLockupIds.findIndex(id => Number(id) === Number(lockupId));
+	if (supporterIndex !== -1) {
+		const unlocked = cast.supporterStakeUnlocked?.[supporterIndex] ?? false;
+		return { type: 'supporter', unlocked };
+	}
+
+	return { type: null, unlocked: null };
+}
+
+/**
+ * Update the unlocked boolean for a specific lockup in the leaderboard entry.
+ * type: 'caster' or 'supporter'. Returns true if updated.
+ */
+export async function updateLockupUnlockedState(castHash: string, params: {
+	type: 'caster' | 'supporter';
+	lockupId: number;
+	unlocked: boolean;
+}): Promise<boolean> {
+	const cast = await getHigherCast(castHash);
+	if (!cast) {
+		return false;
+	}
+
+	if (params.type === 'caster') {
+		const idx = cast.casterStakeLockupIds.findIndex(id => Number(id) === Number(params.lockupId));
+		if (idx === -1) return false;
+		const updated = [...(cast.casterStakeUnlocked || [])];
+		updated[idx] = params.unlocked;
+		await sql`
+      UPDATE leaderboard_entries
+      SET caster_stake_unlocked = ${updated as any}, updated_at = NOW()
+      WHERE cast_hash = ${castHash}
+    `;
+		return true;
+	}
+
+	if (params.type === 'supporter') {
+		const idx = cast.supporterStakeLockupIds.findIndex(id => Number(id) === Number(params.lockupId));
+		if (idx === -1) return false;
+		const updated = [...(cast.supporterStakeUnlocked || [])];
+		updated[idx] = params.unlocked;
+		await sql`
+      UPDATE leaderboard_entries
+      SET supporter_stake_unlocked = ${updated as any}, updated_at = NOW()
+      WHERE cast_hash = ${castHash}
+    `;
+		return true;
+	}
+
+	return false;
+}
+
