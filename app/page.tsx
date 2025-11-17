@@ -60,6 +60,7 @@ interface LockupDetail {
   unlockTime: number;
   receiver: string;
   title: string;
+  unlocked?: boolean;
 }
 
 interface WalletDetail {

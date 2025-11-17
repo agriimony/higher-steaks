@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi';
 import { LOCKUP_CONTRACT, LOCKUP_ABI } from '@/lib/contracts';
 import { fetchValidCast, truncateCastText, isValidCastHash } from '@/lib/cast-helpers';
@@ -96,7 +96,7 @@ export function StakingModal({
   onClose,
   balance,
   lockups: _legacyLockups,
-  wallets,
+  wallets = [],
   loading = false,
   userFid,
   onTransactionSuccess,
@@ -308,8 +308,41 @@ export function StakingModal({
     });
   }, [duneItems]);
 
+  const derivedWallets = useMemo(() => {
+    const map = new Map<string, number>();
+
+    const seedFromList = (entry: WalletDetail) => {
+      const addr = entry.address?.toLowerCase();
+      if (!addr) return;
+      const value = Number(entry.balanceFormatted?.replace(/,/g, '') ?? entry.balance);
+      if (!Number.isFinite(value)) return;
+      map.set(addr, (map.get(addr) || 0) + value);
+    };
+
+    wallets.forEach(seedFromList);
+
+    duneItems.forEach((item) => {
+      if (item.unlocked) return;
+      const addr = item.receiver?.toLowerCase();
+      if (!addr) return;
+      const amt = Number(item.amount);
+      if (!Number.isFinite(amt)) return;
+      map.set(addr, (map.get(addr) || 0) + amt);
+    });
+
+    if (map.size === 0) {
+      return [...wallets];
+    }
+
+    return Array.from(map.entries()).map(([address, amount]) => ({
+      address,
+      balance: amount.toString(),
+      balanceFormatted: amount.toString(),
+    }));
+  }, [wallets, duneItems]);
+
   // Sort wallets: connected first, then by balance descending
-  const sortedWallets = [...wallets].sort((a, b) => {
+  const sortedWallets = [...derivedWallets].sort((a, b) => {
     if (wagmiAddress) {
       if (a.address.toLowerCase() === wagmiAddress.toLowerCase()) return -1;
       if (b.address.toLowerCase() === wagmiAddress.toLowerCase()) return 1;
