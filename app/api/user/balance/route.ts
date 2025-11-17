@@ -93,6 +93,17 @@ function toArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
 }
 
+function formatUsd(total: number, pricePerToken: number): string {
+  if (!Number.isFinite(total) || !Number.isFinite(pricePerToken)) {
+    return '$0.00';
+  }
+  const usd = total * pricePerToken;
+  if (!Number.isFinite(usd)) {
+    return '$0.00';
+  }
+  return `$${usd.toFixed(2)}`;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const fidParam = request.nextUrl.searchParams.get('fid');
@@ -230,6 +241,7 @@ export async function GET(request: NextRequest) {
     const totalBalanceString = totalBalanceValue.toString();
     const lockedBalanceString = lockedBalanceValue.toString();
     const walletBalanceString = walletTotal.toString();
+    const usdValue = formatUsd(totalBalanceValue, pricePerToken);
 
     const responseBody = {
       totalBalance: totalBalanceString,
@@ -238,7 +250,7 @@ export async function GET(request: NextRequest) {
       lockedBalanceFormatted: lockedBalanceString,
       walletBalance: walletBalanceString,
       walletBalanceFormatted: walletBalanceString,
-      usdValue: '$0.00',
+      usdValue,
       pricePerToken: 0,
       higherLogoUrl: HIGHER_LOGO_URL,
       wallets: walletEntries,

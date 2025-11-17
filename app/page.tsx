@@ -556,7 +556,7 @@ export default function HigherSteakMenu() {
                 </span>
                 <span className="text-gray-400">•</span>
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
-                  {balance.usdValue}
+                  {balance.usdValue || '$0.00'}
                 </span>
                 <span className="text-gray-400">•</span>
                 <div className="flex items-center gap-1">
