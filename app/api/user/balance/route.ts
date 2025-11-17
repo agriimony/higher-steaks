@@ -2,11 +2,49 @@ import { NextRequest, NextResponse } from 'next/server';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { sql } from '@vercel/postgres';
 import { convertAmount } from '@/lib/utils/token';
+import { createPublicClient, http } from 'viem';
+import { base } from 'viem/chains';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const HIGHER_LOGO_URL = '/higher-logo.png';
+const HIGHER_TOKEN_ADDRESS = '0x0578d8A44db98B23BF096A382e016e29a5Ce0ffe';
+
+const ERC20_ABI = [
+  {
+    inputs: [{ name: 'account', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+function createCDPClient() {
+  const clientKey =
+    process.env.CDP_API_KEY_SECRET ||
+    process.env.CDP_RPC_CLIENT_KEY ||
+    process.env.CDP_RPC_API_KEY ||
+    '';
+
+  const rpcUrl = clientKey
+    ? `https://api.developer.coinbase.com/rpc/v1/base/${clientKey}`
+    : process.env.BASE_RPC_URL || 'https://mainnet.base.org';
+
+  if (!clientKey) {
+    console.warn('[user/balance] CDP client key not set, falling back to BASE_RPC_URL/public RPC');
+  }
+
+  return createPublicClient({
+    chain: base,
+    transport: http(rpcUrl, {
+      batch: {
+        wait: 10,
+      },
+    }),
+  });
+}
 
 type DbRow = {
   cast_hash: string;
@@ -98,11 +136,16 @@ export async function GET(request: NextRequest) {
       const normalized = normalizeAddress(addr);
       if (normalized) walletSet.add(normalized);
     }
-    const walletEntries = Array.from(walletSet).map((address) => ({
-      address,
-      balance: '0',
-      balanceFormatted: '0.00',
-    }));
+    const walletAddresses = Array.from(walletSet);
+    const walletBalanceMap = await fetchWalletBalances(walletAddresses);
+    const walletEntries = walletAddresses.map((address) => {
+      const amount = walletBalanceMap.get(address) ?? '0';
+      return {
+        address,
+        balance: amount,
+        balanceFormatted: amount,
+      };
+    });
 
     const result = await sql<DbRow>`
       SELECT
@@ -207,6 +250,33 @@ export async function GET(request: NextRequest) {
       { status: 500, headers: { 'Cache-Control': 'no-store' } },
     );
   }
+}
+
+async function fetchWalletBalances(addresses: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (addresses.length === 0) {
+    return map;
+  }
+
+  const client = createCDPClient();
+  await Promise.all(
+    addresses.map(async (address) => {
+      try {
+        const balance = await client.readContract({
+          address: HIGHER_TOKEN_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: 'balanceOf',
+          args: [address as `0x${string}`],
+        });
+        map.set(address, convertAmount(balance));
+      } catch (err) {
+        console.warn('[user/balance] Failed to fetch wallet balance for', address, err);
+        map.set(address, '0');
+      }
+    }),
+  );
+
+  return map;
 }
 
 
