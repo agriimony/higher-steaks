@@ -1084,7 +1084,7 @@ export function OnboardingModal({
               ref={stakeAmountInputRef}
               type="text"
               value={localStakeAmount}
-              // onChange={(e) => setLocalStakeAmount(e.target.value)}
+              onChange={(e) => setLocalStakeAmount(e.target.value)}
               // onFocus={(e) => {
               //   console.log('[OnboardingModal] stakeAmount onFocus', { value: e.target.value });
               // }}
@@ -1132,13 +1132,13 @@ export function OnboardingModal({
               type="number"
               value={localLockupDuration}
               onChange={(e) => setLocalLockupDuration(e.target.value)}
-              onFocus={(e) => {
-                console.log('[OnboardingModal] lockupDuration onFocus', { value: e.target.value });
-              }}
-              onBlur={(e) => {
-                console.log('[OnboardingModal] lockupDuration onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
-                commitIfChanged(lockupDuration, localLockupDuration, onCommitLockupDuration);
-              }}
+              // onFocus={(e) => {
+              //   console.log('[OnboardingModal] lockupDuration onFocus', { value: e.target.value });
+              // }}
+              // onBlur={(e) => {
+              //   console.log('[OnboardingModal] lockupDuration onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
+              //   commitIfChanged(lockupDuration, localLockupDuration, onCommitLockupDuration);
+              // }}
               placeholder="1"
               min="1"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
