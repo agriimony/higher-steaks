@@ -140,6 +140,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Fetch HIGHER price (5 min cache)
+    let pricePerToken = 0;
+    try {
+      const priceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=higher&vs_currencies=usd', {
+        next: { revalidate: 300 },
+      });
+      if (priceResponse.ok) {
+        const priceData = await priceResponse.json();
+        pricePerToken = priceData?.higher?.usd || 0;
+      }
+    } catch (err) {
+      console.warn('[user/balance] Failed to fetch HIGHER price:', err);
+    }
+
     const walletSet = new Set<string>();
     const custody = normalizeAddress(user.custody_address);
     if (custody) walletSet.add(custody);
