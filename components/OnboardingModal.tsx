@@ -1068,11 +1068,11 @@ export function OnboardingModal({
           </div>
         </div>
 
-        {errorMessage && (
+        {/* {errorMessage && (
           <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
             {errorMessage}
           </div>
-        )}
+        )} */}
 
         <div className="flex gap-3">
           <button
