@@ -73,7 +73,10 @@ export function TransactionModal({
         return (
           <>
             <p className="text-sm text-black font-mono">
-              Your stake is locked in. Nice work. Please wait up to 24 hours to see it in the app.
+              Your stake is locked in. Nice work.
+            </p>
+            <p className="text-xs text-gray-500 font-mono">
+              Cooking takes time. Check back in a bit!
             </p>
             {txHash && (
               <a
