@@ -633,11 +633,6 @@ export default function HigherSteakMenu() {
             // CDP webhook will automatically detect the transaction and refresh the balance
             // No manual refresh needed
           }}
-          onRefresh={() => {
-            if (user?.fid) {
-              fetchTokenBalance(user.fid);
-            }
-          }}
           onTransactionFailure={showTransactionFailure}
           onUnlockSuccess={showUnlockSuccess}
         />
