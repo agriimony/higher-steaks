@@ -8,7 +8,6 @@ import { SupporterModal } from '@/components/SupporterModal';
 import { TransactionModal } from '@/components/TransactionModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 import { BlockLivenessIndicator } from '@/components/BlockLivenessIndicator';
-import { useEventSubscriptions } from '@/hooks/useEventSubscriptions';
 import { useAccount } from 'wagmi';
 import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
 
@@ -109,9 +108,6 @@ export default function HigherSteakMenu() {
   
   // Event subscriptions for real-time updates (via SSE/CDP webhooks)
   const { address: wagmiAddress } = useAccount();
-  const wsEnabled = user !== null && !isDevelopmentMode;
-  const ws = useEventSubscriptions(wsEnabled);
-  const lastEventRef = useRef<string | null>(null);
   
   // Close FID switcher when clicking outside
   useEffect(() => {
@@ -437,165 +433,6 @@ export default function HigherSteakMenu() {
     return balance.lockups.some((lockup) => lockup.unlockTime <= currentTime);
   }, [balance?.lockups]);
 
-  // Handle lockup events (via CDP webhooks)
-  useEffect(() => {
-    if (ws.newLockupEvent && user?.fid && wagmiAddress) {
-      // Prefer transaction hash for deduping; fall back to legacy identifiers
-      const eventId = ws.newLockupEvent.transactionHash
-        ? `lockup-tx-${ws.newLockupEvent.transactionHash}`
-        : ws.newLockupEvent.from && ws.newLockupEvent.to
-          ? `lockup-transfer-${ws.newLockupEvent.from}-${ws.newLockupEvent.to}-${ws.newLockupEvent.value}`
-          : `${ws.newLockupEvent.lockUpId}-${ws.newLockupEvent.receiver}`;
-      
-      // Avoid processing duplicate events
-      if (eventId === lastEventRef.current) {
-        return;
-      }
-      lastEventRef.current = eventId;
-
-      console.log('[Event] New lockup detected:', ws.newLockupEvent);
-
-      // Check if this event is relevant to the current user
-      // For Transfer-based: from should be user's wallet
-      // For native LockUpCreated: receiver should be user's wallet
-      const isRelevant = ws.newLockupEvent.from 
-        ? ws.newLockupEvent.from.toLowerCase() === wagmiAddress.toLowerCase()
-        : ws.newLockupEvent.receiver?.toLowerCase() === wagmiAddress.toLowerCase();
-      
-      console.log('[Event] Relevance check:', {
-        isRelevant,
-        eventFrom: ws.newLockupEvent.from,
-        eventReceiver: ws.newLockupEvent.receiver,
-        wagmiAddress,
-        isFromBased: !!ws.newLockupEvent.from
-      });
-      
-      if (isRelevant) {
-        console.log('[Event] Lockup involves current user, refreshing balance and leaderboard');
-        
-        // Refresh balance
-        fetchTokenBalance(user.fid);
-        
-        // Refresh leaderboard
-        fetch('/api/leaderboard/refresh', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }).catch(err => {
-          console.error('Failed to refresh leaderboard:', err);
-        });
-      } else {
-        console.log('[Event] Lockup not relevant to current user');
-      }
-    }
-  }, [ws.newLockupEvent, user?.fid, wagmiAddress]);
-
-  // Handle unlock events (via CDP webhooks)
-  useEffect(() => {
-    console.log('[Unlock Event Handler] Effect triggered:', {
-      hasUnlockEvent: !!ws.unlockEvent,
-      unlockEvent: ws.unlockEvent,
-      hasUser: !!user?.fid,
-      hasWagmiAddress: !!wagmiAddress,
-      wagmiAddress
-    });
-    
-    if (ws.unlockEvent && user?.fid && wagmiAddress) {
-      // Generate event ID based on what data is available
-      // For Transfer-based events: use from/to/value
-      // For native Unlock events: use lockUpId/receiver
-      const eventId = ws.unlockEvent.transactionHash
-        ? `unlock-tx-${ws.unlockEvent.transactionHash}`
-        : ws.unlockEvent.from && ws.unlockEvent.to 
-          ? `unlock-transfer-${ws.unlockEvent.from}-${ws.unlockEvent.to}-${ws.unlockEvent.value}`
-          : `unlock-${ws.unlockEvent.lockUpId}-${ws.unlockEvent.receiver}`;
-      
-      console.log('[Unlock Event] Event received:', {
-        eventId,
-        currentLastEvent: lastEventRef.current,
-        lockUpId: ws.unlockEvent.lockUpId,
-        receiver: ws.unlockEvent.receiver,
-        from: ws.unlockEvent.from,
-        to: ws.unlockEvent.to,
-        value: ws.unlockEvent.value,
-        wagmiAddress
-      });
-      
-      // Avoid processing duplicate events
-      if (eventId === lastEventRef.current) {
-        console.log('[Unlock Event] Duplicate event, skipping');
-        return;
-      }
-      lastEventRef.current = eventId;
-
-      console.log('[Event] Unlock detected:', ws.unlockEvent);
-
-      // Check if this event is relevant to the current user
-      // For Transfer-based: to should be user's wallet (funds moving FROM lockup TO user)
-      // For native Unlock: receiver should be user's wallet
-      const eventTo = ws.unlockEvent.to?.toLowerCase();
-      const eventReceiver = ws.unlockEvent.receiver?.toLowerCase();
-      const userAddress = wagmiAddress.toLowerCase();
-      
-      const isRelevant = eventTo 
-        ? eventTo === userAddress
-        : eventReceiver === userAddress;
-      
-      console.log('[Unlock Event] Relevance check:', {
-        eventTo,
-        eventReceiver,
-        userAddress,
-        isRelevant,
-        eventType: eventTo ? 'Transfer-based' : 'Native Unlock'
-      });
-      
-      if (isRelevant) {
-        console.log('[Event] Unlock involves current user, refreshing balance');
-        
-        // Refresh balance (unlock doesn't affect leaderboard, only individual balance)
-        fetchTokenBalance(user.fid);
-      } else {
-        console.log('[Unlock Event] Event not relevant to current user');
-      }
-    } else if (ws.unlockEvent) {
-      console.log('[Unlock Event] Missing required data:', {
-        hasUser: !!user?.fid,
-        hasWagmiAddress: !!wagmiAddress,
-        unlockEvent: ws.unlockEvent
-      });
-    }
-  }, [ws.unlockEvent, user?.fid, wagmiAddress]);
-
-  // Handle transfer events (via CDP webhooks)
-  useEffect(() => {
-    if (ws.transferEvent && user?.fid && wagmiAddress) {
-      const eventId = ws.transferEvent.transactionHash
-        ? `transfer-tx-${ws.transferEvent.transactionHash}`
-        : `transfer-${ws.transferEvent.from}-${ws.transferEvent.to}`;
-      
-      // Avoid processing duplicate events
-      if (eventId === lastEventRef.current) {
-        return;
-      }
-      lastEventRef.current = eventId;
-
-      console.log('[Event] Transfer detected:', ws.transferEvent);
-
-      // Check if this transfer involves the current user's wallet
-      const lowerWagmiAddr = wagmiAddress.toLowerCase();
-      const isRelevant = 
-        ws.transferEvent.from.toLowerCase() === lowerWagmiAddr ||
-        ws.transferEvent.to.toLowerCase() === lowerWagmiAddr;
-
-      if (isRelevant) {
-        console.log('[Event] Transfer involves current user, refreshing balance');
-        
-        // Refresh wallet balance
-        fetchTokenBalance(user.fid);
-      }
-    }
-  }, [ws.transferEvent, user?.fid, wagmiAddress]);
 
   return (
     <>

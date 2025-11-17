@@ -5,7 +5,6 @@ import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAcc
 import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
-import { useEventSubscriptions } from '@/hooks/useEventSubscriptions';
 import { formatTimeRemaining } from '@/lib/supporter-helpers';
 
 interface SupporterModalProps {
@@ -130,11 +129,6 @@ export function SupporterModal({
     },
     [onTransactionFailure]
   );
-
-  // Webhook listeners
-  const wsEnabled = userFid !== null;
-  const ws = useEventSubscriptions(wsEnabled);
-  const lastEventRef = useRef<string | null>(null);
 
   // Handle escape key to close
   useEffect(() => {
@@ -336,92 +330,6 @@ export function SupporterModal({
       hasScheduledCreateLockUp.current = false;
     }
   }, [approveError, createLockUpError, reportStakeError, reportTransactionFailure]);
-
-  // Listen for webhook events to refresh cast data
-  useEffect(() => {
-    if (ws.newLockupEvent && wagmiAddress && castHash) {
-      // Generate event ID based on what data is available
-      const eventId = ws.newLockupEvent.from && ws.newLockupEvent.to 
-        ? `lockup-transfer-${ws.newLockupEvent.from}-${ws.newLockupEvent.to}-${ws.newLockupEvent.value}`
-        : `${ws.newLockupEvent.lockUpId}-${ws.newLockupEvent.receiver}`;
-      
-      // Avoid processing duplicate events
-      if (eventId === lastEventRef.current) {
-        return;
-      }
-      lastEventRef.current = eventId;
-
-      console.log('[SupporterModal] New lockup detected:', ws.newLockupEvent);
-
-      // Check if this event is relevant to the current user
-      const isRelevant = ws.newLockupEvent.from 
-        ? ws.newLockupEvent.from.toLowerCase() === wagmiAddress.toLowerCase()
-        : ws.newLockupEvent.receiver?.toLowerCase() === wagmiAddress.toLowerCase();
-      
-      if (isRelevant) {
-        console.log('[SupporterModal] Lockup involves current user, refreshing cast data');
-        
-        // Refresh cast data using same validation logic as initial fetch
-        const fetchCastData = async () => {
-          try {
-            // Step 1: Check DB first
-            const dbUrl = `/api/cast/${castHash}${userFid ? `?userFid=${userFid}` : ''}`;
-            const dbResponse = await fetch(dbUrl);
-            
-            if (dbResponse.ok) {
-              const dbData = await dbResponse.json();
-              
-              // If cast_state is 'higher' or 'expired', use DB data directly
-              if (dbData.state === 'higher' || dbData.state === 'expired') {
-                setCastData(dbData);
-                return;
-              }
-              
-              // If cast_state is 'valid' or 'invalid', try Neynar fallback
-              if (dbData.state === 'valid' || dbData.state === 'invalid') {
-                try {
-                  const neynarResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
-                  if (neynarResponse.ok) {
-                    const neynarData = await neynarResponse.json();
-                    if (neynarData.valid) {
-                      // Merge Neynar data with DB data
-                      setCastData({
-                        ...dbData,
-                        castText: neynarData.castText || dbData.castText,
-                        description: neynarData.description || dbData.description,
-                        username: neynarData.author?.username || dbData.username,
-                        displayName: neynarData.author?.display_name || dbData.displayName,
-                        pfpUrl: neynarData.author?.pfp_url || dbData.pfpUrl,
-                      });
-                      return;
-                    }
-                  }
-                } catch (neynarError) {
-                  console.error('[SupporterModal] Error validating cast via Neynar:', neynarError);
-                }
-                
-                // Use DB data even if Neynar failed
-                setCastData(dbData);
-                return;
-              }
-              
-              // Use DB data for any other state
-              setCastData(dbData);
-              return;
-            }
-          } catch (err) {
-            console.error('[SupporterModal] Error refreshing cast data:', err);
-            // Don't show error on refresh - just log it
-          }
-        };
-        
-        fetchCastData();
-        
-        // Call success callback
-        onStakeSuccess?.();
-      }
-    }
-  }, [ws.newLockupEvent, wagmiAddress, castHash, userFid, onStakeSuccess]);
 
   const handleStake = async () => {
     if (!wagmiAddress || !isConnected) {
