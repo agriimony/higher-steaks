@@ -146,6 +146,10 @@ export async function GET(request: NextRequest) {
         balanceFormatted: amount,
       };
     });
+    const walletTotal = walletEntries.reduce((sum, wallet) => {
+      const value = Number(wallet.balance?.replace(/,/g, '') ?? wallet.balance);
+      return sum + (Number.isFinite(value) ? value : 0);
+    }, 0);
 
     const result = await sql<DbRow>`
       SELECT
@@ -219,14 +223,21 @@ export async function GET(request: NextRequest) {
       { total: 0, locked: 0 },
     );
 
-    const totalBalanceString = totals.total.toString();
-    const lockedBalanceString = totals.locked.toString();
+    const stakedTotal = totals.total;
+    const lockedBalanceValue = totals.locked;
+    const totalBalanceValue = stakedTotal + walletTotal;
+
+    const totalBalanceString = totalBalanceValue.toString();
+    const lockedBalanceString = lockedBalanceValue.toString();
+    const walletBalanceString = walletTotal.toString();
 
     const responseBody = {
       totalBalance: totalBalanceString,
       totalBalanceFormatted: totalBalanceString,
       lockedBalance: lockedBalanceString,
       lockedBalanceFormatted: lockedBalanceString,
+      walletBalance: walletBalanceString,
+      walletBalanceFormatted: walletBalanceString,
       usdValue: '$0.00',
       pricePerToken: 0,
       higherLogoUrl: HIGHER_LOGO_URL,

@@ -311,11 +311,17 @@ export function StakingModal({
   const derivedWallets = useMemo(() => {
     const map = new Map<string, number>();
 
+    const parseAmount = (value?: string) => {
+      if (value === undefined || value === null) return 0;
+      const num = Number(String(value).replace(/,/g, ''));
+      return Number.isFinite(num) ? num : 0;
+    };
+
     const seedFromList = (entry: WalletDetail) => {
       const addr = entry.address?.toLowerCase();
       if (!addr) return;
-      const value = Number(entry.balanceFormatted?.replace(/,/g, '') ?? entry.balance);
-      if (!Number.isFinite(value)) return;
+      const value = parseAmount(entry.balanceFormatted ?? entry.balance);
+      if (value <= 0) return;
       map.set(addr, (map.get(addr) || 0) + value);
     };
 
@@ -326,19 +332,21 @@ export function StakingModal({
       const addr = item.receiver?.toLowerCase();
       if (!addr) return;
       const amt = Number(item.amount);
-      if (!Number.isFinite(amt)) return;
+      if (!Number.isFinite(amt) || amt <= 0) return;
       map.set(addr, (map.get(addr) || 0) + amt);
     });
 
     if (map.size === 0) {
-      return [...wallets];
+      return wallets.filter((entry) => parseAmount(entry.balanceFormatted ?? entry.balance) > 0);
     }
 
-    return Array.from(map.entries()).map(([address, amount]) => ({
-      address,
-      balance: amount.toString(),
-      balanceFormatted: amount.toString(),
-    }));
+    return Array.from(map.entries())
+      .map(([address, amount]) => ({
+        address,
+        balance: amount.toString(),
+        balanceFormatted: amount.toString(),
+      }))
+      .filter((entry) => parseAmount(entry.balanceFormatted ?? entry.balance) > 0);
   }, [wallets, duneItems]);
 
   // Sort wallets: connected first, then by balance descending

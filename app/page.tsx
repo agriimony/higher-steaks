@@ -32,6 +32,8 @@ interface TokenBalance {
   totalBalanceFormatted: string;
   lockedBalance?: string;
   lockedBalanceFormatted: string;
+  walletBalance?: string;
+  walletBalanceFormatted?: string;
   usdValue: string;
   pricePerToken: number;
   higherLogoUrl?: string;
@@ -224,6 +226,17 @@ export default function HigherSteakMenu() {
       return num.toFixed(2);
     }
   };
+
+  const { pillStaked, pillWallet, pillTotal } = useMemo(() => {
+    const staked = parseFloat(balance?.lockedBalanceFormatted ?? '0') || 0;
+    const wallet = parseFloat(balance?.walletBalanceFormatted ?? '0') || 0;
+    const total = staked + wallet;
+    return {
+      pillStaked: formatTokenAmount(staked.toString()),
+      pillWallet: formatTokenAmount(wallet.toString()),
+      pillTotal: formatTokenAmount(total.toString()),
+    };
+  }, [balance]);
   
   // Fallback menu items (shown if leaderboard is empty)
   const fallbackMenuItems = [
@@ -535,8 +548,11 @@ export default function HigherSteakMenu() {
                     (e.target as HTMLImageElement).style.display = 'none';
                   }}
                 />
-                <span className="text-[0.65rem] sm:text-xs font-bold text-purple-700">
-                  {formatTokenAmount(balance.lockedBalanceFormatted)}/{formatTokenAmount(balance.totalBalanceFormatted)}
+                <span
+                  className="text-[0.65rem] sm:text-xs font-bold text-purple-700"
+                  title={`Wallet: ${pillWallet} HIGHER`}
+                >
+                  {pillStaked}/{pillTotal}
                 </span>
                 <span className="text-gray-400">•</span>
                 <span className="text-[0.65rem] sm:text-xs text-gray-600">
