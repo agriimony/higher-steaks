@@ -171,7 +171,7 @@ export function StakingModal({
         return {
           lockupId: String(it.lockUpId),
           amount: amountToken,
-          amountFormatted: amountToken,
+          amountFormatted: formatTokenAmount(amountToken),
           unlockTime: Number(it.unlockTime || 0),
           receiver: String(it.receiver || ''),
           title: String(it.title || ''),

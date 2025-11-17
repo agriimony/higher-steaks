@@ -106,7 +106,6 @@ export function OnboardingModal({
   onTransactionFailure,
   onLockSuccess,
 }: OnboardingModalProps) {
-  console.log('[OnboardingModal] Component render', { userFid, walletBalance });
   // Helper function to normalize hash format (ensure 0x prefix and lowercase)
   const normalizeHash = useCallback((hash: string): string => {
     if (!hash) return hash;
@@ -624,29 +623,20 @@ export function OnboardingModal({
 
     // Normalize hash format for comparison
     const normalizedCastHash = normalizeHash(castHash);
-    console.log('[handleStake] Validating cast:', { castHash, normalizedCastHash, userFid });
 
     // Check if cast exists in local state (for reference, but we'll still validate via Neynar)
     const localCast = castsRef.current.find(c => normalizeHash(c.hash) === normalizedCastHash);
-    console.log('[handleStake] Local cast found:', !!localCast);
     
     // Always validate via Neynar to ensure cast exists, belongs to user, and is valid
     try {
       const validateResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(normalizedCastHash)}&isUrl=false`);
       
       if (!validateResponse.ok) {
-        console.error('[handleStake] Validation request failed:', validateResponse.status, validateResponse.statusText);
         reportStakeError('Failed to validate cast. Please try again.');
         return;
       }
 
       const validateData = await validateResponse.json();
-      console.log('[handleStake] Validation response:', { 
-        valid: validateData.valid, 
-        fid: validateData.fid, 
-        state: validateData.state,
-        hash: validateData.hash 
-      });
       
       if (!validateData.valid) {
         reportStakeError('Higher cast not found. Please create a valid cast first.');
@@ -655,7 +645,6 @@ export function OnboardingModal({
 
       // Validate ownership - only the caster can stake on their own cast
       if (validateData.fid !== userFid) {
-        console.warn('[handleStake] Ownership mismatch:', { validateFid: validateData.fid, userFid });
         reportStakeError('Only the caster can stake on their own cast');
         return;
       }
@@ -679,7 +668,6 @@ export function OnboardingModal({
         );
       }
     } catch (error) {
-      console.error('[handleStake] Validation error:', error);
       reportStakeError('Failed to validate cast ownership. Please try again.');
       return;
     }
@@ -789,7 +777,6 @@ export function OnboardingModal({
 
   // Create Cast Flow Component - memoized to prevent re-renders that cause focus loss
   const CreateCastFlow = useMemo(() => {
-    console.log('[OnboardingModal] CreateCastFlow render', { customMessage, castUrl, showCreateCast });
     return (
       <>
         <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
@@ -808,14 +795,7 @@ export function OnboardingModal({
             key="custom-message-textarea"
             value={customMessage}
             onChange={(e) => {
-              console.log('[OnboardingModal] customMessage onChange', { value: e.target.value, isFocused: document.activeElement === e.target });
               setCustomMessage(e.target.value);
-            }}
-            onFocus={(e) => {
-              console.log('[OnboardingModal] customMessage onFocus', { value: e.target.value });
-            }}
-            onBlur={(e) => {
-              console.log('[OnboardingModal] customMessage onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
             }}
             placeholder="[your message here]"
             className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black resize-none"
@@ -839,15 +819,8 @@ export function OnboardingModal({
             type="text"
             value={castUrl}
             onChange={(e) => {
-              console.log('[OnboardingModal] castUrl onChange', { value: e.target.value, isFocused: document.activeElement === e.target });
               setCastUrl(e.target.value);
               setUrlValidationError(null);
-            }}
-            onFocus={(e) => {
-              console.log('[OnboardingModal] castUrl onFocus', { value: e.target.value });
-            }}
-            onBlur={(e) => {
-              console.log('[OnboardingModal] castUrl onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
             }}
             placeholder="Paste your cast URL here..."
             className="w-full text-xs font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
@@ -972,8 +945,6 @@ export function OnboardingModal({
     onCancel: () => void;
     errorMessage: string | null;
   }) => {
-    console.log('[OnboardingModal] StakingForm render', { stakeAmount, lockupDuration, castHash });
-
     const [localStakeAmount, setLocalStakeAmount] = React.useState(stakeAmount);
     const [localLockupDuration, setLocalLockupDuration] = React.useState(lockupDuration);
     const [localLockupUnit, setLocalLockupUnit] = React.useState<'minute' | 'day' | 'week' | 'month' | 'year'>(initialLockupUnit);
@@ -996,13 +967,6 @@ export function OnboardingModal({
               type="text"
               value={localStakeAmount}
               onChange={(e) => setLocalStakeAmount(e.target.value)}
-              // onFocus={(e) => {
-              //   console.log('[OnboardingModal] stakeAmount onFocus', { value: e.target.value });
-              // }}
-              // onBlur={(e) => {
-              //   console.log('[OnboardingModal] stakeAmount onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
-              //   commitIfChanged(stakeAmount, localStakeAmount, onCommitStakeAmount);
-              // }}
               placeholder="0.00"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
             />
@@ -1043,13 +1007,6 @@ export function OnboardingModal({
               type="number"
               value={localLockupDuration}
               onChange={(e) => setLocalLockupDuration(e.target.value)}
-              // onFocus={(e) => {
-              //   console.log('[OnboardingModal] lockupDuration onFocus', { value: e.target.value });
-              // }}
-              // onBlur={(e) => {
-              //   console.log('[OnboardingModal] lockupDuration onBlur', { value: e.target.value, relatedTarget: e.relatedTarget });
-              //   commitIfChanged(lockupDuration, localLockupDuration, onCommitLockupDuration);
-              // }}
               placeholder="1"
               min="1"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
@@ -1114,11 +1071,6 @@ export function OnboardingModal({
 
   // Cast Cards View Component - memoized to prevent recreation on every render
   const CastCardsView = useMemo(() => {
-    console.log('[OnboardingModal] CastCardsView render', { 
-      castsLength: castsRef.current.length, 
-      activeCardIndex, 
-      selectedCastIndex
-    });
     const currentCast = castsRef.current[activeCardIndex];
     
     if (!currentCast) {
