@@ -3,31 +3,11 @@ import crypto from 'crypto';
 
 // Import contract addresses to filter events
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
-import { eventStore } from '@/lib/event-store';
 import { isValidCastHash } from '@/lib/cast-helpers';
 import { getHigherCast, castExistsInDB, upsertHigherCast } from '@/lib/services/db-service';
 import { sql } from '@vercel/postgres';
 import { getFidsFromAddresses } from '@/lib/services/stake-service';
 import { getCastByHash } from '@/lib/services/cast-service';
-
-// Broadcast event to all connected SSE clients
-function broadcastEvent(type: string, data: any) {
-  const event = {
-    id: crypto.randomUUID(),
-    timestamp: Date.now(),
-    type: type as 'lockup_created' | 'unlock' | 'transfer',
-    data,
-  };
-  
-  // Keep only last 100 events
-  eventStore.events.push(event);
-  if (eventStore.events.length > 100) {
-    eventStore.events.shift();
-  }
-  
-  // Notify all subscribers
-  eventStore.subscriptions.forEach((notify) => notify());
-}
 
 // Verify webhook signature from CDP
 // CDP uses X-Hook0-Signature header with format: t=timestamp,h=headers,v1=signature
@@ -258,16 +238,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
     
-    // Parse and broadcast event
+    // Parse and handle event
     const parsedEvent = parseCDPEvent(body);
     if (parsedEvent) {
-      console.log('[CDP Webhook] Broadcasting event:', {
+      console.log('[CDP Webhook] Processing event:', {
         type: parsedEvent.type,
         data: parsedEvent.data,
         eventName: body.event_name,
         contractAddress: body.contract_address
       });
-      broadcastEvent(parsedEvent.type, parsedEvent.data);
       
       // Optimistic update for lockup_created events
       if (parsedEvent.type === 'lockup_created' && parsedEvent.data.title) {
@@ -285,7 +264,7 @@ export async function POST(request: NextRequest) {
         });
       }
     } else {
-      console.log('[CDP Webhook] Event parsed but returned null - not broadcasting');
+      console.log('[CDP Webhook] Event parsed but returned null - not processing');
     }
     
     return NextResponse.json({ success: true, message: 'Event received' });
