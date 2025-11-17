@@ -116,12 +116,20 @@ export function OnboardingModal({
     return hash.toLowerCase();
   }, []);
 
-  // Cast cards state
-  const [casts, setCasts] = useState<CastCard[]>([]);
+  // Cast cards snapshot stored in ref to avoid unnecessary rerenders
+  const castsRef = useRef<CastCard[]>([]);
+  const [castsVersion, setCastsVersion] = useState(0);
+  const replaceCasts = useCallback((next: CastCard[]) => {
+    castsRef.current = next;
+    setCastsVersion((v) => v + 1);
+  }, []);
+  const updateCasts = useCallback((updater: (prev: CastCard[]) => CastCard[]) => {
+    replaceCasts(updater(castsRef.current));
+  }, [replaceCasts]);
+
   const [loadingCasts, setLoadingCasts] = useState(true);
   const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
   const [showCreateCast, setShowCreateCast] = useState(false);
-  const [temporaryNewCast, setTemporaryNewCast] = useState<CastCard | null>(null);
   
   // Create cast state
   const [customMessage, setCustomMessage] = useState('');
@@ -149,61 +157,6 @@ export function OnboardingModal({
   const lockupDurationInputRef = useRef<HTMLInputElement>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
 
-  // Debug: Log state changes that might cause re-renders (after all state declarations)
-  useEffect(() => {
-    console.log('[OnboardingModal] State change - customMessage:', customMessage);
-  }, [customMessage]);
-
-  useEffect(() => {
-    console.log('[OnboardingModal] State change - castUrl:', castUrl);
-  }, [castUrl]);
-
-  useEffect(() => {
-    console.log('[OnboardingModal] State change - stakeAmount:', stakeAmount);
-  }, [stakeAmount]);
-
-  useEffect(() => {
-    console.log('[OnboardingModal] State change - lockupDuration:', lockupDuration);
-  }, [lockupDuration]);
-
-  useEffect(() => {
-    console.log('[OnboardingModal] State change - casts:', casts.length);
-  }, [casts.length]);
-
-  useEffect(() => {
-    console.log('[OnboardingModal] State change - activeCardIndex:', activeCardIndex);
-  }, [activeCardIndex]);
-
-  useEffect(() => {
-    console.log('[OnboardingModal] State change - selectedCastIndex:', selectedCastIndex);
-  }, [selectedCastIndex]);
-
-  useEffect(() => {
-    console.log('[OnboardingModal] State change - showCreateCast:', showCreateCast);
-  }, [showCreateCast]);
-
-  // Debug: Track focus changes globally (after refs are declared)
-  useEffect(() => {
-    const handleFocusChange = () => {
-      console.log('[OnboardingModal] Focus changed', { 
-        activeElement: document.activeElement?.tagName,
-        activeElementId: (document.activeElement as HTMLElement)?.id,
-        activeElementValue: (document.activeElement as HTMLInputElement)?.value,
-        activeElementRef: document.activeElement === castUrlInputRef.current || 
-                         document.activeElement === stakeAmountInputRef.current || 
-                         document.activeElement === lockupDurationInputRef.current
-      });
-    };
-
-    document.addEventListener('focusin', handleFocusChange);
-    document.addEventListener('focusout', handleFocusChange);
-    
-    return () => {
-      document.removeEventListener('focusin', handleFocusChange);
-      document.removeEventListener('focusout', handleFocusChange);
-    };
-  }, []);
-  
   
   // Wagmi hooks
   const { address: wagmiAddress } = useAccount();
@@ -233,9 +186,9 @@ export function OnboardingModal({
     address: HIGHER_TOKEN_ADDRESS,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: wagmiAddress && !showCreateCast && casts.length > 0 ? [wagmiAddress, LOCKUP_CONTRACT] : undefined,
+    args: wagmiAddress && !showCreateCast && castsRef.current.length > 0 ? [wagmiAddress, LOCKUP_CONTRACT] : undefined,
     query: {
-      enabled: !!wagmiAddress && !showCreateCast && casts.length > 0,
+      enabled: !!wagmiAddress && !showCreateCast && castsRef.current.length > 0,
       refetchInterval: false,
       refetchOnMount: false,
       refetchOnWindowFocus: false,
@@ -271,22 +224,22 @@ export function OnboardingModal({
     [onTransactionFailure]
   );
 
-  // Fetch all casts on mount
+  // Fetch all casts on mount (single snapshot)
   useEffect(() => {
+    let isMounted = true;
     const fetchCasts = async () => {
       setLoadingCasts(true);
       try {
         const response = await fetch(`/api/user/casts/all?fid=${userFid}`);
-        if (response.ok) {
+        if (response.ok && isMounted) {
           const data = await response.json();
-          const castsWithTotals = data.casts.map((cast: any) => {
+          const castsWithTotals: CastCard[] = data.casts.map((cast: any) => {
             const { totalCasterStaked, totalSupporterStaked } = calculateStakeTotals(
               cast.casterStakeAmounts || [],
               cast.casterStakeUnlockTimes || [],
               cast.supporterStakeAmounts || [],
               cast.totalHigherStaked
             );
-            
             return {
               hash: cast.hash,
               text: cast.text,
@@ -305,58 +258,53 @@ export function OnboardingModal({
               supporterStakeFids: cast.supporterStakeFids || [],
             };
           });
-          
-          // Merge with temporary casts (valid casts not yet in database)
-          setCasts(prevCasts => {
-            // Get temporary casts (valid state, not found in API results)
-            const temporaryCasts = prevCasts.filter(cast => 
-              cast.castState === 'valid' && 
-              !castsWithTotals.find((apiCast: CastCard) => apiCast.hash === cast.hash)
+
+          updateCasts(() => {
+            const prevCasts = castsRef.current;
+            const temporary = prevCasts.filter(
+              (cast) =>
+                cast.castState === 'valid' &&
+                !castsWithTotals.find((apiCast) => apiCast.hash === cast.hash)
             );
-            
-            // Combine API casts with temporary casts, deduplicate by hash
-            const allCasts = [...castsWithTotals, ...temporaryCasts];
-            const uniqueCasts = allCasts.reduce((acc: CastCard[], cast: CastCard) => {
-              if (!acc.find(c => c.hash === cast.hash)) {
-                acc.push(cast);
+            const combined = [...castsWithTotals, ...temporary];
+            const unique: CastCard[] = [];
+            const seen = new Set<string>();
+            for (const cast of combined) {
+              if (!seen.has(cast.hash)) {
+                seen.add(cast.hash);
+                unique.push(cast);
               }
-              return acc;
-            }, []);
-            
-            // Only update if hashes actually changed
-            const prevHashes = prevCasts.map((c: CastCard) => c.hash).sort().join(',');
-            const newHashes = uniqueCasts.map((c: CastCard) => c.hash).sort().join(',');
-            if (prevHashes === newHashes) {
-              return prevCasts; // Return previous array reference if hashes unchanged
             }
-            
-            return uniqueCasts;
+            return unique;
           });
-          
-          setTemporaryNewCast(null); // Clear temporary cast flag when API data is loaded
         }
-      } catch (error) {
-        // Keep existing casts if API fails
+      } catch {
+        // ignore, keep previous snapshot
       } finally {
-        setLoadingCasts(false);
+        if (isMounted) {
+          setLoadingCasts(false);
+        }
       }
     };
-    
+
     fetchCasts();
-  }, [userFid]);
+    return () => {
+      isMounted = false;
+    };
+  }, [userFid, updateCasts]);
 
   // Reset activeCardIndex if it's out of bounds when casts change
   useEffect(() => {
-    if (casts.length > 0 && activeCardIndex >= casts.length) {
+    const currentCasts = castsRef.current;
+    if (currentCasts.length > 0 && activeCardIndex >= currentCasts.length) {
       setActiveCardIndex(0);
     }
-  }, [casts.length, activeCardIndex]);
+  }, [castsVersion, activeCardIndex]);
 
   // Navigate to previous card - memoized to prevent recreating CastCardsView
   const scrollToPrevious = useCallback(() => {
     setActiveCardIndex(prev => {
       if (prev > 0) {
-        // Reset staking form when changing cards
         setSelectedCastIndex(null);
         setStakeAmount('');
         setLockupDuration('');
@@ -368,11 +316,10 @@ export function OnboardingModal({
     });
   }, []);
 
-  // Navigate to next card - memoized to prevent recreating CastCardsView
   const scrollToNext = useCallback(() => {
     setActiveCardIndex(prev => {
-      if (prev < casts.length - 1) {
-        // Reset staking form when changing cards
+      const currentCasts = castsRef.current;
+      if (prev < currentCasts.length - 1) {
         setSelectedCastIndex(null);
         setStakeAmount('');
         setLockupDuration('');
@@ -382,7 +329,7 @@ export function OnboardingModal({
       }
       return prev;
     });
-  }, [casts.length]);
+  }, []);
 
   // Handle escape key to close
   useEffect(() => {
@@ -550,22 +497,10 @@ export function OnboardingModal({
           supporterStakeFids: [],
         };
         
-        // Add temporary cast first, then existing casts
-        setCasts(prevCasts => {
-          // Remove any existing temporary cast with same hash
+        updateCasts(prevCasts => {
           const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
-          const newCasts = [newCast, ...filtered];
-          
-          // Only update if hashes actually changed
-          const prevHashes = prevCasts.map(c => c.hash).sort().join(',');
-          const newHashes = newCasts.map(c => c.hash).sort().join(',');
-          if (prevHashes === newHashes) {
-            return prevCasts; // Return previous array reference if hashes unchanged
-          }
-          
-          return newCasts;
+          return [newCast, ...filtered];
         });
-        setTemporaryNewCast(newCast);
         setShowCreateCast(false);
         setCustomMessage('');
       }
@@ -667,22 +602,10 @@ export function OnboardingModal({
           supporterStakeFids: [],
         };
         
-        // Add temporary cast first, then existing casts
-        setCasts(prevCasts => {
-          // Remove any existing temporary cast with same hash
+        updateCasts(prevCasts => {
           const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
-          const newCasts = [newCast, ...filtered];
-          
-          // Only update if hashes actually changed
-          const prevHashes = prevCasts.map(c => c.hash).sort().join(',');
-          const newHashes = newCasts.map(c => c.hash).sort().join(',');
-          if (prevHashes === newHashes) {
-            return prevCasts; // Return previous array reference if hashes unchanged
-          }
-          
-          return newCasts;
+          return [newCast, ...filtered];
         });
-        setTemporaryNewCast(newCast);
         setShowCreateCast(false);
       } else if (data.valid && data.fid !== userFid) {
         setUrlValidationError('This cast belongs to a different user');
@@ -708,7 +631,7 @@ export function OnboardingModal({
     console.log('[handleStake] Validating cast:', { castHash, normalizedCastHash, userFid });
 
     // Check if cast exists in local state (for reference, but we'll still validate via Neynar)
-    const localCast = casts.find(c => normalizeHash(c.hash) === normalizedCastHash);
+    const localCast = castsRef.current.find(c => normalizeHash(c.hash) === normalizedCastHash);
     console.log('[handleStake] Local cast found:', !!localCast);
     
     // Always validate via Neynar to ensure cast exists, belongs to user, and is valid
@@ -751,9 +674,9 @@ export function OnboardingModal({
       // If we have local cast state, sync it with the validated state from Neynar/DB
       // This ensures local state stays in sync with the source of truth
       if (localCast && localCast.castState !== validateData.state) {
-        setCasts(prevCasts => 
-          prevCasts.map(c => 
-            normalizeHash(c.hash) === normalizedCastHash 
+        updateCasts(prevCasts =>
+          prevCasts.map(c =>
+            normalizeHash(c.hash) === normalizedCastHash
               ? { ...c, castState: validateData.state as 'valid' | 'higher' | 'expired' }
               : c
           )
@@ -1205,11 +1128,11 @@ export function OnboardingModal({
   // Cast Cards View Component - memoized to prevent recreation on every render
   const CastCardsView = useMemo(() => {
     console.log('[OnboardingModal] CastCardsView render', { 
-      castsLength: casts.length, 
+      castsLength: castsRef.current.length, 
       activeCardIndex, 
       selectedCastIndex
     });
-    const currentCast = casts[activeCardIndex];
+    const currentCast = castsRef.current[activeCardIndex];
     
     if (!currentCast) {
       return null;
@@ -1224,7 +1147,7 @@ export function OnboardingModal({
         {/* Single card display with navigation arrows */}
         <div className="mb-4 relative" style={{ overflow: 'visible' }}>
           {/* Left arrow button - positioned outside container, overlapping halfway */}
-          {casts.length > 1 && activeCardIndex > 0 && (
+          {castsRef.current.length > 1 && activeCardIndex > 0 && (
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -1287,7 +1210,7 @@ export function OnboardingModal({
           </div>
           
           {/* Right arrow button - positioned outside container, overlapping halfway */}
-          {casts.length > 1 && activeCardIndex < casts.length - 1 && (
+          {castsRef.current.length > 1 && activeCardIndex < castsRef.current.length - 1 && (
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -1325,15 +1248,14 @@ export function OnboardingModal({
       </>
     );
   }, [
-    casts,
+    castsVersion,
     activeCardIndex,
     selectedCastIndex,
     handleOpenStakeForm,
     handleBuyHigher,
     scrollToPrevious,
     scrollToNext,
-    showCreateCast,
-    formatTimestamp
+    showCreateCast
   ]);
 
   return (
@@ -1385,21 +1307,21 @@ export function OnboardingModal({
               </div>
             </div>
           </div>
-        ) : showCreateCast || casts.length === 0 ? (
+        ) : showCreateCast || castsRef.current.length === 0 ? (
           CreateCastFlow
         ) : (
           <>
             {CastCardsView}
             {/* Staking Form - rendered outside CastCardsView to prevent re-renders when form state changes */}
-            {selectedCastIndex === activeCardIndex && casts[activeCardIndex] && (
+            {selectedCastIndex === activeCardIndex && castsRef.current[activeCardIndex] && (
               <StakingForm
-                key={`staking-form-${casts[activeCardIndex].hash}-${selectedCastIndex}`}
+                key={`staking-form-${castsRef.current[activeCardIndex].hash}-${selectedCastIndex}`}
                 stakeAmount={stakeAmount}
                 lockupDuration={lockupDuration}
                 lockupDurationUnit={lockupDurationUnit}
                 isLoadingTransaction={isLoadingTransaction}
                 connectedWalletBalance={connectedWalletBalance}
-                castHash={casts[activeCardIndex].hash}
+                castHash={castsRef.current[activeCardIndex].hash}
                 stakeAmountInputRef={stakeAmountInputRef}
                 lockupDurationInputRef={lockupDurationInputRef}
                 onCommitStakeAmount={commitStakeAmount}
@@ -1412,9 +1334,9 @@ export function OnboardingModal({
               />
             )}
             {/* Card indicator (e.g., "1 of 3") - rendered outside CastCardsView */}
-            {casts.length > 1 && (
+            {castsRef.current.length > 1 && (
               <div className="flex justify-center mt-2 text-xs text-black/60 mb-4">
-                {activeCardIndex + 1} of {casts.length}
+                {activeCardIndex + 1} of {castsRef.current.length}
               </div>
             )}
             {/* Create new cast link - rendered outside CastCardsView */}
