@@ -439,11 +439,13 @@ export default function HigherSteakMenu() {
 
   const filteredLeaderboard = getFilteredLeaderboard();
 
-  // Check if there are any unstakeable positions (unlockTime <= currentTime)
+  // Check if there are any unstakeable positions (unlockTime <= currentTime and not already unlocked)
   const hasUnstakeablePositions = useMemo(() => {
     if (!balance?.lockups || balance.lockups.length === 0) return false;
     const currentTime = Math.floor(Date.now() / 1000);
-    return balance.lockups.some((lockup) => lockup.unlockTime <= currentTime);
+    return balance.lockups.some((lockup) => 
+      lockup.unlockTime <= currentTime && !lockup.unlocked
+    );
   }, [balance?.lockups]);
 
 
