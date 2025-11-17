@@ -74,8 +74,7 @@ export async function GET(req: NextRequest) {
     const normalized = rows.map((r: any) => {
       const lockUpId = Number(r.lockUpId);
       const castHash = normalizeHash(String(r.title || ''));
-      const baseAmount = convertAmount(r.amount ?? '0');
-      let overrideAmount = baseAmount;
+      let overrideAmount = convertAmount(r.amount ?? '0');
       let unlocked = Boolean(r.unlocked);
       let stakeType: 'caster' | 'supporter' | null = null;
 
@@ -86,13 +85,19 @@ export async function GET(req: NextRequest) {
           if (casterIdx !== -1) {
             stakeType = 'caster';
             unlocked = cast.casterStakeUnlocked?.[casterIdx] ?? unlocked;
-            overrideAmount = cast.casterStakeAmounts?.[casterIdx]?.toString() ?? overrideAmount;
+            const raw = cast.casterStakeAmounts?.[casterIdx];
+            if (raw !== undefined) {
+              overrideAmount = convertAmount(raw);
+            }
           } else {
             const supporterIdx = cast.supporterStakeLockupIds?.findIndex((id: number) => Number(id) === lockUpId) ?? -1;
             if (supporterIdx !== -1) {
               stakeType = 'supporter';
               unlocked = cast.supporterStakeUnlocked?.[supporterIdx] ?? unlocked;
-              overrideAmount = cast.supporterStakeAmounts?.[supporterIdx]?.toString() ?? overrideAmount;
+              const raw = cast.supporterStakeAmounts?.[supporterIdx];
+              if (raw !== undefined) {
+                overrideAmount = convertAmount(raw);
+              }
             }
           }
         }

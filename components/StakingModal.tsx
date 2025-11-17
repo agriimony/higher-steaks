@@ -83,8 +83,12 @@ function formatTokenAmount(amount: string): string {
     return (num / 1_000_000).toFixed(2) + 'M';
   } else if (num >= 1_000) {
     return (num / 1_000).toFixed(2) + 'K';
-  } else {
+  } else if (num >= 1) {
     return num.toFixed(2);
+  } else if (num >= 0.01) {
+    return num.toFixed(4);
+  } else {
+    return num.toFixed(6);
   }
 }
 
