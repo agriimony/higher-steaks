@@ -2,63 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { fetchAllLatestResults } from '@/lib/dune';
 import { getHigherCast, HigherCastData } from '@/lib/services/db-service';
-import { formatUnits } from 'viem';
+import { buildInFilter, normalizeAddr, normalizeHash, serverSort, convertAmount } from './utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const QUERY_ID = 6214515;
 const COLUMNS = ['sender','lockTime','lockUpId','title','amount','receiver','unlockTime','unlocked'];
-
-function normalizeAddr(a: string | null | undefined): string | null {
-  if (!a) return null;
-  return String(a).toLowerCase();
-}
-
-function normalizeHash(hash: string | null | undefined): string | null {
-  if (!hash) return null;
-  let h = String(hash).trim().toLowerCase();
-  if (!h) return null;
-  if (!h.startsWith('0x')) {
-    if (/^[0-9a-f]+$/i.test(h)) {
-      h = `0x${h}`;
-    } else {
-      return null;
-    }
-  }
-  return h;
-}
-
-export function buildInFilter(addresses: string[]): string {
-  // (unlocked = false) AND (receiver IN ('0x..','0x..'))
-  const quoted = addresses.map(a => `'${a}'`).join(',');
-  return `(unlocked = false) AND (receiver IN (${quoted}))`;
-}
-
-function serverSort(lockups: any[], connectedAddress?: string | null): any[] {
-  const now = Math.floor(Date.now() / 1000);
-  const conn = normalizeAddr(connectedAddress || '');
-  // 1) receiver === connected first
-  // 2) unlockTime > now asc
-  // 3) unlockTime <= now desc amount
-  return [...lockups].sort((a, b) => {
-    const aConn = normalizeAddr(a.receiver) === conn ? 0 : 1;
-    const bConn = normalizeAddr(b.receiver) === conn ? 0 : 1;
-    if (aConn !== bConn) return aConn - bConn;
-    const aActive = Number(a.unlockTime) > now;
-    const bActive = Number(b.unlockTime) > now;
-    if (aActive && !bActive) return -1;
-    if (!aActive && bActive) return 1;
-    if (aActive && bActive) {
-      return Number(a.unlockTime) - Number(b.unlockTime);
-    }
-    // both expired/unstakeable -> sort by amount desc
-    const aAmt = Number(a.amount ?? '0');
-    const bAmt = Number(b.amount ?? '0');
-    if (aAmt !== bAmt) return bAmt - aAmt;
-    return 0;
-  });
-}
 
 export async function GET(req: NextRequest) {
   try {
@@ -120,15 +70,6 @@ export async function GET(req: NextRequest) {
         castCache.set(hash, data);
       })
     );
-
-    function convertAmount(raw: any): string {
-      try {
-        return formatUnits(BigInt(raw), 18);
-      } catch {
-        const num = Number(raw);
-        return Number.isFinite(num) ? num.toString() : '0';
-      }
-    }
 
     const normalized = rows.map((r: any) => {
       const lockUpId = Number(r.lockUpId);

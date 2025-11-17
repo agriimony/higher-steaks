@@ -43,9 +43,11 @@ export function serverSort(lockups: any[], connectedAddress?: string | null): an
   });
 }
 
+import { formatUnits } from 'viem';
+
 export function convertAmount(raw: any): string {
   try {
-    return (BigInt(raw)).toString(); // actual scaling handled upstream
+    return formatUnits(BigInt(raw), 18);
   } catch {
     const num = Number(raw);
     return Number.isFinite(num) ? num.toString() : '0';
