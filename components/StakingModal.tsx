@@ -421,7 +421,7 @@ export function StakingModal({
       pendingUnstakeRef.current = null;
       setUnstakeLockupId(null);
       
-      console.log('[Staking Modal] Unstake transaction successful - Webhook will refresh UI');
+      console.log('[Staking Modal] Unstake transaction successful - UI updated optimistically');
       onUnlockSuccess?.(unstakeHash);
       
       if (onTransactionSuccess) {

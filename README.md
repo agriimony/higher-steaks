@@ -14,7 +14,6 @@ A Farcaster Mini App for the higher network discovery. This Mini App can be embe
 - 🗄️ Vercel Postgres database integration
 - 🎨 Modern, responsive design optimized for 424px modal
 - 📐 3:2 aspect ratio embed images
-- 🔴 Real-time blockchain event monitoring via CDP Webhooks
 - ⚡ Instant UI updates when users stake tokens
 
 ## Setup
@@ -46,12 +45,6 @@ ALCHEMY_API_KEY=your_alchemy_api_key_here
 # Optional: Base RPC URL (fallback if ALCHEMY_API_KEY not set, defaults to public RPC)
 BASE_RPC_URL=https://mainnet.base.org
 
-# Required for Production: CDP (Coinbase Developer Platform) API keys for webhook event monitoring
-CDP_API_KEY_ID=your_cdp_api_key_id
-CDP_API_KEY_SECRET=your_cdp_api_key_secret
-# Each webhook subscription has its own secret from metadata.secret in the creation response
-CDP_WEBHOOK_SECRET_LOCKUP=secret_from_lockup_webhook_subscription
-CDP_WEBHOOK_SECRET_TRANSFER=secret_from_transfer_webhook_subscription
 
 # Required for Production: Vercel Postgres (auto-added by Vercel)
 POSTGRES_URL=postgres://...
@@ -75,13 +68,6 @@ CRON_SECRET=your_random_secret_here
 5. The endpoint format is: `https://base-mainnet.g.alchemy.com/v2/{YOUR_API_KEY}`
 6. Alchemy provides better rate limits, reliability, and supports optimized batch requests
 
-**Get your CDP (Coinbase Developer Platform) API keys:**
-1. Visit [https://portal.cdp.coinbase.com](https://portal.cdp.coinbase.com)
-2. Sign up or log in
-3. Create a Secret API Key from the API Keys dashboard
-4. Save the API Key ID and Secret securely
-5. Configure webhook subscriptions (see [CDP Webhooks documentation](https://docs.cdp.coinbase.com/data/webhooks/quickstart))
-6. Set `CDP_WEBHOOK_SECRET` to the secret value provided when creating each webhook subscription
 
 **Vercel Postgres Setup:**
 See [DATABASE_SETUP.md](./DATABASE_SETUP.md) for detailed database configuration instructions.
@@ -150,9 +136,7 @@ npm run build
   - Protected by `CRON_SECRET` header
 
 ### Real-time Features
-- **WebSocket Subscriptions**: Monitors Base blockchain for new lockup events and block headers
 - **Instant Updates**: UI refreshes automatically when users stake tokens (when connected via Wagmi)
-- **Block Freshness Indicator**: Visual indicator showing data synchronization status
 
 ## Development
 

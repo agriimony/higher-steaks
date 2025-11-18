@@ -108,7 +108,6 @@ export default function HigherSteakMenu() {
   const [pixelDensity, setPixelDensity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(0);
   
-  // Event subscriptions for real-time updates (via SSE/CDP webhooks)
   const { address: wagmiAddress } = useAccount();
   
   // Close FID switcher when clicking outside
@@ -482,8 +481,7 @@ export default function HigherSteakMenu() {
           wallets={balance.wallets || []}
           loading={loadingBalance}
           onTransactionSuccess={async () => {
-            // CDP webhook will automatically detect the transaction and refresh the balance
-            // No manual refresh needed
+            // Balance will be refreshed on next fetch
           }}
           onTransactionFailure={showTransactionFailure}
           onUnlockSuccess={showUnlockSuccess}
