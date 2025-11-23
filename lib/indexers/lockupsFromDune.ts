@@ -247,8 +247,24 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 
 export async function syncLockupsFromDune(): Promise<{ castsUpserted: number }> {
 	const aggregated = await fetchAndAggregateLockupsFromDune();
+	
+	// Calculate ranks for casts with state 'higher' based on total_higher_staked
+	// Only 'higher' casts get ranks; others get null
+	const higherCasts = Array.from(aggregated.values())
+		.filter(cast => cast.castState === 'higher')
+		.sort((a, b) => b.totalHigherStaked - a.totalHigherStaked); // Sort DESC by total staked
+	
+	// Create a map of cast hash to rank
+	const rankMap = new Map<string, number>();
+	higherCasts.forEach((cast, index) => {
+		rankMap.set(cast.castHash, index + 1); // Rank starts at 1
+	});
+	
 	let upserts = 0;
 	for (const [_hash, data] of aggregated) {
+		// Get rank for this cast (only 'higher' casts have ranks)
+		const rank = data.castState === 'higher' ? rankMap.get(data.castHash) || null : null;
+		
 		await upsertHigherCast({
 			castHash: data.castHash,
 			creatorFid: data.creatorFid,
@@ -274,6 +290,7 @@ export async function syncLockupsFromDune(): Promise<{ castsUpserted: number }> 
 			supporterStakeLockTimes: data.supporterStakeLockTimes,
 			supporterStakeUnlocked: data.supporterStakeUnlocked,
 			castState: data.castState,
+			rank, // Include calculated rank
 		});
 		upserts += 1;
 	}
