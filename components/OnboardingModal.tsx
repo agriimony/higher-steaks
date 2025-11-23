@@ -1118,9 +1118,6 @@ export function OnboardingModal({
                   <div className="text-sm text-black font-bold mb-1">
                     Rank: {currentCast.rank ? `#${currentCast.rank}` : 'Unranked'}
                   </div>
-                  <div className="text-xs text-black/80 mb-2">
-                    {currentCast.totalHigherStaked.toFixed(2)} HIGHER staked
-                  </div>
                   <div className="text-xs text-black/60 flex items-center gap-1">
                     <img 
                       src="/higher-logo.png" 
@@ -1130,9 +1127,9 @@ export function OnboardingModal({
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
-                    <span>{currentCast.totalCasterStaked.toFixed(2)}</span>
-                    <span className="text-black/40">|</span>
-                    <span>{currentCast.totalSupporterStaked.toFixed(2)}</span>
+                    <span>{currentCast.totalCasterStaked.toFixed(2)} staked</span>
+                    <span className="text-black/40">+</span>
+                    <span>{currentCast.totalSupporterStaked.toFixed(2)} supporting</span>
                   </div>
                 </>
               ) : currentCast.castState === 'expired' ? (

@@ -263,7 +263,9 @@ export async function syncLockupsFromDune(): Promise<{ castsUpserted: number }> 
 	let upserts = 0;
 	for (const [_hash, data] of aggregated) {
 		// Get rank for this cast (only 'higher' casts have ranks)
-		const rank = data.castState === 'higher' ? rankMap.get(data.castHash) || null : null;
+		// Convert null to undefined to match the function signature (rank?: number)
+		const rankValue = data.castState === 'higher' ? rankMap.get(data.castHash) : null;
+		const rank = rankValue !== null ? rankValue : undefined;
 		
 		await upsertHigherCast({
 			castHash: data.castHash,
@@ -290,7 +292,7 @@ export async function syncLockupsFromDune(): Promise<{ castsUpserted: number }> 
 			supporterStakeLockTimes: data.supporterStakeLockTimes,
 			supporterStakeUnlocked: data.supporterStakeUnlocked,
 			castState: data.castState,
-			rank, // Include calculated rank
+			rank, // Include calculated rank (undefined for non-higher casts)
 		});
 		upserts += 1;
 	}
