@@ -726,12 +726,20 @@ export default function HigherSteakMenu() {
               ) : filteredLeaderboard.length > 0 ? (
                 // Leaderboard entries
                 filteredLeaderboard.map((entry, index) => (
-                  <div key={entry.castHash} className="group">
+                  <button
+                    key={entry.castHash}
+                    onClick={() => {
+                      setSelectedCastHash(entry.castHash);
+                      setShowSupporterModal(true);
+                    }}
+                    className="w-full text-left group hover:bg-gray-50/50 transition-colors cursor-pointer rounded-sm p-1 -m-1"
+                  >
                     <div className="flex items-baseline text-xs sm:text-sm md:text-base">
                       <a 
                         href={`https://farcaster.xyz/${entry.username}`}
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
                         className="flex-shrink-0 font-bold hover:text-purple-700 transition-colors"
                       >
                         @{entry.username}
@@ -739,16 +747,10 @@ export default function HigherSteakMenu() {
                       <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                       <span className="flex-shrink-0 font-bold tracking-wider">{entry.usdValue}</span>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedCastHash(entry.castHash);
-                        setShowSupporterModal(true);
-                      }}
-                      className="block mt-1 text-[0.65rem] sm:text-xs text-gray-600 hover:text-gray-900 transition-colors italic text-left w-full"
-                    >
+                    <div className="mt-1 text-[0.65rem] sm:text-xs text-gray-600 italic">
                       {entry.description}
-                    </button>
-                  </div>
+                    </div>
+                  </button>
                 ))
               ) : (
                 // Sold Out if leaderboard is empty
