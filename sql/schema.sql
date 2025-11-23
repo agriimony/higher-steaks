@@ -18,12 +18,14 @@ CREATE TABLE IF NOT EXISTS leaderboard_entries (
   caster_stake_lockup_ids INTEGER[] DEFAULT '{}',
   caster_stake_amounts NUMERIC[] DEFAULT '{}',
   caster_stake_unlock_times INTEGER[] DEFAULT '{}',
+  caster_stake_lock_times BIGINT[] DEFAULT '{}', -- ADDED: Missing column
+  caster_stake_unlocked BOOLEAN[] DEFAULT '{}',
   supporter_stake_lockup_ids INTEGER[] DEFAULT '{}',
   supporter_stake_amounts NUMERIC[] DEFAULT '{}',
   supporter_stake_fids INTEGER[] DEFAULT '{}',
   supporter_stake_pfps TEXT[] DEFAULT '{}',
   supporter_stake_unlock_times INTEGER[] DEFAULT '{}',
-  caster_stake_unlocked BOOLEAN[] DEFAULT '{}',
+  supporter_stake_lock_times BIGINT[] DEFAULT '{}', -- ADDED: Missing column
   supporter_stake_unlocked BOOLEAN[] DEFAULT '{}',
   cast_state VARCHAR(20) DEFAULT 'higher' -- 'invalid', 'valid', 'higher', or 'expired'
 );
@@ -34,4 +36,3 @@ CREATE INDEX IF NOT EXISTS idx_rank ON leaderboard_entries(rank);
 CREATE INDEX IF NOT EXISTS idx_cast_hash ON leaderboard_entries(cast_hash);
 CREATE INDEX IF NOT EXISTS idx_creator_fid ON leaderboard_entries(creator_fid);
 CREATE INDEX IF NOT EXISTS idx_cast_state ON leaderboard_entries(cast_state);
-

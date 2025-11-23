@@ -6,6 +6,7 @@ import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
 import { KEYPHRASE_TEXT } from '@/lib/constants';
+import { extractDescription } from '@/lib/cast-helpers';
 
 interface CastCard {
   hash: string;
@@ -468,11 +469,8 @@ export function OnboardingModal({
         // Normalize hash format (ensure 0x prefix)
         const castHash = normalizeHash(result.cast.hash);
         
-        // Extract description from cast text
-        const keyphraseMatch = result.cast.text.match(/started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i);
-        const description = keyphraseMatch && keyphraseMatch[1] 
-          ? keyphraseMatch[1].trim() 
-          : '';
+        // Extract description from cast text using consolidated function
+        const description = extractDescription(result.cast.text) || '';
         
         // Create temporary cast card
         const newCast: CastCard = {
