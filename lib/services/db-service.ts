@@ -1,4 +1,4 @@
-import { sql } from '@vercel/postgres';
+import { sql, createClient } from '@vercel/postgres';
 
 export interface HigherCastData {
 	castHash: string;
@@ -31,45 +31,91 @@ export interface HigherCastData {
 
 /**
  * Get a higher cast from the database by hash
+ * Uses non-pooling connection to avoid stale data issues
  */
 export async function getHigherCast(hash: string): Promise<HigherCastData | null> {
+	let client;
 	try {
-		const result = await sql`
-      SELECT 
-        cast_hash,
-        creator_fid,
-        creator_username,
-        creator_display_name,
-        creator_pfp_url,
-        cast_text,
-        description,
-        cast_timestamp,
-        total_higher_staked,
-        usd_value,
-        rank,
-        caster_stake_lockup_ids,
-        caster_stake_amounts,
-        caster_stake_unlock_times,
-        caster_stake_unlocked,
-        caster_stake_lock_times,
-        supporter_stake_lockup_ids,
-        supporter_stake_amounts,
-        supporter_stake_fids,
-        supporter_stake_pfps,
-        supporter_stake_unlock_times,
-        supporter_stake_unlocked,
-        supporter_stake_lock_times,
-        cast_state
-      FROM leaderboard_entries
-      WHERE cast_hash = ${hash}
-      LIMIT 1
-    `;
+		// Use non-pooling connection for fresh data
+		if (process.env.POSTGRES_URL_NON_POOLING) {
+			client = createClient({
+				connectionString: process.env.POSTGRES_URL_NON_POOLING,
+			});
+			await client.connect();
+		}
+
+		const query = client 
+			? client.sql`
+				SELECT 
+					cast_hash,
+					creator_fid,
+					creator_username,
+					creator_display_name,
+					creator_pfp_url,
+					cast_text,
+					description,
+					cast_timestamp,
+					total_higher_staked,
+					usd_value,
+					rank,
+					caster_stake_lockup_ids,
+					caster_stake_amounts,
+					caster_stake_unlock_times,
+					caster_stake_unlocked,
+					caster_stake_lock_times,
+					supporter_stake_lockup_ids,
+					supporter_stake_amounts,
+					supporter_stake_fids,
+					supporter_stake_pfps,
+					supporter_stake_unlock_times,
+					supporter_stake_unlocked,
+					supporter_stake_lock_times,
+					cast_state
+				FROM leaderboard_entries
+				WHERE cast_hash = ${hash}
+				LIMIT 1
+			`
+			: sql`
+				SELECT 
+					cast_hash,
+					creator_fid,
+					creator_username,
+					creator_display_name,
+					creator_pfp_url,
+					cast_text,
+					description,
+					cast_timestamp,
+					total_higher_staked,
+					usd_value,
+					rank,
+					caster_stake_lockup_ids,
+					caster_stake_amounts,
+					caster_stake_unlock_times,
+					caster_stake_unlocked,
+					caster_stake_lock_times,
+					supporter_stake_lockup_ids,
+					supporter_stake_amounts,
+					supporter_stake_fids,
+					supporter_stake_pfps,
+					supporter_stake_unlock_times,
+					supporter_stake_unlocked,
+					supporter_stake_lock_times,
+					cast_state
+				FROM leaderboard_entries
+				WHERE cast_hash = ${hash}
+				LIMIT 1
+			`;
+
+		const result = await query;
 
 		if (result.rows.length === 0) {
+			console.log(`[db-service] No cast found for hash: ${hash}`);
 			return null;
 		}
 
 		const row = result.rows[0];
+		console.log(`[db-service] Found cast for hash: ${hash}, cast_state: ${row.cast_state}`);
+		
 		return {
 			castHash: row.cast_hash,
 			creatorFid: row.creator_fid,
@@ -98,7 +144,21 @@ export async function getHigherCast(hash: string): Promise<HigherCastData | null
 		};
 	} catch (error) {
 		console.error('[db-service] Error getting higher cast:', error);
+		console.error('[db-service] Hash:', hash);
+		if (error instanceof Error) {
+			console.error('[db-service] Error message:', error.message);
+			console.error('[db-service] Error stack:', error.stack);
+		}
 		return null;
+	} finally {
+		// Always close the connection if we created one
+		if (client) {
+			try {
+				await client.end();
+			} catch (closeError) {
+				console.error('[db-service] Error closing connection:', closeError);
+			}
+		}
 	}
 }
 
