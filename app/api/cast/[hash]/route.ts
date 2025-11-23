@@ -38,6 +38,7 @@ export async function GET(
 
     // Get cast from database (primary source of truth)
     const castData = await getHigherCast(castHash);
+    console.log('[Cast API] Cast data:', castData);
 
     if (!castData) {
       return NextResponse.json(
