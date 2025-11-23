@@ -735,15 +735,7 @@ export default function HigherSteakMenu() {
                     className="w-full text-left group hover:bg-gray-50/50 transition-colors cursor-pointer rounded-sm p-1 -m-1"
                   >
                     <div className="flex items-baseline text-xs sm:text-sm md:text-base">
-                      <a 
-                        href={`https://farcaster.xyz/${entry.username}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="flex-shrink-0 font-bold hover:text-purple-700 transition-colors"
-                      >
-                        @{entry.username}
-                      </a>
+                      <span className="flex-shrink-0 font-bold">@{entry.username}</span>
                       <span className="flex-grow mx-2 border-b border-dotted border-black/30 mb-1"></span>
                       <span className="flex-shrink-0 font-bold tracking-wider">{entry.usdValue}</span>
                     </div>
