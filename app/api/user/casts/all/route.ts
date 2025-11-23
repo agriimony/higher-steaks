@@ -42,10 +42,12 @@ export async function GET(request: NextRequest) {
     try {
       // Query all casts (higher and expired) for this user
       // Sort: higher casts first (by total_higher_staked DESC), then expired casts (by cast_timestamp DESC)
+      const timestamp = Date.now();
       const dbResult = await sql`
         SELECT * FROM leaderboard_entries 
         WHERE creator_fid = ${fid} 
         AND cast_state IN ('higher', 'expired')
+        AND ${timestamp} = ${timestamp}  -- Cache-busting: always true but forces query re-execution
         ORDER BY 
           CASE WHEN cast_state = 'higher' THEN 0 ELSE 1 END,
           CASE WHEN cast_state = 'higher' THEN total_higher_staked ELSE 0 END DESC,

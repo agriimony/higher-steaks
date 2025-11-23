@@ -191,6 +191,30 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			}
 		}
 
+		// Calculate cast_state based on actual caster stake data
+		// This ensures casts are properly marked as 'higher', 'expired', or 'valid'
+		const currentTime = Math.floor(Date.now() / 1000);
+		let calculatedState: 'invalid' | 'valid' | 'higher' | 'expired' = 'valid';
+
+		if (casterStakeLockupIds.length > 0) {
+			// Check if there are any valid (not expired, not unlocked) caster stakes
+			const hasValidCasterStake = casterStakeUnlockTimes.some((unlockTime, index) => {
+				const unlocked = casterStakeUnlocked[index] || false;
+				return !unlocked && unlockTime > currentTime;
+			});
+
+			if (hasValidCasterStake) {
+				calculatedState = 'higher';
+			} else {
+				// All caster stakes are expired or unlocked
+				calculatedState = 'expired';
+			}
+		} else {
+			// No caster stakes yet - keep as 'valid' if cast exists, otherwise 'invalid'
+			// If we have cast metadata, it's valid; otherwise invalid
+			calculatedState = castMeta ? 'valid' : 'invalid';
+		}
+
 		const aggregated: AggregatedCast = {
 			castHash,
 			creatorFid: castMeta?.fid || ownerFid || 0,
@@ -212,7 +236,7 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			supporterStakeUnlockTimes,
 			supporterStakeLockTimes,
 			supporterStakeUnlocked,
-			castState: castMeta?.state || 'valid',
+			castState: calculatedState, // Use calculated state instead of castMeta?.state
 		};
 
 		result.set(castHash, aggregated);
