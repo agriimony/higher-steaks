@@ -18,6 +18,25 @@ export function containsKeyphrase(castText: string): boolean {
 }
 
 /**
+ * Validates if a cast is from the /higher channel
+ */
+export function isHigherChannel(cast: { channel?: { id?: string } | null; parent_url?: string | null }): boolean {
+  return cast.channel?.id === 'higher' || (cast.parent_url?.includes('/higher') ?? false);
+}
+
+/**
+ * Consolidated validation function for higher casts
+ * Validates both keyphrase and channel in one place
+ * This is the single source of truth for validating higher casts
+ */
+export function isValidHigherCast(
+  castText: string,
+  cast: { channel?: { id?: string } | null; parent_url?: string | null }
+): boolean {
+  return containsKeyphrase(castText) && isHigherChannel(cast);
+}
+
+/**
  * Extracts description from cast text after keyphrase
  */
 export function extractDescription(castText: string): string | null {

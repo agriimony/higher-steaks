@@ -235,20 +235,6 @@ export default function HigherSteakMenu() {
       pillTotal: formatTokenAmount(total.toString()),
     };
   }, [balance]);
-  
-  // Fallback menu items (shown if leaderboard is empty)
-  const fallbackMenuItems = [
-    { name: "The Ribeye Supreme", price: "$48.00", description: "Perfectly aged and grilled to perfection" },
-    { name: "Filet Mignon Deluxe", price: "$52.00", description: "Tender cut with signature seasoning" },
-    { name: "New York Strip Classic", price: "$44.00", description: "Bold flavor, classic preparation" },
-    { name: "Porterhouse for Two", price: "$89.00", description: "A sharing experience for true steak lovers" },
-    { name: "Wagyu Sirloin Experience", price: "$76.00", description: "Premium marbling, unmatched richness" },
-    { name: "Grilled Salmon Steak", price: "$38.00", description: "Fresh catch with lemon butter" },
-    { name: "Bone-In Tomahawk", price: "$95.00", description: "Showstopper presentation, unforgettable taste" },
-    { name: "Surf & Turf Combo", price: "$68.00", description: "Best of land and sea" },
-    { name: "Prime Skirt Steak", price: "$36.00", description: "Flavorful and perfectly charred" },
-    { name: "Vegetarian Portobello Stack", price: "$28.00", description: "Hearty mushrooms with seasonal vegetables" },
-  ];
 
   // Detect pixel density and viewport width for responsive ASCII art
   useEffect(() => {

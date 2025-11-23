@@ -5,6 +5,7 @@ import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useAcc
 import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
+import { KEYPHRASE_TEXT } from '@/lib/constants';
 
 interface CastCard {
   hash: string;
@@ -455,7 +456,7 @@ export function OnboardingModal({
   // Define handlers before useMemo that depends on them
   const handleQuickCast = useCallback(async () => {
     try {
-      const fullMessage = "started aiming higher and it worked out! " + customMessage;
+      const fullMessage = KEYPHRASE_TEXT + " " + customMessage;
       const result = await sdk.actions.composeCast({
         text: fullMessage,
         channelKey: "higher"
@@ -789,7 +790,7 @@ export function OnboardingModal({
         
         <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
           <div className="text-xs text-black font-mono mb-2">
-            <strong>started aiming higher and it worked out!</strong>
+            <strong>{KEYPHRASE_TEXT}</strong>
           </div>
           <textarea
             key="custom-message-textarea"
@@ -849,7 +850,7 @@ export function OnboardingModal({
             {validatingUrl ? 'Validating...' : 'Use URL'}
             <span className="absolute top-0 right-0 text-xs opacity-60 group-hover:opacity-100">ⓘ</span>
             <div className="absolute bottom-full right-0 mb-2 w-64 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-              Valid cast must begin with "started aiming higher and it worked out!" and be cast by you
+              Valid cast must begin with "{KEYPHRASE_TEXT}" and be cast by you
             </div>
           </button>
         )}
@@ -1105,7 +1106,7 @@ export function OnboardingModal({
           {/* Single card */}
           <div className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none relative z-10">
             <div className="text-xs text-black font-mono mb-2">
-              <strong>started aiming higher and it worked out!</strong> {currentCast.description}
+              <strong>{KEYPHRASE_TEXT}</strong> {currentCast.description}
             </div>
             {currentCast.timestamp && (
               <div className="text-xs text-black/50 font-mono mb-3">

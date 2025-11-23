@@ -1,5 +1,5 @@
 import { getHigherCast, castExistsInDB } from './db-service';
-import { isValidCastHash, containsKeyphrase, extractDescription } from '../cast-helpers';
+import { isValidCastHash, containsKeyphrase, extractDescription, isValidHigherCast } from '../cast-helpers';
 
 export interface CastData {
   hash: string;
@@ -187,14 +187,8 @@ export async function validateCastFromNeynar(hash: string): Promise<CastData | n
       return null;
     }
 
-    // Validate keyphrase
-    if (!containsKeyphrase(cast.text)) {
-      return null;
-    }
-
-    // Validate /higher channel
-    const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
-    if (!isHigherChannel) {
+    // Use consolidated validation function (validates both keyphrase and channel)
+    if (!isValidHigherCast(cast.text, cast)) {
       return null;
     }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sql } from '@vercel/postgres';
-import { extractDescription, containsKeyphrase } from '@/lib/cast-helpers';
+import { extractDescription, isValidHigherCast } from '@/lib/cast-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -81,11 +81,9 @@ export async function GET(request: NextRequest) {
       limit: 25,
     });
 
-    // Filter for /higher channel casts with keyphrase
+    // Filter for /higher channel casts with keyphrase using consolidated validation
     const higherCasts = (userCasts.casts || []).filter((cast: any) => {
-      const isHigherChannel = cast.channel?.id === 'higher' || cast.parent_url?.includes('/higher');
-      const hasKeyphrase = containsKeyphrase(cast.text);
-      return isHigherChannel && hasKeyphrase;
+      return isValidHigherCast(cast.text, cast);
     });
 
     if (higherCasts.length > 0) {

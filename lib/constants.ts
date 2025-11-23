@@ -1,4 +1,4 @@
 // Keyphrase for valid HIGHER casts
-export const KEYPHRASE_REGEX = /started\s+aiming\s+higher\s+and\s+it\s+worked\s+out!\s*(.+)/i;
-export const KEYPHRASE_TEXT = "started aiming higher and it worked out!";
+export const KEYPHRASE_REGEX = /cooking\s+up\s+a\s+higher\s+steak\s*(.+)/i;
+export const KEYPHRASE_TEXT = "Cooking up a higher steak";
 
