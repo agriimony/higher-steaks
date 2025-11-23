@@ -655,7 +655,7 @@ export function SupporterModal({
         {/* Cast Description */}
         <div className="mb-4 pb-4 border-b border-black/20">
           <a
-            href={`https://farcaster.xyz/${castData.username}/${castData.hash.replace(/^0x/, '')}`}
+            href={`https://farcaster.xyz/${castData.username}/${castData.hash}`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-black/70 mb-2 hover:text-purple-700 transition-colors block break-words cursor-pointer"
