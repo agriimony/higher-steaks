@@ -658,13 +658,10 @@ export function SupporterModal({
             href={`https://farcaster.xyz/${castData.username}/${castData.hash.replace(/^0x/, '')}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-black mb-2 hover:text-purple-700 transition-colors block break-words cursor-pointer"
+            className="text-sm text-black/70 mb-2 hover:text-purple-700 transition-colors block break-words cursor-pointer"
           >
-            {castData.castText}
+            {castData.description}
           </a>
-          {castData.description && (
-            <div className="text-sm text-black/70 mb-2">{castData.description}</div>
-          )}
           <div className="text-xs text-black/50">{formatTimestamp(castData.timestamp)}</div>
         </div>
 
