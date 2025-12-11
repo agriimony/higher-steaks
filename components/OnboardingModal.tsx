@@ -32,7 +32,7 @@ interface OnboardingModalProps {
   walletBalance?: number;
   onStakeSuccess?: () => void;
   onTransactionFailure?: (message?: string) => void;
-  onLockSuccess?: (txHash?: string, castHash?: string) => void;
+  onLockSuccess?: (txHash?: string, castHash?: string, amount?: string, unlockTime?: number, lockupId?: string) => void;
 }
 
 // Format timestamp to readable date
@@ -150,6 +150,9 @@ export function OnboardingModal({
     amountWei: bigint;
     unlockTime: number;
   } | null>(null);
+  // Metadata storage for optimistic updates (keyed by params key or tx hash)
+  const pendingStakeMetadataRef = useRef<Map<string, { amount: string; unlockTime: number }>>(new Map());
+  const pendingParamsKeyRef = useRef<string | null>(null);
   
   // Card navigation state
   const castUrlInputRef = useRef<HTMLInputElement>(null);
@@ -349,6 +352,9 @@ export function OnboardingModal({
 
     hasScheduledCreateLockUp.current = true;
     const paramsToUse = createLockUpParams;
+    // Create a unique key for this transaction based on params and store it for later lookup when hash is available
+    const paramsKey = `${paramsToUse.amountWei.toString()}-${paramsToUse.unlockTime}`;
+    pendingParamsKeyRef.current = paramsKey;
 
     const delay = setTimeout(() => {
       createLockUpTimeoutRef.current = null;
@@ -372,6 +378,9 @@ export function OnboardingModal({
         reportTransactionFailure(message);
         setPendingCreateLockUp(false);
         hasScheduledCreateLockUp.current = false;
+        // Clean up metadata on error
+        pendingStakeMetadataRef.current.delete(paramsKey);
+        pendingParamsKeyRef.current = null;
       }
     }, 1000);
 
@@ -387,7 +396,28 @@ export function OnboardingModal({
     };
   }, [isApproveSuccess, approveReceipt, wagmiAddress, selectedCastHash, writeContractCreateLockUp]);
 
-  // Handle transaction success - no real-time updates, just reset form state
+  // Move metadata from params key to hash key when transaction hash becomes available
+  useEffect(() => {
+    if (createLockUpHash) {
+      let paramsKey: string | null = null;
+      if (pendingParamsKeyRef.current) {
+        paramsKey = pendingParamsKeyRef.current;
+        pendingParamsKeyRef.current = null;
+      } else if (createLockUpParams) {
+        paramsKey = `${createLockUpParams.amountWei.toString()}-${createLockUpParams.unlockTime}`;
+      }
+
+      if (paramsKey) {
+        const metadata = pendingStakeMetadataRef.current.get(paramsKey);
+        if (metadata) {
+          pendingStakeMetadataRef.current.set(createLockUpHash, metadata);
+          pendingStakeMetadataRef.current.delete(paramsKey);
+        }
+      }
+    }
+  }, [createLockUpHash, createLockUpParams]);
+
+  // Handle transaction success - now also send metadata for optimistic update
   useEffect(() => {
     if (isCreateLockUpSuccess && createLockUpHash) {
       // Check if we've already processed this transaction
@@ -410,9 +440,15 @@ export function OnboardingModal({
       setStakeError(null);
       transactionErrorReportedRef.current = false;
       
-      
-      // Call parent callback - let the parent/staking modal handle real-time updates
-      onLockSuccess?.(createLockUpHash, castHashForCallback);
+      // Call parent callback with metadata for optimistic update
+      const metadata = pendingStakeMetadataRef.current.get(createLockUpHash);
+      if (metadata) {
+        const tempLockupId = `temp-${createLockUpHash}`;
+        onLockSuccess?.(createLockUpHash, castHashForCallback, metadata.amount, metadata.unlockTime, tempLockupId);
+        pendingStakeMetadataRef.current.delete(createLockUpHash);
+      } else {
+        onLockSuccess?.(createLockUpHash, castHashForCallback);
+      }
       onStakeSuccess?.();
     }
   }, [
@@ -715,6 +751,12 @@ export function OnboardingModal({
       // Store params for createLockUp (will be called after approve succeeds or if already approved)
       setCreateLockUpParams({ amountWei, unlockTime });
       setSelectedCastHash(normalizedCastHash);
+      // Store metadata for optimistic update keyed by params (moved to hash when available)
+      const paramsKey = `${amountWei.toString()}-${unlockTime}`;
+      pendingStakeMetadataRef.current.set(paramsKey, {
+        amount: inputStakeAmount.replace(/,/g, ''),
+        unlockTime,
+      });
 
       // Step 1: Check if we need to approve (only approve if current allowance is insufficient)
       const allowance = currentAllowance || BigInt(0);
@@ -724,6 +766,7 @@ export function OnboardingModal({
         hasScheduledCreateLockUp.current = true;
         setPendingCreateLockUp(true);
         transactionErrorReportedRef.current = false;
+        pendingParamsKeyRef.current = paramsKey;
         
         // Call createLockUp directly after a short delay
         const delay = setTimeout(() => {
