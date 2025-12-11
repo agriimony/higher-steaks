@@ -61,6 +61,8 @@ interface LockupDetail {
   unlockTime: number;
   receiver: string;
   title: string;
+  castHash?: string | null;
+  stakeType?: 'caster' | 'supporter' | null;
   unlocked?: boolean;
 }
 
