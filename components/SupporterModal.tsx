@@ -91,10 +91,8 @@ export function SupporterModal({
     amountWei: bigint;
     unlockTime: number;
   } | null>(null);
-  const [pendingStakeMetadata, setPendingStakeMetadata] = useState<{
-    amount: string;
-    unlockTime: number;
-  } | null>(null);
+  // Store metadata keyed by transaction hash to handle multiple concurrent stakes
+  const pendingStakeMetadataRef = useRef<Map<string, { amount: string; unlockTime: number }>>(new Map());
   
   // Wagmi hooks
   const { address: wagmiAddress, isConnected } = useAccount();
@@ -123,6 +121,8 @@ export function SupporterModal({
   // Use ref to track if we've already processed this transaction success
   const processedTxHash = useRef<string | null>(null);
   const createLockUpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Store params key for pending transactions to enable metadata lookup
+  const pendingParamsKeyRef = useRef<string | null>(null);
   const reportStakeError = useCallback((message: string) => {
     setStakeError(message);
   }, []);
@@ -262,6 +262,10 @@ export function SupporterModal({
 
     hasScheduledCreateLockUp.current = true;
     const paramsToUse = createLockUpParams;
+    // Create a unique key for this transaction based on params
+    const paramsKey = `${paramsToUse.amountWei.toString()}-${paramsToUse.unlockTime}`;
+    // Store params key for later lookup when hash is available
+    pendingParamsKeyRef.current = paramsKey;
 
     const delay = setTimeout(() => {
       createLockUpTimeoutRef.current = null;
@@ -279,6 +283,7 @@ export function SupporterModal({
             castHash // Use cast hash as title
           ],
         });
+        // Metadata is already stored with paramsKey - will be moved to hash key when hash is available
       } catch (error: any) {
         console.error('[SupporterModal] CreateLockUp error:', error);
         const message = error?.message || 'Failed to create lockup';
@@ -286,6 +291,8 @@ export function SupporterModal({
         reportTransactionFailure(message);
         setPendingCreateLockUp(false);
         hasScheduledCreateLockUp.current = false;
+        // Clean up metadata on error
+        pendingStakeMetadataRef.current.delete(paramsKey);
       }
     }, 1000);
 
@@ -300,6 +307,29 @@ export function SupporterModal({
       }
     };
   }, [isApproveSuccess, approveReceipt, wagmiAddress, castHash, isConnected, writeContractCreateLockUp]);
+
+  // Move metadata from params key to hash key when transaction hash becomes available
+  useEffect(() => {
+    if (createLockUpHash) {
+      // Try to find metadata using stored params key or current createLockUpParams
+      let paramsKey: string | null = null;
+      if (pendingParamsKeyRef.current) {
+        paramsKey = pendingParamsKeyRef.current;
+        pendingParamsKeyRef.current = null; // Clear after use
+      } else if (createLockUpParams) {
+        paramsKey = `${createLockUpParams.amountWei.toString()}-${createLockUpParams.unlockTime}`;
+      }
+      
+      if (paramsKey) {
+        const metadata = pendingStakeMetadataRef.current.get(paramsKey);
+        if (metadata) {
+          // Move metadata from params key to hash key
+          pendingStakeMetadataRef.current.set(createLockUpHash, metadata);
+          pendingStakeMetadataRef.current.delete(paramsKey);
+        }
+      }
+    }
+  }, [createLockUpHash, createLockUpParams]);
 
   // Handle transaction success
   useEffect(() => {
@@ -319,12 +349,14 @@ export function SupporterModal({
       setStakeError(null);
       
       // Call success callback with metadata for optimistic update
-      const metadata = pendingStakeMetadata;
+      // Look up metadata by transaction hash
+      const metadata = pendingStakeMetadataRef.current.get(createLockUpHash);
       if (metadata) {
         // Generate temporary lockupId from tx hash (will be replaced when Dune updates)
         const tempLockupId = `temp-${createLockUpHash}`;
         onLockSuccess?.(createLockUpHash, castHash, metadata.amount, metadata.unlockTime, tempLockupId);
-        setPendingStakeMetadata(null);
+        // Clean up metadata after use
+        pendingStakeMetadataRef.current.delete(createLockUpHash);
       } else {
         onLockSuccess?.(createLockUpHash, castHash);
       }
@@ -409,8 +441,12 @@ export function SupporterModal({
 
       // Store params for createLockUp (will be called after approve succeeds or if already approved)
       setCreateLockUpParams({ amountWei, unlockTime });
-      // Store metadata for optimistic update
-      setPendingStakeMetadata({ amount: stakeAmount.replace(/,/g, ''), unlockTime });
+      // Store metadata for optimistic update, keyed by transaction params (will be moved to hash key when hash is available)
+      const paramsKey = `${amountWei.toString()}-${unlockTime}`;
+      pendingStakeMetadataRef.current.set(paramsKey, {
+        amount: stakeAmount.replace(/,/g, ''),
+        unlockTime,
+      });
 
       // Step 1: Check if we need to approve (only approve if current allowance is insufficient)
       const allowance = currentAllowance || BigInt(0);
@@ -420,6 +456,10 @@ export function SupporterModal({
         // Sufficient allowance - simulate approve success to trigger createLockUp
         hasScheduledCreateLockUp.current = true;
         setPendingCreateLockUp(true);
+        
+        // Store params key for later lookup when hash is available
+        const paramsKey = `${amountWei.toString()}-${unlockTime}`;
+        pendingParamsKeyRef.current = paramsKey;
         
         // Call createLockUp directly after a short delay
         const delay = setTimeout(() => {
@@ -437,6 +477,7 @@ export function SupporterModal({
                 castHash // Use cast hash as title
               ],
             });
+            // Metadata is already stored with paramsKey - will be moved to hash key when hash is available
           } catch (error: any) {
             console.error('[SupporterModal] CreateLockUp error:', error);
             const message = error?.message || 'Failed to create lockup';
@@ -444,6 +485,9 @@ export function SupporterModal({
             reportTransactionFailure(message);
             setPendingCreateLockUp(false);
             hasScheduledCreateLockUp.current = false;
+            // Clean up metadata on error
+            pendingStakeMetadataRef.current.delete(paramsKey);
+            pendingParamsKeyRef.current = null;
           }
         }, 100);
         
