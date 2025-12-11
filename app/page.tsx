@@ -102,8 +102,7 @@ export default function HigherSteakMenu() {
   const [showSupporterModal, setShowSupporterModal] = useState(false);
   const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
   const [simulatedFid, setSimulatedFid] = useState<number | null>(null); // For testing supporter vs caster view
-  const [showFidSwitcher, setShowFidSwitcher] = useState(false);
-  const fidSwitcherRef = useRef<HTMLDivElement>(null);
+  // FID switcher removed; simulatedFid now unused in UI (could be set via dev tools if needed)
   const [transactionModal, setTransactionModal] = useState<{
     variant: 'failure' | 'lock-success' | 'unlock-success';
     errorMessage?: string;
@@ -116,23 +115,6 @@ export default function HigherSteakMenu() {
   const [viewportWidth, setViewportWidth] = useState(0);
   
   const { address: wagmiAddress } = useAccount();
-  
-  // Close FID switcher when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (fidSwitcherRef.current && !fidSwitcherRef.current.contains(event.target as Node)) {
-        setShowFidSwitcher(false);
-      }
-    };
-
-    if (showFidSwitcher) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showFidSwitcher]);
   
   // Handle stake success: refresh balance and staking details to get the new lockup
   const handleStakeSuccess = useCallback(() => {
@@ -586,7 +568,7 @@ export default function HigherSteakMenu() {
             setShowSupporterModal(false);
             setSelectedCastHash(null);
           }}
-          userFid={simulatedFid !== null ? simulatedFid : (user?.fid || null)}
+          userFid={user?.fid || null}
           walletBalance={getWalletBalance()}
           onStakeSuccess={() => {
             // Refresh balance and leaderboard
@@ -679,9 +661,7 @@ export default function HigherSteakMenu() {
             />
           ) : (
             <div 
-              ref={fidSwitcherRef}
-              className="relative flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm hover:shadow-md transition-shadow cursor-pointer z-[100]"
-              onClick={() => setShowFidSwitcher(!showFidSwitcher)}
+              className="relative flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm"
             >
               {user ? (
                 <>
@@ -692,61 +672,7 @@ export default function HigherSteakMenu() {
                   />
                   <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800">
                     @{user.username}
-                    {simulatedFid !== null && simulatedFid !== user.fid && (
-                      <span className="text-purple-600 ml-1">(FID: {simulatedFid})</span>
-                    )}
                   </span>
-                  {showFidSwitcher && (
-                    <div 
-                      className="absolute top-full mt-2 right-0 bg-white border border-black/20 rounded-lg shadow-lg z-[100] min-w-[200px] p-3"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="text-xs font-bold text-black mb-2">Switch FID for Testing</div>
-                      <div className="mb-2">
-                        <input
-                          type="number"
-                          placeholder="Enter FID"
-                          value={simulatedFid || ''}
-                          onChange={(e) => {
-                            const fid = e.target.value ? parseInt(e.target.value, 10) : null;
-                            setSimulatedFid(fid);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full text-xs border border-black/20 p-2 rounded"
-                        />
-                      </div>
-                      <div className="text-xs text-gray-600 mb-2">Or select from leaderboard:</div>
-                      <div className="max-h-40 overflow-y-auto space-y-1">
-                        {leaderboard.slice(0, 10).map((entry) => (
-                          <button
-                            key={entry.fid}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSimulatedFid(entry.fid);
-                              setShowFidSwitcher(false);
-                            }}
-                            className={`w-full text-left px-2 py-1 text-xs hover:bg-gray-100 rounded ${
-                              simulatedFid === entry.fid ? 'bg-purple-50 border border-purple-200' : ''
-                            }`}
-                          >
-                            @{entry.username} (FID: {entry.fid})
-                          </button>
-                        ))}
-                      </div>
-                      <div className="mt-2 pt-2 border-t border-black/20">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSimulatedFid(null);
-                            setShowFidSwitcher(false);
-                          }}
-                          className="w-full text-xs text-gray-600 hover:text-black underline"
-                        >
-                          Reset to real FID
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </>
               ) : (
                 <>
