@@ -79,6 +79,11 @@ export default function HigherSteakMenu() {
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [duneStakedData, setDuneStakedData] = useState<{
+    totalStaked: string;
+    lockups: LockupDetail[];
+    loading: boolean;
+  } | null>(null);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -148,19 +153,73 @@ export default function HigherSteakMenu() {
     });
   }, []);
 
-  const showLockSuccess = useCallback((txHash?: string, castHash?: string) => {
+  const showLockSuccess = useCallback((txHash?: string, castHash?: string, amount?: string, unlockTime?: number, lockupId?: string) => {
     setTransactionModal({
       variant: 'lock-success',
       txHash,
       castHash,
     });
-  }, []);
+    // Optimistically update: add new lockup to list and add to total
+    if (amount && unlockTime && lockupId && wagmiAddress) {
+      setDuneStakedData(prev => {
+        if (!prev) {
+          return {
+            totalStaked: amount,
+            lockups: [{
+              lockupId,
+              amount,
+              amountFormatted: formatTokenAmount(amount),
+              unlockTime,
+              receiver: wagmiAddress,
+              title: castHash || '',
+              castHash: castHash || null,
+              unlocked: false,
+            }],
+            loading: false,
+          };
+        }
+        const currentTotal = parseFloat(prev.totalStaked);
+        const amountNum = parseFloat(amount);
+        const newTotal = currentTotal + amountNum;
+        const newLockup: LockupDetail = {
+          lockupId,
+          amount,
+          amountFormatted: formatTokenAmount(amount),
+          unlockTime,
+          receiver: wagmiAddress,
+          title: castHash || '',
+          castHash: castHash || null,
+          unlocked: false,
+        };
+        return {
+          ...prev,
+          totalStaked: newTotal.toString(),
+          lockups: [...prev.lockups, newLockup],
+        };
+      });
+    }
+  }, [wagmiAddress]);
 
-  const showUnlockSuccess = useCallback((txHash?: string) => {
+  const showUnlockSuccess = useCallback((txHash?: string, lockupId?: string, amount?: string) => {
     setTransactionModal({
       variant: 'unlock-success',
       txHash,
     });
+    // Optimistically update: remove lockup from list and subtract from total
+    if (lockupId && amount) {
+      setDuneStakedData(prev => {
+        if (!prev) return prev;
+        const filteredLockups = prev.lockups.filter(l => l.lockupId !== lockupId);
+        const currentTotal = parseFloat(prev.totalStaked);
+        const amountNum = parseFloat(amount);
+        const newTotal = Math.max(0, currentTotal - amountNum);
+        return {
+          ...prev,
+          totalStaked: newTotal.toString(),
+          lockups: filteredLockups,
+        };
+      });
+    }
   }, []);
 
   const fetchTokenBalance = async (fid: number) => {
@@ -208,6 +267,44 @@ export default function HigherSteakMenu() {
       setCastData({ hasCast: false, totalStaked: 0, rank: null });
     }
   };
+
+  const fetchDuneStakes = async (fid: number, connectedAddress?: string) => {
+    console.log('[fetchDuneStakes] Called for fid:', fid, 'address:', connectedAddress);
+    setDuneStakedData(prev => prev ? { ...prev, loading: true } : { totalStaked: '0', lockups: [], loading: true });
+    
+    try {
+      const url = `/api/user/stakes?fid=${fid}${connectedAddress ? `&connectedAddress=${connectedAddress}` : ''}&offset=0`;
+      const response = await fetch(url, { cache: 'no-store' });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const items = data.items || [];
+        
+        // Filter to only include lockups where unlocked === false
+        const lockedLockups = items.filter((item: LockupDetail) => !item.unlocked);
+        
+        // Calculate totalStaked by summing amounts of locked lockups
+        const totalStaked = lockedLockups.reduce((sum: number, lockup: LockupDetail) => {
+          const amount = parseFloat(lockup.amount || '0');
+          return sum + (Number.isFinite(amount) ? amount : 0);
+        }, 0);
+        
+        console.log('[fetchDuneStakes] Locked lockups:', lockedLockups.length, 'Total staked:', totalStaked);
+        
+        setDuneStakedData({
+          totalStaked: totalStaked.toString(),
+          lockups: lockedLockups,
+          loading: false,
+        });
+      } else {
+        console.error('[fetchDuneStakes] Failed to fetch stakes, status:', response.status);
+        setDuneStakedData(prev => prev ? { ...prev, loading: false } : { totalStaked: '0', lockups: [], loading: false });
+      }
+    } catch (error) {
+      console.error('[fetchDuneStakes] Error:', error);
+      setDuneStakedData(prev => prev ? { ...prev, loading: false } : { totalStaked: '0', lockups: [], loading: false });
+    }
+  };
   
   // Format large numbers with K/M/B suffixes
   const formatTokenAmount = (amount: string): string => {
@@ -226,7 +323,7 @@ export default function HigherSteakMenu() {
   };
 
   const { pillStaked, pillWallet, pillTotal } = useMemo(() => {
-    const staked = parseFloat(balance?.lockedBalanceFormatted ?? '0') || 0;
+    const staked = parseFloat(duneStakedData?.totalStaked ?? balance?.lockedBalanceFormatted ?? '0') || 0;
     const wallet = parseFloat(balance?.walletBalanceFormatted ?? '0') || 0;
     const total = staked + wallet;
     return {
@@ -234,7 +331,7 @@ export default function HigherSteakMenu() {
       pillWallet: formatTokenAmount(wallet.toString()),
       pillTotal: formatTokenAmount(total.toString()),
     };
-  }, [balance]);
+  }, [balance, duneStakedData]);
 
   // Detect pixel density and viewport width for responsive ASCII art
   useEffect(() => {
@@ -298,6 +395,7 @@ export default function HigherSteakMenu() {
           // Fetch token balance and cast data after getting user profile
           fetchTokenBalance(fid);
           fetchCastData(fid);
+          fetchDuneStakes(fid, wagmiAddress);
         } else {
           console.error('Failed to fetch profile');
           // Fallback to just FID if profile fetch fails
@@ -466,6 +564,10 @@ export default function HigherSteakMenu() {
           lockups={balance.lockups || []}
           wallets={balance.wallets || []}
           loading={loadingBalance}
+          duneStakedData={duneStakedData ? {
+            totalStaked: duneStakedData.totalStaked,
+            lockups: duneStakedData.lockups,
+          } : null}
           onTransactionSuccess={async () => {
             // Balance will be refreshed on next fetch
           }}

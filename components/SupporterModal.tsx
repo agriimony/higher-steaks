@@ -14,7 +14,7 @@ interface SupporterModalProps {
   walletBalance?: number;
   onStakeSuccess?: () => void;
   onTransactionFailure?: (message?: string) => void;
-  onLockSuccess?: (txHash?: string, castHash?: string) => void;
+  onLockSuccess?: (txHash?: string, castHash?: string, amount?: string, unlockTime?: number, lockupId?: string) => void;
 }
 
 interface CastData {
@@ -89,6 +89,10 @@ export function SupporterModal({
   const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
   const [createLockUpParams, setCreateLockUpParams] = useState<{
     amountWei: bigint;
+    unlockTime: number;
+  } | null>(null);
+  const [pendingStakeMetadata, setPendingStakeMetadata] = useState<{
+    amount: string;
     unlockTime: number;
   } | null>(null);
   
@@ -314,8 +318,16 @@ export function SupporterModal({
       setStakeAmount('');
       setStakeError(null);
       
-      // Call success callback
-      onLockSuccess?.(createLockUpHash, castHash);
+      // Call success callback with metadata for optimistic update
+      const metadata = pendingStakeMetadata;
+      if (metadata) {
+        // Generate temporary lockupId from tx hash (will be replaced when Dune updates)
+        const tempLockupId = `temp-${createLockUpHash}`;
+        onLockSuccess?.(createLockUpHash, castHash, metadata.amount, metadata.unlockTime, tempLockupId);
+        setPendingStakeMetadata(null);
+      } else {
+        onLockSuccess?.(createLockUpHash, castHash);
+      }
       onStakeSuccess?.();
     }
   }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess, onLockSuccess, castHash]);
@@ -397,6 +409,8 @@ export function SupporterModal({
 
       // Store params for createLockUp (will be called after approve succeeds or if already approved)
       setCreateLockUpParams({ amountWei, unlockTime });
+      // Store metadata for optimistic update
+      setPendingStakeMetadata({ amount: stakeAmount.replace(/,/g, ''), unlockTime });
 
       // Step 1: Check if we need to approve (only approve if current allowance is insufficient)
       const allowance = currentAllowance || BigInt(0);

@@ -37,9 +37,13 @@ interface StakingModalProps {
   wallets: WalletDetail[];
   loading?: boolean;
   userFid?: number; // If not provided, we'll resolve from connected address
+  duneStakedData?: {
+    totalStaked: string;
+    lockups: LockupDetail[];
+  } | null;
   onTransactionSuccess?: () => void;
   onTransactionFailure?: (message?: string) => void;
-  onUnlockSuccess?: (txHash?: string) => void;
+  onUnlockSuccess?: (txHash?: string, lockupId?: string, amount?: string) => void;
 }
 
 // Format time remaining to show only largest unit
@@ -95,6 +99,7 @@ export function StakingModal({
   wallets = [],
   loading = false,
   userFid,
+  duneStakedData,
   onTransactionSuccess,
   onTransactionFailure,
   onUnlockSuccess,
@@ -132,12 +137,6 @@ export function StakingModal({
     hash: unstakeHash,
   });
 
-  // Dune-backed lockups (always-on; we resolve fid from connected address if not provided)
-  const [duneItems, setDuneItems] = useState<LockupDetail[]>([]);
-  const [duneNextOffset, setDuneNextOffset] = useState<number | null>(0);
-  const [duneLoading, setDuneLoading] = useState(false);
-  const [effectiveFid, setEffectiveFid] = useState<number | null>(null);
-  const [duneTotals, setDuneTotals] = useState<{ totalStaked?: string } | null>(null);
   const pendingUnstakeRef = useRef<{
     lockupId: string;
     castHash?: string | null;
@@ -145,79 +144,8 @@ export function StakingModal({
     amount?: string;
   } | null>(null);
 
-  const fetchDunePage = useCallback(async (nextOffset: number | null) => {
-    if (nextOffset === null) return;
-    if (!wagmiAddress) return; // need connectedAddress for server-side sorting priority
-    if (effectiveFid == null) return;
-    try {
-      setDuneLoading(true);
-      const res = await fetch(`/api/user/stakes?fid=${effectiveFid}&connectedAddress=${wagmiAddress}&offset=${nextOffset}`, {
-        cache: 'no-store'
-      });
-      if (!res.ok) {
-        setDuneLoading(false);
-        return;
-      }
-      const data = await res.json();
-      if (data.totals) {
-        setDuneTotals(data.totals);
-      }
-      const newItems: LockupDetail[] = (data.items || []).map((it: any) => {
-        const amountToken = String(it.amount ?? '0');
-        return {
-          lockupId: String(it.lockUpId),
-          amount: amountToken,
-          amountFormatted: formatTokenAmount(amountToken),
-          unlockTime: Number(it.unlockTime || 0),
-          receiver: String(it.receiver || ''),
-          title: String(it.title || ''),
-          castHash: it.castHash || null,
-          stakeType: it.stakeType || null,
-          unlocked: Boolean(it.unlocked),
-        };
-      });
-      setDuneItems(prev => nextOffset === 0 ? newItems : [...prev, ...newItems]);
-      setDuneNextOffset(data.nextOffset ?? null);
-      setDuneLoading(false);
-    } catch {
-      setDuneLoading(false);
-    }
-  }, [effectiveFid, wagmiAddress]);
-
-  useEffect(() => {
-    // Establish effective fid: prefer prop, else resolve via connected address
-    const setup = async () => {
-      if (userFid && Number.isFinite(userFid)) {
-        setEffectiveFid(userFid);
-        setDuneItems([]);
-        setDuneNextOffset(0);
-        setDuneTotals(null);
-        return;
-      }
-      if (!wagmiAddress) return;
-      try {
-        const r = await fetch(`/api/user/fid-by-address?address=${wagmiAddress}`, { cache: 'no-store' });
-        if (r.ok) {
-          const j = await r.json();
-          if (j.fid) {
-            setEffectiveFid(Number(j.fid));
-            setDuneItems([]);
-            setDuneNextOffset(0);
-            setDuneTotals(null);
-          }
-        }
-      } catch {
-        // ignore
-      }
-    };
-    setup();
-  }, [userFid, wagmiAddress]);
-
-  useEffect(() => {
-    if (effectiveFid != null && duneNextOffset === 0) {
-      fetchDunePage(0);
-    }
-  }, [effectiveFid, duneNextOffset, fetchDunePage]);
+  // Use duneStakedData prop instead of internal fetching
+  const duneItems = duneStakedData?.lockups || [];
 
   // Handle escape key to close
   useEffect(() => {
@@ -234,6 +162,7 @@ export function StakingModal({
   // Fetch cast text for lockups when data changes
   // Updated logic: check DB first, then Neynar, show Invalid cast if both fail
   useEffect(() => {
+    if (!duneItems.length) return;
     duneItems.forEach(async (lockup) => {
       if (isValidCastHash(lockup.title)) {
         const castHash = lockup.title;
@@ -422,7 +351,6 @@ export function StakingModal({
       setUnstakeLockupId(null);
       
       console.log('[Staking Modal] Unstake transaction successful - UI updated optimistically');
-      onUnlockSuccess?.(unstakeHash);
       
       if (onTransactionSuccess) {
         setTimeout(() => {
@@ -431,21 +359,11 @@ export function StakingModal({
       }
 
       if (meta) {
-        setDuneItems(prev => prev.map(i => i.lockupId === meta.lockupId ? { ...i, unlocked: true } : i));
-        if (meta.amount) {
-          const amtNum = parseFloat(meta.amount);
-          if (!Number.isNaN(amtNum)) {
-            setDuneTotals(prev => {
-              if (!prev?.totalStaked) return prev;
-              const current = parseFloat(prev.totalStaked);
-              if (Number.isNaN(current)) return prev;
-              const nextTotal = Math.max(0, current - amtNum);
-              return { ...prev, totalStaked: nextTotal.toString() };
-            });
-          }
-        }
-        if (duneNextOffset !== null) {
-          fetchDunePage(duneNextOffset);
+        // Pass lockup metadata to parent for optimistic update
+        if (meta.lockupId && meta.amount) {
+          onUnlockSuccess?.(unstakeHash, meta.lockupId, meta.amount);
+        } else {
+          onUnlockSuccess?.(unstakeHash);
         }
         if (meta.castHash && meta.stakeType) {
           fetch('/api/user/lockup/unlock', {
@@ -460,7 +378,7 @@ export function StakingModal({
         }
       }
     }
-  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess, onUnlockSuccess, fetchDunePage, duneNextOffset]);
+  }, [isUnstakeSuccess, unstakeHash, onTransactionSuccess, onUnlockSuccess]);
 
   // Update error states
   useEffect(() => {
@@ -513,7 +431,7 @@ export function StakingModal({
               className="w-5 h-5 rounded-full"
             />
             <span className="text-sm font-bold text-purple-700">
-              {formatTokenAmount(duneTotals?.totalStaked ?? balance.lockedBalanceFormatted)} / {formatTokenAmount(balance.totalBalanceFormatted)}
+              {formatTokenAmount(duneStakedData?.totalStaked ?? balance.lockedBalanceFormatted)} / {formatTokenAmount(balance.totalBalanceFormatted)}
             </span>
             <span className="text-sm">🥩</span>
           </div>
@@ -627,17 +545,6 @@ export function StakingModal({
                     );
                   })}
                 </ul>
-              )}
-              {duneNextOffset !== null && (
-                <div className="mt-3 text-center">
-                  <button
-                    className="text-xs text-purple-600 hover:text-purple-700 underline disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => fetchDunePage(duneNextOffset)}
-                    disabled={duneLoading}
-                  >
-                    {duneLoading ? 'Loading...' : '... more'}
-                  </button>
-                </div>
               )}
             </div>
 
