@@ -145,8 +145,13 @@ export function StakingModal({
     amount?: string;
   } | null>(null);
 
-  // Use duneStakedData prop instead of internal fetching
-  const duneItems = duneStakedData?.lockups || [];
+  // Use duneStakedData prop instead of internal fetching; fallback to legacy lockups if needed
+  const duneItems = duneStakedData?.lockups ?? _legacyLockups ?? [];
+  // Normalize amounts so we always have an amountFormatted for display/sorting
+  const normalizedLockups = duneItems.map((l) => ({
+    ...l,
+    amountFormatted: l.amountFormatted ?? l.amount ?? '0',
+  }));
 
   // Handle escape key to close
   useEffect(() => {
@@ -290,7 +295,7 @@ export function StakingModal({
   // Sort lockups: (1) connected wallet first, (2) expired first, then by time remaining
   // (3) then by amount descending
   // Hide locally-unstaked rows; show only not unlocked
-  const sourceLockups = duneItems.filter(l => !l.unlocked);
+  const sourceLockups = normalizedLockups.filter(l => !l.unlocked);
   const sortedLockups = [...sourceLockups].sort((a, b) => {
     // Calculate time remaining for sorting
     const aTimeRemaining = a.unlockTime - currentTime;
