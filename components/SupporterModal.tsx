@@ -390,7 +390,8 @@ export function SupporterModal({
     const isCaster = userFid !== null && castData.fid === userFid;
 
     // Validation
-    const amountNum = parseFloat(stakeAmount.replace(/,/g, ''));
+    const amountStr = (stakeAmount ?? '').toString();
+    const amountNum = parseFloat(amountStr.replace(/,/g, ''));
     
     if (isNaN(amountNum) || amountNum <= 0) {
       reportStakeError('Please enter a valid stake amount');
@@ -408,7 +409,7 @@ export function SupporterModal({
 
     try {
       // Convert amount to wei (18 decimals)
-      const amountWei = parseUnits(stakeAmount.replace(/,/g, ''), 18);
+      const amountWei = parseUnits(amountStr.replace(/,/g, ''), 18);
       
       let unlockTime: number;
       
@@ -444,7 +445,7 @@ export function SupporterModal({
       // Store metadata for optimistic update, keyed by transaction params (will be moved to hash key when hash is available)
       const paramsKey = `${amountWei.toString()}-${unlockTime}`;
       pendingStakeMetadataRef.current.set(paramsKey, {
-        amount: stakeAmount.replace(/,/g, ''),
+        amount: amountStr.replace(/,/g, ''),
         unlockTime,
       });
 

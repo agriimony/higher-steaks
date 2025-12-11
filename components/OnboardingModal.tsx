@@ -708,8 +708,10 @@ export function OnboardingModal({
     }
 
     // Validation
-    const amountNum = parseFloat(inputStakeAmount.replace(/,/g, ''));
-    const durationNum = parseFloat(inputLockupDuration);
+    const amountStr = (inputStakeAmount ?? '').toString();
+    const durationStr = (inputLockupDuration ?? '').toString();
+    const amountNum = parseFloat(amountStr.replace(/,/g, ''));
+    const durationNum = parseFloat(durationStr);
     
     if (isNaN(amountNum) || amountNum <= 0) {
       reportStakeError('Please enter a valid stake amount');
@@ -736,7 +738,7 @@ export function OnboardingModal({
 
     try {
       // Convert amount to wei (18 decimals)
-      const amountWei = parseUnits(inputStakeAmount.replace(/,/g, ''), 18);
+      const amountWei = parseUnits(amountStr.replace(/,/g, ''), 18);
       
       // Calculate unlock time (current time + duration in seconds)
       const durationSeconds = durationToSeconds(durationNum, inputLockupUnit);
@@ -754,7 +756,7 @@ export function OnboardingModal({
       // Store metadata for optimistic update keyed by params (moved to hash when available)
       const paramsKey = `${amountWei.toString()}-${unlockTime}`;
       pendingStakeMetadataRef.current.set(paramsKey, {
-        amount: inputStakeAmount.replace(/,/g, ''),
+        amount: amountStr.replace(/,/g, ''),
         unlockTime,
       });
 
