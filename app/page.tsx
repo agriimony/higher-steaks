@@ -6,6 +6,7 @@ import { OnboardingModal } from '@/components/OnboardingModal';
 import { StakingModal } from '@/components/StakingModal';
 import { SupporterModal } from '@/components/SupporterModal';
 import { TransactionModal } from '@/components/TransactionModal';
+import { UserModal } from '@/components/UserModal';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 import { useAccount } from 'wagmi';
 import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
@@ -100,6 +101,7 @@ export default function HigherSteakMenu() {
   } | null>(null);
   const [showStakingModal, setShowStakingModal] = useState(false);
   const [showSupporterModal, setShowSupporterModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
   const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
   const [simulatedFid, setSimulatedFid] = useState<number | null>(null); // For testing supporter vs caster view
   // FID switcher removed; simulatedFid now unused in UI (could be set via dev tools if needed)
@@ -595,6 +597,14 @@ export default function HigherSteakMenu() {
         />
       )}
 
+      {/* User Modal */}
+      {showUserModal && user && (
+        <UserModal
+          onClose={() => setShowUserModal(false)}
+          userFid={user.fid}
+        />
+      )}
+
       <main className="min-h-screen bg-[#f9f7f1] text-black p-2 sm:p-4 md:p-6 font-mono">
         <div className="max-w-4xl mx-auto bg-[#fefdfb] shadow-lg p-3 sm:p-4 md:p-8 border border-[#e5e3db]">
         {/* Header Row - Balance left, Profile right */}
@@ -666,7 +676,8 @@ export default function HigherSteakMenu() {
             />
           ) : (
             <div 
-              className="relative flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm"
+              className="relative flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setShowUserModal(true)}
             >
               {user ? (
                 <>
