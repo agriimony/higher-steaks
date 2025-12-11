@@ -33,6 +33,7 @@ interface OnboardingModalProps {
   onStakeSuccess?: () => void;
   onTransactionFailure?: (message?: string) => void;
   onLockSuccess?: (txHash?: string, castHash?: string, amount?: string, unlockTime?: number, lockupId?: string) => void;
+  onOpenSupporterModal?: (castHash: string) => void;
 }
 
 // Format timestamp to readable date
@@ -107,6 +108,7 @@ export function OnboardingModal({
   onStakeSuccess,
   onTransactionFailure,
   onLockSuccess,
+  onOpenSupporterModal,
 }: OnboardingModalProps) {
   // Helper function to normalize hash format (ensure 0x prefix and lowercase)
   const normalizeHash = useCallback((hash: string): string => {
@@ -613,7 +615,24 @@ export function OnboardingModal({
         // Normalize hash format (ensure 0x prefix)
         const castHash = normalizeHash(data.hash);
         
-        // Create temporary cast card from validation response
+        // Check if cast exists in HS DB
+        try {
+          const castCheckResponse = await fetch(`/api/cast/${encodeURIComponent(castHash)}`);
+          if (castCheckResponse.ok) {
+            // Cast exists in DB - open SupporterModal instead
+            if (onOpenSupporterModal) {
+              onOpenSupporterModal(castHash);
+              setShowCreateCast(false);
+              setValidatingUrl(false);
+              return;
+            }
+          }
+        } catch (error) {
+          // If check fails, continue with normal flow
+          console.error('[OnboardingModal] Error checking cast in DB:', error);
+        }
+        
+        // Cast not in DB or check failed - create temporary cast card from validation response
         const newCast: CastCard = {
           hash: castHash,
           text: data.castText || '',

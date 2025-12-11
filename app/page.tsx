@@ -537,6 +537,11 @@ export default function HigherSteakMenu() {
           onStakeSuccess={handleStakeSuccess}
           onTransactionFailure={showTransactionFailure}
           onLockSuccess={showLockSuccess}
+          onOpenSupporterModal={(castHash) => {
+            setSelectedCastHash(castHash);
+            setShowOnboardingModal(false);
+            setShowSupporterModal(true);
+          }}
         />
       )}
 
