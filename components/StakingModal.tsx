@@ -78,8 +78,9 @@ function truncateAddress(address: string): string {
 
 // Format token amount with K/M/B suffixes
 function formatTokenAmount(amount: string): string {
-  const num = parseFloat(amount.replace(/,/g, ''));
-  if (isNaN(num)) return amount;
+  const safe = (amount ?? '0').toString();
+  const num = parseFloat(safe.replace(/,/g, ''));
+  if (isNaN(num)) return safe;
   
   if (num >= 1_000_000_000) {
     return (num / 1_000_000_000).toFixed(2) + 'B';
@@ -275,12 +276,15 @@ export function StakingModal({
   }, [wallets, duneItems]);
 
   // Sort wallets: connected first, then by balance descending
+  const parseFormatted = (v?: string) =>
+    parseFloat((v ?? '0').toString().replace(/,/g, ''));
+
   const sortedWallets = [...derivedWallets].sort((a, b) => {
     if (wagmiAddress) {
       if (a.address.toLowerCase() === wagmiAddress.toLowerCase()) return -1;
       if (b.address.toLowerCase() === wagmiAddress.toLowerCase()) return 1;
     }
-    return parseFloat(b.balanceFormatted.replace(/,/g, '')) - parseFloat(a.balanceFormatted.replace(/,/g, ''));
+    return parseFormatted(b.balanceFormatted) - parseFormatted(a.balanceFormatted);
   });
 
   // Sort lockups: (1) connected wallet first, (2) expired first, then by time remaining
@@ -312,7 +316,7 @@ export function StakingModal({
     }
     
     // (4) Finally by amount descending (largest first)
-    return parseFloat(String(b.amountFormatted).replace(/,/g, '')) - parseFloat(String(a.amountFormatted).replace(/,/g, ''));
+    return parseFormatted(b.amountFormatted) - parseFormatted(a.amountFormatted);
   });
 
   // Handle Unstake
