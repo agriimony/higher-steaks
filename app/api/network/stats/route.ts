@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const currentTime = Math.floor(Date.now() / 1000);
 
-    // Query all leaderboard entries
+    // Query only non-expired casts (cast_state = 'higher')
     const result = await sql`
       SELECT 
         caster_stake_amounts,
@@ -19,6 +19,7 @@ export async function GET() {
         supporter_stake_unlock_times,
         cast_hash
       FROM leaderboard_entries
+      WHERE cast_state = 'higher'
     `;
 
     let totalCasterStaked = BigInt(0);

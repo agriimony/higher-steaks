@@ -213,7 +213,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 </div>
                 
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-black/20">
-                  <span className="text-sm text-black/70">Total Casts Staked On</span>
+                  <span className="text-sm text-black/70">Total Casts with Active Stakes</span>
                   <span className="text-sm font-bold text-black">
                     {networkStats?.totalCastsStakedOn ?? 0}
                   </span>
