@@ -114,7 +114,7 @@ export function SupporterModal({
   // Convert balance from wei to number (18 decimals)
   const connectedWalletBalance = walletBalanceRaw 
     ? parseFloat(formatUnits(walletBalanceRaw, 18))
-    : walletBalance; // Fallback to prop if no wallet connected
+    : 0; // Fallback to 0 if no wallet connected
   
   // Read current allowance to avoid unnecessary approvals
   const { data: currentAllowance } = useReadContract({
