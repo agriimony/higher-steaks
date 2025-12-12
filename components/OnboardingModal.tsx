@@ -135,6 +135,14 @@ export function OnboardingModal({
   const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
   const [showCreateCast, setShowCreateCast] = useState(false);
   const [userUsername, setUserUsername] = useState<string | null>(null);
+  const [otherUserCast, setOtherUserCast] = useState<{ 
+    hash: string; 
+    state: string; 
+    hasActiveStakes: boolean; 
+    casterFid: number; 
+    casterUsername?: string;
+    casterDisplayName?: string;
+  } | null>(null);
   
   // Create cast state
   const [customMessage, setCustomMessage] = useState('');
@@ -333,6 +341,7 @@ export function OnboardingModal({
         setStakeAmount('');
         setLockupDuration('');
         setSelectedCastHash(null);
+        setOtherUserCast(null);
         return prev - 1;
       }
       return prev;
@@ -347,6 +356,7 @@ export function OnboardingModal({
         setStakeAmount('');
         setLockupDuration('');
         setSelectedCastHash(null);
+        setOtherUserCast(null);
         return prev + 1;
       }
       return prev;
@@ -628,30 +638,83 @@ export function OnboardingModal({
       
       const data = await response.json();
       
-      if (data.valid && data.fid === userFid) {
-        setUrlValidationError(null);
-        setCastUrl('');
-        
-        // Normalize hash format (ensure 0x prefix)
-        const castHash = normalizeHash(data.hash);
-        
-        // Check if cast exists in HS DB
-        try {
-          const castCheckResponse = await fetch(`/api/cast/${encodeURIComponent(castHash)}`);
-          if (castCheckResponse.ok) {
-            // Cast exists in DB - open SupporterModal instead
+      if (!data.valid) {
+        setUrlValidationError(data.reason || 'Cast not found or invalid');
+        setValidatingUrl(false);
+        return;
+      }
+
+      setUrlValidationError(null);
+      setCastUrl('');
+      
+      // Normalize hash format (ensure 0x prefix)
+      const castHash = normalizeHash(data.hash);
+      const isOtherUser = data.fid !== userFid;
+      
+      // Check if cast exists in HS DB to get full cast data including stakes
+      try {
+        const castCheckResponse = await fetch(`/api/cast/${encodeURIComponent(castHash)}${userFid ? `?userFid=${userFid}` : ''}`);
+        if (castCheckResponse.ok) {
+          const castData = await castCheckResponse.json();
+          const hasActiveStakes = castData.state === 'higher';
+          
+          // If cast has active stakes, open SupporterModal (for any user)
+          if (hasActiveStakes) {
             if (onOpenSupporterModal) {
               onOpenSupporterModal(castHash);
               setShowCreateCast(false);
               setValidatingUrl(false);
+              setOtherUserCast(null);
               return;
             }
           }
-        } catch (error) {
-          // If check fails, continue with normal flow
-          console.error('[OnboardingModal] Error checking cast in DB:', error);
+          
+          // If cast is from different user and has no active stakes, store for display
+          if (isOtherUser && !hasActiveStakes) {
+            setOtherUserCast({
+              hash: castHash,
+              state: castData.state || 'valid',
+              hasActiveStakes: false,
+              casterFid: castData.fid,
+              casterUsername: castData.username,
+              casterDisplayName: castData.displayName,
+            });
+            
+            // Add to cast cards for display
+            const newCast: CastCard = {
+              hash: castHash,
+              text: castData.castText || data.castText || '',
+              description: castData.description || data.description || '',
+              timestamp: castData.timestamp || data.timestamp || new Date().toISOString(),
+              castState: castData.state || data.state || 'valid',
+              rank: castData.rank || null,
+              totalHigherStaked: parseFloat(castData.totalHigherStaked || '0'),
+              totalCasterStaked: parseFloat(castData.totalCasterStaked || '0'),
+              totalSupporterStaked: parseFloat(castData.totalSupporterStaked || '0'),
+              casterStakeLockupIds: [],
+              casterStakeAmounts: [],
+              casterStakeUnlockTimes: [],
+              supporterStakeLockupIds: [],
+              supporterStakeAmounts: [],
+              supporterStakeFids: [],
+              username: castData.username || data.author?.username || data.username,
+            };
+            
+            updateCasts(prevCasts => {
+              const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
+              return [newCast, ...filtered];
+            });
+            setShowCreateCast(false);
+            setValidatingUrl(false);
+            return;
+          }
         }
-        
+      } catch (error) {
+        console.error('[OnboardingModal] Error checking cast in DB:', error);
+      }
+      
+      // If cast is from same user, use existing flow
+      if (!isOtherUser) {
         // Cast not in DB or check failed - create temporary cast card from validation response
         const newCast: CastCard = {
           hash: castHash,
@@ -677,17 +740,69 @@ export function OnboardingModal({
           return [newCast, ...filtered];
         });
         setShowCreateCast(false);
-      } else if (data.valid && data.fid !== userFid) {
-        setUrlValidationError('This cast belongs to a different user');
       } else {
-        setUrlValidationError(data.reason || 'Cast not found or invalid');
+        // Other user's cast not in DB - treat as valid but no stakes
+        setOtherUserCast({
+          hash: castHash,
+          state: data.state || 'valid',
+          hasActiveStakes: false,
+          casterFid: data.fid,
+          casterUsername: data.author?.username || data.username,
+          casterDisplayName: data.author?.display_name,
+        });
+        
+        const newCast: CastCard = {
+          hash: castHash,
+          text: data.castText || '',
+          description: data.description || '',
+          timestamp: data.timestamp || new Date().toISOString(),
+          castState: data.state || 'valid',
+          rank: null,
+          totalHigherStaked: 0,
+          totalCasterStaked: 0,
+          totalSupporterStaked: 0,
+          casterStakeLockupIds: [],
+          casterStakeAmounts: [],
+          casterStakeUnlockTimes: [],
+          supporterStakeLockupIds: [],
+          supporterStakeAmounts: [],
+          supporterStakeFids: [],
+          username: data.author?.username || data.username,
+        };
+        
+        updateCasts(prevCasts => {
+          const filtered = prevCasts.filter(c => c.hash !== newCast.hash);
+          return [newCast, ...filtered];
+        });
+        setShowCreateCast(false);
       }
     } catch (error) {
       setUrlValidationError('Failed to validate cast URL. Please check the URL format and try again.');
     } finally {
       setValidatingUrl(false);
     }
-  }, [castUrl, userFid]);
+  }, [castUrl, userFid, onOpenSupporterModal, normalizeHash, updateCasts]);
+
+  // Handle "Ask to Stake" - opens cast composer with reply
+  const handleAskToStake = useCallback(async (castHash: string) => {
+    try {
+      const message = "I want to support you! Please add stake to your cast!";
+      const result = await sdk.actions.composeCast({
+        text: message,
+        parent: { type: 'cast', hash: castHash },
+      });
+      
+      if (result.cast) {
+        console.log('[OnboardingModal] Reply cast created successfully');
+        // Optionally close the modal or show success message
+      } else {
+        console.log('[OnboardingModal] User cancelled or cast composer closed');
+      }
+    } catch (error) {
+      console.error('[OnboardingModal] Error opening cast composer:', error);
+      alert('Failed to open cast composer. Please try again.');
+    }
+  }, []);
 
 
   const handleStake = async (castHash: string, inputStakeAmount: string, inputLockupDuration: string, inputLockupUnit: 'minute' | 'day' | 'week' | 'month' | 'year') => {
@@ -987,6 +1102,8 @@ export function OnboardingModal({
     setSelectedCastHash(null);
     setStakeError(null);
     transactionErrorReportedRef.current = false;
+    // Clear other user cast state when canceling
+    setOtherUserCast(null);
   }, []);
 
   const handleOpenStakeForm = useCallback((index: number, hash: string) => {
@@ -994,6 +1111,8 @@ export function OnboardingModal({
     setSelectedCastHash(normalizeHash(hash));
     setStakeError(null);
     transactionErrorReportedRef.current = false;
+    // Clear other user cast state when opening stake form (user is staking on their own cast)
+    setOtherUserCast(null);
   }, [normalizeHash]);
 
 
@@ -1161,6 +1280,10 @@ export function OnboardingModal({
       return null;
     }
     
+    // Check if this is an other user's cast with no active stakes
+    const isOtherUserCast = otherUserCast && normalizeHash(otherUserCast.hash) === normalizeHash(currentCast.hash);
+    const isOtherUserNoStakes = isOtherUserCast && !otherUserCast.hasActiveStakes;
+    
     return (
       <>
         <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
@@ -1187,17 +1310,22 @@ export function OnboardingModal({
           )}
           
           {/* Single card */}
-          <a
-            href={userUsername 
-              ? `https://farcaster.xyz/${userUsername}/${currentCast.hash}`
-              : `https://warpcast.com/~/conversations/${currentCast.hash}`
-            }
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block bg-[#f9f7f1] p-4 border border-black/20 rounded-none relative z-10 hover:bg-[#f5f3ed] transition-colors cursor-pointer"
-          >
+          <div className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none relative z-10">
             <div className="text-xs text-black font-mono mb-2">
-              <strong>{KEYPHRASE_TEXT}</strong> {currentCast.description}
+              <strong>{KEYPHRASE_TEXT}</strong>{' '}
+              <a
+                href={(isOtherUserCast && otherUserCast.casterUsername) 
+                  ? `https://farcaster.xyz/${otherUserCast.casterUsername}/${currentCast.hash}`
+                  : userUsername 
+                  ? `https://farcaster.xyz/${userUsername}/${currentCast.hash}`
+                  : `https://warpcast.com/~/conversations/${currentCast.hash}`
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-purple-700 hover:underline transition-colors"
+              >
+                {currentCast.description}
+              </a>
             </div>
             {currentCast.timestamp && (
               <div className="text-xs text-black/50 font-mono mb-3">
@@ -1227,15 +1355,19 @@ export function OnboardingModal({
                 </>
               ) : currentCast.castState === 'expired' ? (
                 <div className="text-xs text-black/60 italic mb-2">
-                  This cast is expired, add stake to rejoin the leaderboard
+                  {isOtherUserNoStakes 
+                    ? 'This cast has expired. The caster needs to add stake to reactivate it.'
+                    : 'This cast is expired, add stake to rejoin the leaderboard'}
                 </div>
               ) : (
                 <div className="text-xs text-black/60 mb-2">
-                  Add stake to join the leaderboard
+                  {isOtherUserNoStakes
+                    ? 'This cast is valid but has no active stakes yet. The caster needs to add stake to join the leaderboard.'
+                    : 'Add stake to join the leaderboard'}
                 </div>
               )}
             </div>
-          </a>
+          </div>
           
           {/* Right arrow button - positioned outside container, overlapping halfway */}
           {castsRef.current.length > 1 && activeCardIndex < castsRef.current.length - 1 && (
@@ -1258,12 +1390,21 @@ export function OnboardingModal({
         {/* Add stake button - shown when staking form is not open */}
         {selectedCastIndex !== activeCardIndex && (
           <div className="mb-4 flex gap-3">
-            <button
-              onClick={() => handleOpenStakeForm(activeCardIndex, currentCast.hash)}
-              className="flex-1 px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
-            >
-              Add stake
-            </button>
+            {isOtherUserNoStakes ? (
+              <button
+                onClick={() => handleAskToStake(currentCast.hash)}
+                className="flex-1 px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+              >
+                Ask to Stake
+              </button>
+            ) : (
+              <button
+                onClick={() => handleOpenStakeForm(activeCardIndex, currentCast.hash)}
+                className="flex-1 px-4 py-2 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition"
+              >
+                Add stake
+              </button>
+            )}
             <button
               onClick={handleBuyHigher}
               className="flex-1 px-4 py-2 bg-purple-600 text-white text-xs font-bold border-2 border-purple-600 hover:bg-purple-700 transition"
@@ -1281,9 +1422,13 @@ export function OnboardingModal({
     selectedCastIndex,
     handleOpenStakeForm,
     handleBuyHigher,
+    handleAskToStake,
     scrollToPrevious,
     scrollToNext,
-    showCreateCast
+    showCreateCast,
+    otherUserCast,
+    userUsername,
+    normalizeHash
   ]);
 
   return (
