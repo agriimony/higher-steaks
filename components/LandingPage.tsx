@@ -5,7 +5,7 @@ export function LandingPage() {
     <div className="min-h-screen bg-[#f9f7f1] flex items-center justify-center p-4">
       <div className="text-center">
         <img 
-          src="/icon.png" 
+          src="/splash.png" 
           alt="Higher Steaks" 
           className="w-24 h-24 sm:w-32 sm:h-32 mx-auto mb-6"
         />
