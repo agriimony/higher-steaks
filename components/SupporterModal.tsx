@@ -97,6 +97,25 @@ export function SupporterModal({
   // Wagmi hooks
   const { address: wagmiAddress, isConnected } = useAccount();
   
+  // Read balance from connected wallet address
+  const { data: walletBalanceRaw } = useReadContract({
+    address: HIGHER_TOKEN_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: 'balanceOf',
+    args: wagmiAddress ? [wagmiAddress] : undefined,
+    query: {
+      enabled: !!wagmiAddress,
+      refetchInterval: false,
+      refetchOnMount: false,
+      refetchOnWindowFocus: false,
+    },
+  });
+  
+  // Convert balance from wei to number (18 decimals)
+  const connectedWalletBalance = walletBalanceRaw 
+    ? parseFloat(formatUnits(walletBalanceRaw, 18))
+    : walletBalance; // Fallback to prop if no wallet connected
+  
   // Read current allowance to avoid unnecessary approvals
   const { data: currentAllowance } = useReadContract({
     address: HIGHER_TOKEN_ADDRESS,
@@ -399,7 +418,7 @@ export function SupporterModal({
     }
 
     // Check balance
-    if (amountNum > walletBalance) {
+    if (amountNum > connectedWalletBalance) {
       reportStakeError('Amount exceeds wallet balance');
       return;
     }
@@ -772,7 +791,7 @@ export function SupporterModal({
                 className="w-full text-sm font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
               />
               <div className="text-xs text-black/50 mt-1">
-                Available: {walletBalance.toFixed(2)} HIGHER
+                Available: {connectedWalletBalance.toFixed(2)} HIGHER
               </div>
             </div>
             {isCaster ? (
@@ -829,11 +848,11 @@ export function SupporterModal({
                 </div>
               </div>
             )}
-            {stakeError && (
+            {/* {stakeError && (
               <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-700 text-xs">
                 {stakeError}
               </div>
-            )}
+            )} */}
             <div className="flex gap-2">
               <button
                 onClick={() => {
