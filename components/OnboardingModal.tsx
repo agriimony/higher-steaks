@@ -24,6 +24,7 @@ interface CastCard {
   supporterStakeLockupIds: number[];
   supporterStakeAmounts: string[];
   supporterStakeFids: number[];
+  username?: string; // Optional username for constructing cast URL
 }
 
 interface OnboardingModalProps {
@@ -133,6 +134,7 @@ export function OnboardingModal({
   const [loadingCasts, setLoadingCasts] = useState(true);
   const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
   const [showCreateCast, setShowCreateCast] = useState(false);
+  const [userUsername, setUserUsername] = useState<string | null>(null);
   
   // Create cast state
   const [customMessage, setCustomMessage] = useState('');
@@ -229,6 +231,22 @@ export function OnboardingModal({
     [onTransactionFailure]
   );
 
+  // Fetch user username on mount
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await fetch(`/api/user/profile?fid=${userFid}`);
+        if (response.ok) {
+          const profileData = await response.json();
+          setUserUsername(profileData.username);
+        }
+      } catch (error) {
+        console.error('[OnboardingModal] Error fetching user profile:', error);
+      }
+    };
+    fetchUserProfile();
+  }, [userFid]);
+
   // Fetch all casts on mount (single snapshot)
   useEffect(() => {
     let isMounted = true;
@@ -261,6 +279,7 @@ export function OnboardingModal({
               supporterStakeLockupIds: cast.supporterStakeLockupIds || [],
               supporterStakeAmounts: cast.supporterStakeAmounts || [],
               supporterStakeFids: cast.supporterStakeFids || [],
+              username: cast.username,
             };
           });
 
@@ -527,6 +546,7 @@ export function OnboardingModal({
           supporterStakeLockupIds: [],
           supporterStakeAmounts: [],
           supporterStakeFids: [],
+          // Username not available from composeCast result
         };
         
         updateCasts(prevCasts => {
@@ -649,6 +669,7 @@ export function OnboardingModal({
           supporterStakeLockupIds: [],
           supporterStakeAmounts: [],
           supporterStakeFids: [],
+          username: data.author?.username || data.username,
         };
         
         updateCasts(prevCasts => {
@@ -1166,7 +1187,15 @@ export function OnboardingModal({
           )}
           
           {/* Single card */}
-          <div className="bg-[#f9f7f1] p-4 border border-black/20 rounded-none relative z-10">
+          <a
+            href={userUsername 
+              ? `https://farcaster.xyz/${userUsername}/${currentCast.hash}`
+              : `https://warpcast.com/~/conversations/${currentCast.hash}`
+            }
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block bg-[#f9f7f1] p-4 border border-black/20 rounded-none relative z-10 hover:bg-[#f5f3ed] transition-colors cursor-pointer"
+          >
             <div className="text-xs text-black font-mono mb-2">
               <strong>{KEYPHRASE_TEXT}</strong> {currentCast.description}
             </div>
@@ -1206,7 +1235,7 @@ export function OnboardingModal({
                 </div>
               )}
             </div>
-          </div>
+          </a>
           
           {/* Right arrow button - positioned outside container, overlapping halfway */}
           {castsRef.current.length > 1 && activeCardIndex < castsRef.current.length - 1 && (

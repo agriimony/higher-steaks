@@ -13,6 +13,7 @@ export const ALLOWED_FIDS = [
   191780, // agrimony
   243906, // know
   9318,   // catra
+  1553723, // highersteaks
   // Add more FIDs here
 ];
 

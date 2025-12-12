@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
           supporterStakeLockupIds: row.supporter_stake_lockup_ids || [],
           supporterStakeAmounts: row.supporter_stake_amounts?.map((a: any) => a.toString()) || [],
           supporterStakeFids: row.supporter_stake_fids || [],
+          username: row.creator_username || undefined,
         }));
 
         console.log(`[User Casts All API] Found ${casts.length} casts in database`);
