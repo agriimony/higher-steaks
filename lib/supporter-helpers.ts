@@ -129,3 +129,37 @@ export function filterValidSupporterStakes(
   });
 }
 
+/**
+ * Calculate weighted stake in higher-days (cumulative time-weighted stake to date)
+ * Formula: (stake_amount_in_tokens) * (min(now, unlock_time) - lock_time) / 86400
+ * 
+ * This handles all cases:
+ * - Active stakes: uses current time (now - lock_time)
+ * - Expired/unlocked stakes: uses unlock_time (full period until unlock)
+ * 
+ * @param amount - Stake amount in wei
+ * @param lockTime - Unix timestamp when stake was locked
+ * @param unlockTime - Unix timestamp when stake unlocks
+ * @param currentTime - Current unix timestamp (defaults to now)
+ * @returns Weighted stake in higher-days (tokens * days)
+ */
+export function calculateWeightedStake(
+  amount: bigint, // in wei
+  lockTime: number, // unix timestamp
+  unlockTime: number, // unix timestamp
+  currentTime: number = Math.floor(Date.now() / 1000)
+): number {
+  // Calculate stake period: min(now, unlock_time) - lock_time
+  // This handles all cases: active (now < unlock_time), expired (now > unlock_time), unlocked
+  const stakePeriod = Math.min(currentTime, unlockTime) - lockTime;
+  
+  // Ensure non-negative period (handle edge cases where lockTime > unlockTime or lockTime > currentTime)
+  if (stakePeriod <= 0) {
+    return 0;
+  }
+  
+  const stakePeriodDays = stakePeriod / 86400; // Convert seconds to days
+  const amountInTokens = Number(amount) / 1e18; // Convert wei to tokens
+  return amountInTokens * stakePeriodDays; // Returns cumulative time-weighted stake
+}
+

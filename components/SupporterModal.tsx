@@ -6,6 +6,7 @@ import { parseUnits, formatUnits } from 'viem';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { LOCKUP_CONTRACT, HIGHER_TOKEN_ADDRESS, LOCKUP_ABI, ERC20_ABI } from '@/lib/contracts';
 import { formatTimeRemaining } from '@/lib/supporter-helpers';
+import { SupporterLeaderboardModal } from './SupporterLeaderboardModal';
 
 interface SupporterModalProps {
   castHash: string;
@@ -84,6 +85,7 @@ export function SupporterModal({
   const [lockupDuration, setLockupDuration] = useState<string>('');
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   const [stakeError, setStakeError] = useState<string | null>(null);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
   
   // Staking transaction state
   const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
@@ -745,7 +747,10 @@ export function SupporterModal({
 
         {/* Supported By Section */}
         {castData.supporterStakes.length > 0 && (
-          <div className="mb-4 pb-4 border-b border-black/20">
+          <button
+            onClick={() => setShowLeaderboardModal(true)}
+            className="w-full mb-4 pb-4 border-b border-black/20 text-left hover:bg-black/5 transition-colors rounded p-2 -ml-2 -mr-2"
+          >
             <div className="text-xs font-bold text-black mb-2">Supported by:</div>
             <div className="flex flex-wrap gap-2 items-center">
               {/* Show connected user's stake first if exists */}
@@ -770,7 +775,8 @@ export function SupporterModal({
                 />
               ))}
             </div>
-          </div>
+            <div className="text-xs text-black/50 mt-2">Click to view leaderboard</div>
+          </button>
         )}
 
         {/* Staking Form */}
@@ -922,6 +928,15 @@ export function SupporterModal({
           </div>
         )}
       </div>
+      
+      {/* Supporter Leaderboard Modal */}
+      {showLeaderboardModal && (
+        <SupporterLeaderboardModal
+          castHash={castHash}
+          userFid={userFid}
+          onClose={() => setShowLeaderboardModal(false)}
+        />
+      )}
     </div>
   );
 }
