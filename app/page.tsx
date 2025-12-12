@@ -7,9 +7,11 @@ import { StakingModal } from '@/components/StakingModal';
 import { SupporterModal } from '@/components/SupporterModal';
 import { TransactionModal } from '@/components/TransactionModal';
 import { UserModal } from '@/components/UserModal';
+import { LandingPage } from '@/components/LandingPage';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 import { useAccount } from 'wagmi';
 import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
+import { ALLOWED_FIDS } from '@/config/allowed-fids';
 
 interface User {
   fid: number;
@@ -78,6 +80,7 @@ export default function HigherSteakMenu() {
   const [isDevelopmentMode, setIsDevelopmentMode] = useState(false);
   const [simulatedProfile, setSimulatedProfile] = useState<SimulatedProfile | null>(null);
   
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
@@ -365,11 +368,23 @@ export default function HigherSteakMenu() {
         
         if (!context?.user?.fid) {
           console.log('Not in Farcaster client or no user context');
+          setHasAccess(false);
           return;
         }
 
         const fid = context.user.fid;
         console.log('✅ User FID from context:', fid);
+
+        // Check if FID is in allowed list
+        const isAllowed = ALLOWED_FIDS.includes(fid);
+        setHasAccess(isAllowed);
+
+        if (!isAllowed) {
+          console.log('❌ User FID not in allowed list:', fid);
+          return;
+        }
+
+        console.log('✅ User FID is allowed, fetching profile...');
 
         // Fetch full profile from backend
         const response = await fetch(`/api/user/profile?fid=${fid}`);
@@ -395,6 +410,7 @@ export default function HigherSteakMenu() {
         }
       } catch (error) {
         console.log('Not in Farcaster client:', error);
+        setHasAccess(false);
       }
     };
 
@@ -435,6 +451,14 @@ export default function HigherSteakMenu() {
   // Handle simulated profile changes in development mode
   useEffect(() => {
     if (isDevelopmentMode && simulatedProfile) {
+      // Check if simulated FID is allowed
+      const isAllowed = ALLOWED_FIDS.includes(simulatedProfile.fid);
+      setHasAccess(isAllowed);
+      
+      if (!isAllowed) {
+        return;
+      }
+      
       // Set simulated user data
       setUser({
         fid: simulatedProfile.fid,
@@ -517,6 +541,15 @@ export default function HigherSteakMenu() {
     );
   }, [balance?.lockups]);
 
+  // Conditional rendering based on access
+  if (hasAccess === false) {
+    return <LandingPage />;
+  }
+
+  if (hasAccess === null) {
+    // Loading state - show nothing or minimal loading indicator
+    return null;
+  }
 
   return (
     <>
