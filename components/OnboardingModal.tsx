@@ -1048,7 +1048,7 @@ export function OnboardingModal({
             {validatingUrl ? 'Validating...' : 'Use URL'}
             <span className="absolute top-0 right-0 text-xs opacity-60 group-hover:opacity-100">ⓘ</span>
             <div className="absolute bottom-full right-0 mb-2 w-64 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-              Valid cast must begin with "{KEYPHRASE_TEXT}" and be cast by you
+              Valid cast must begin with "{KEYPHRASE_TEXT}"
             </div>
           </button>
         )}
@@ -1287,7 +1287,9 @@ export function OnboardingModal({
     return (
       <>
         <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
-          You are aiming higher!
+          {isOtherUserCast && otherUserCast.casterUsername
+            ? `@${otherUserCast.casterUsername} is aiming higher!`
+            : 'You are aiming higher!'}
         </h2>
         
         {/* Single card display with navigation arrows */}
