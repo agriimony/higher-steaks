@@ -771,6 +771,9 @@ export function SupporterModal({
                 placeholder="0.00"
                 className="w-full text-sm font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
               />
+              <div className="text-xs text-black/50 mt-1">
+                Available: {walletBalance.toFixed(2)} HIGHER
+              </div>
             </div>
             {isCaster ? (
               /* Caster: Show duration input */
