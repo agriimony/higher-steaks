@@ -982,11 +982,10 @@ export function OnboardingModal({
           Come cook with Higher!
         </h2>
         
-        <p className="mb-3 text-black text-sm">
+        <div className="text-xs text-black/60 font-mono mb-2">
           Do you have a dream? Come cook with Higher. 
-          Higher signals belief. Believe in yourself, believe in your friends. 
           Tell us what you're cooking up:
-        </p>
+        </div>
         
         <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
           <div className="text-xs text-black font-mono mb-2">
@@ -1295,10 +1294,8 @@ export function OnboardingModal({
         </h2>
 
         <div className="text-xs text-black/60 font-mono mb-2">
-          You are part of the higher network. Believe in yourself.
-          Higher signals belief.
           Stake on your dreams, and invite others to join.
-          This is what you're cooking up:
+          Believe in yourself:
         </div>
         
         {/* Single card display with navigation arrows */}
