@@ -786,7 +786,7 @@ export function OnboardingModal({
   // Handle "Ask to Stake" - opens cast composer with reply
   const handleAskToStake = useCallback(async (castHash: string) => {
     try {
-      const message = "I want to support you! Please add stake to your cast!";
+      const message = "I want to support your cooking! Please add stake to your cast!";
       const result = await sdk.actions.composeCast({
         text: message,
         parent: { type: 'cast', hash: castHash },
@@ -979,11 +979,13 @@ export function OnboardingModal({
     return (
       <>
         <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
-          Are you aiming higher today?
+          Come cook with Higher!
         </h2>
         
         <p className="mb-3 text-black text-sm">
-          Start your journey with /higher:
+          Do you have a dream? Come cook with Higher. 
+          Higher signals belief. Believe in yourself, believe in your friends. 
+          Tell us what you're cooking up:
         </p>
         
         <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
@@ -1288,9 +1290,16 @@ export function OnboardingModal({
       <>
         <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
           {isOtherUserCast && otherUserCast.casterUsername
-            ? `@${otherUserCast.casterUsername} is aiming higher!`
-            : 'You are aiming higher!'}
+            ? `${otherUserCast.casterUsername}'s cooking!`
+            : "Now you're cooking 🔥"}
         </h2>
+
+        <div className="text-xs text-black/60 font-mono mb-2">
+          You are part of the higher network. Believe in yourself.
+          Higher signals belief.
+          Stake on your dreams, and invite others to join.
+          This is what you're cooking up:
+        </div>
         
         {/* Single card display with navigation arrows */}
         <div className="mb-4 relative" style={{ overflow: 'visible' }}>
@@ -1358,14 +1367,14 @@ export function OnboardingModal({
               ) : currentCast.castState === 'expired' ? (
                 <div className="text-xs text-black/60 italic mb-2">
                   {isOtherUserNoStakes 
-                    ? 'This cast has expired. The caster needs to add stake to reactivate it.'
-                    : 'This cast is expired, add stake to rejoin the leaderboard'}
+                    ? 'This cast has expired. The caster needs to add stake to cook!'
+                    : 'This cast is expired, add stake to start cooking again!'}
                 </div>
               ) : (
                 <div className="text-xs text-black/60 mb-2">
                   {isOtherUserNoStakes
-                    ? 'This cast is valid but has no active stakes yet. The caster needs to add stake to join the leaderboard.'
-                    : 'Add stake to join the leaderboard'}
+                    ? `${otherUserCast.casterUsername} needs to add stake to start cooking!`
+                    : 'Add stake to start cooking!'}
                 </div>
               )}
             </div>
