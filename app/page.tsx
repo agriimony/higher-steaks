@@ -786,8 +786,8 @@ export default function HigherSteakMenu() {
                                                        @@@@@@@@@@@@@@@@                                               `}
               </pre>
             </div>
-            <div className="text-sm sm:text-base md:text-lg lg:text-xl mt-4 md:mt-6 opacity-70">
-              <p className="mb-1">Premium Cuts from the Higher Network</p>
+            <div className="text-xs sm:text-sm md:text-base lg:text-l mt-4 md:mt-6 opacity-70">
+              <p className="mb-1">Higher Network Menu</p>
               <div className="border-t-2 border-black/30"></div>
             </div>
           </div>
