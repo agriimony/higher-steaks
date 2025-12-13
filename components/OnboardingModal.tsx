@@ -983,8 +983,8 @@ export function OnboardingModal({
         </h2>
         
         <div className="text-xs text-black/60 font-mono mb-2">
-          Do you have a higher dream?
-          Tell us what you're cooking up:
+          <p>Ready to start working on your dream?</p>
+          <p>Tell us what you're cooking up:</p>
         </div>
         
         <div className="bg-[#f9f7f1] p-4 border border-black/20 mb-4">
