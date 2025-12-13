@@ -1236,7 +1236,7 @@ export function OnboardingModal({
         )} */}
 
         <div className="text-xs text-black/60 mb-1 font-mono italic">
-          Uses mint.club lockup contracts for token staking (<a href="https://docs.mint.club/tools/lock-ups" target="_blank" rel="noopener noreferrer" className="underline">Read more.</a>)
+          ⓘ Uses <a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">mint.club lockups</a> for staking
         </div>
 
         <div className="flex gap-3">
