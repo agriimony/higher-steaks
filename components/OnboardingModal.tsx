@@ -1013,7 +1013,7 @@ export function OnboardingModal({
         </div>
 
         <div className="text-xs text-black/60 font-mono mb-2">
-          Find a cast to support. Valid casts begin with "{KEYPHRASE_TEXT}".
+          Find a /higher cast to support. Valid casts begin with "{KEYPHRASE_TEXT}".
         </div>
 
         <div className="mb-4">
