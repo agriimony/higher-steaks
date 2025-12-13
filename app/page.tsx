@@ -787,8 +787,7 @@ export default function HigherSteakMenu() {
               </pre>
             </div>
             <div className="text-sm sm:text-base md:text-lg lg:text-xl mt-4 md:mt-6 opacity-70">
-              <p className="mb-1">Premium Cuts & Fine Dining</p>
-              <p className="text-xs sm:text-sm md:text-base lg:text-lg mb-3 md:mb-4 font-bold">Est. 2025</p>
+              <p className="mb-1">Higher Network Discovery</p>
               <div className="border-t-2 border-black/30"></div>
             </div>
           </div>
@@ -840,6 +839,7 @@ export default function HigherSteakMenu() {
 
          <div className="text-center mt-3 md:mt-4">
            <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60">Menu Changes Daily · 12PM UTC</p>
+           <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60 font-bold">Est. 2025</p>
          </div>
        </div>
 
