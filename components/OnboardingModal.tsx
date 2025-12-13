@@ -1295,7 +1295,7 @@ export function OnboardingModal({
 
         <div className="text-xs text-black/60 font-mono mb-2">
           {isOtherUserCast && otherUserCast.casterUsername
-            ? `Higher signals belief. Believe in ${otherUserCast.casterUsername}!`
+            ? "Higher signals belief. Believe in something!"
             : "Higher signals belief. Believe in yourself!"}
         </div>
         

@@ -839,7 +839,7 @@ export default function HigherSteakMenu() {
         </div>
 
          <div className="text-center mt-3 md:mt-4">
-           <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60">Menu Changes Daily · 12PM UTC</p>
+           <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60 mb-1">Menu Changes Daily · 12PM UTC</p>
            <p className="text-[0.65rem] xs:text-[0.7rem] sm:text-xs tracking-wide opacity-60 font-bold">Est. 2025</p>
          </div>
        </div>
