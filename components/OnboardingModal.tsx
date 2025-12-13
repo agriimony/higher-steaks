@@ -1235,6 +1235,10 @@ export function OnboardingModal({
           </div>
         )} */}
 
+        <div className="text-xs text-black/60 font-mono italic">
+          Uses mint.club lockup contracts for token staking (<a href="https://docs.mint.club/tools/lock-ups" target="_blank" rel="noopener noreferrer" className="underline">Read more.</a>)
+        </div>
+
         <div className="flex gap-3">
           <button
             onClick={() => {
@@ -1248,12 +1252,9 @@ export function OnboardingModal({
           >
             {isLoadingTransaction ? 'Staking...' : (
               <span className="flex items-center justify-center gap-1">
-                Stake <span className="text-sm">ⓘ</span>
+                Stake
               </span>
             )}
-            <div className="absolute bottom-full left-0 mb-2 w-72 bg-black text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-              Uses mint.club lockup contracts for secure token staking (<a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">https://mint.club/lockup/create</a>)
-            </div>
           </button>
           <button
             onClick={onCancel}
