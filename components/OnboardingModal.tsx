@@ -1236,7 +1236,7 @@ export function OnboardingModal({
         )} */}
 
         <div className="text-xs text-black/60 mb-1 font-mono italic">
-          ⓘ Uses <a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">mint.club lockups</a> for staking
+          <span className="not-italic">ⓘ</span> Uses <a href="https://mint.club/lockup/create" target="_blank" rel="noopener noreferrer" className="underline">mint.club lockups</a> for staking
         </div>
 
         <div className="flex gap-3">
