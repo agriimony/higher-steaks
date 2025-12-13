@@ -64,7 +64,7 @@ export function TransactionModal({
       case 'failure':
         return (
           <>
-            <p className="text-sm text-red-700 font-mono whitespace-pre-wrap">
+            <p className="text-xs text-red-700 font-mono whitespace-pre-wrap">
               {errorMessage || 'Something went wrong with your transaction.'}
             </p>
           </>
