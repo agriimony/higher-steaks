@@ -1013,7 +1013,7 @@ export function OnboardingModal({
         </div>
 
         <div className="text-xs text-black/60 font-mono mb-2">
-          Find a cast to add stake to. Valid casts begin with "{KEYPHRASE_TEXT}".
+          Find a cast to support. Valid casts begin with "{KEYPHRASE_TEXT}".
         </div>
 
         <div className="mb-4">
@@ -1293,14 +1293,14 @@ export function OnboardingModal({
       <>
         <h2 className="text-xl font-bold mb-4 text-black border-b-2 border-black pb-2">
           {isOtherUserCast && otherUserCast.casterUsername
-            ? `${otherUserCast.casterUsername}'s cooking!`
+            ? `Cook with ${otherUserCast.casterUsername}!`
             : "Now you're cooking 🔥"}
         </h2>
 
         <div className="text-xs text-black/60 font-mono mb-2">
           {isOtherUserCast && otherUserCast.casterUsername
-            ? `Cook with ${otherUserCast.casterUsername}!`
-            : "Stake on your dreams and invite others along:"}
+            ? `Believe in ${otherUserCast.casterUsername}? Cook with them!`
+            : "Believe in yourself. Stake on your dreams!"}
         </div>
         
         {/* Single card display with navigation arrows */}
