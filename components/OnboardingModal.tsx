@@ -983,7 +983,7 @@ export function OnboardingModal({
         </h2>
         
         <div className="text-xs text-black/60 font-mono mb-2">
-          Do you have a dream? Come cook with Higher. 
+          Do you have a higher dream?
           Tell us what you're cooking up:
         </div>
         
@@ -1010,6 +1010,10 @@ export function OnboardingModal({
           <div className="relative flex justify-center text-xs uppercase">
             <span className="bg-[#fefdfb] px-2 text-black/60">Or</span>
           </div>
+        </div>
+
+        <div className="text-xs text-black/60 font-mono mb-2">
+          Find a cast to add stake to. Valid casts begin with "{KEYPHRASE_TEXT}".
         </div>
 
         <div className="mb-4">
@@ -1294,8 +1298,7 @@ export function OnboardingModal({
         </h2>
 
         <div className="text-xs text-black/60 font-mono mb-2">
-          Stake on your dreams, and invite others to join.
-          Believe in yourself:
+          Stake on your dreams and invite others along:
         </div>
         
         {/* Single card display with navigation arrows */}
