@@ -1298,7 +1298,9 @@ export function OnboardingModal({
         </h2>
 
         <div className="text-xs text-black/60 font-mono mb-2">
-          Stake on your dreams and invite others along:
+          {isOtherUserCast && otherUserCast.casterUsername
+            ? `Cook with ${otherUserCast.casterUsername}!`
+            : "Stake on your dreams and invite others along:"}
         </div>
         
         {/* Single card display with navigation arrows */}
