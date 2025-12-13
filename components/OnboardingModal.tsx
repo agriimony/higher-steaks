@@ -1051,7 +1051,6 @@ export function OnboardingModal({
             className="relative group flex-1 px-4 py-2.5 bg-purple-600 text-white font-bold border-2 border-purple-600 hover:bg-purple-700 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {validatingUrl ? 'Validating...' : 'Use URL'}
-            <span className="absolute top-0 right-0 text-xs opacity-60 group-hover:opacity-100">ⓘ</span>
           </button>
         )}
       </div>
