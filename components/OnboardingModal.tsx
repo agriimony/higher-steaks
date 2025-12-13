@@ -1295,8 +1295,8 @@ export function OnboardingModal({
 
         <div className="text-xs text-black/60 font-mono mb-2">
           {isOtherUserCast && otherUserCast.casterUsername
-            ? `Believe in ${otherUserCast.casterUsername}? Cook with them!`
-            : "Believe in yourself. Stake on your dreams!"}
+            ? `Higher signals belief. Believe in ${otherUserCast.casterUsername}!`
+            : "Higher signals belief. Believe in yourself!"}
         </div>
         
         {/* Single card display with navigation arrows */}
