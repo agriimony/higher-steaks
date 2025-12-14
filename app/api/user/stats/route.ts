@@ -190,14 +190,13 @@ export async function GET(req: NextRequest) {
     }
 
     // Query casts where user is the creator to get stakes on their casts
-    let totalStakedOnUserCasts = 0;
-    let totalCasterStakesOnUserCasts = 0;
-    let totalSupporterStakesOnUserCasts = 0;
+    let totalStakedOnUserCasts = BigInt(0);
+    let totalCasterStakesOnUserCasts = BigInt(0);
+    let totalSupporterStakesOnUserCasts = BigInt(0);
 
     try {
       const userCastsResult = await sql`
         SELECT 
-          total_higher_staked,
           caster_stake_amounts,
           caster_stake_unlocked,
           supporter_stake_amounts,
@@ -208,34 +207,51 @@ export async function GET(req: NextRequest) {
       `;
 
       for (const row of userCastsResult.rows) {
-        // Add total staked on this cast
-        const totalStaked = parseFloat(row.total_higher_staked || '0');
-        totalStakedOnUserCasts += totalStaked;
-
         // Sum caster stakes (stakes the user made on their own casts)
+        // Amounts are stored as wei (string representation of BigInt)
         const casterAmounts = row.caster_stake_amounts || [];
         const casterUnlocked = row.caster_stake_unlocked || [];
         for (let i = 0; i < casterAmounts.length; i++) {
           if (!casterUnlocked[i]) {
-            const amount = parseFloat(String(casterAmounts[i] || '0'));
-            totalCasterStakesOnUserCasts += amount;
+            try {
+              const amountBigInt = BigInt(String(casterAmounts[i] || '0'));
+              totalCasterStakesOnUserCasts += amountBigInt;
+            } catch (e) {
+              // Skip invalid amounts
+            }
           }
         }
 
         // Sum supporter stakes (stakes others made on the user's casts)
+        // Amounts are stored as wei (string representation of BigInt)
         const supporterAmounts = row.supporter_stake_amounts || [];
         const supporterUnlocked = row.supporter_stake_unlocked || [];
         for (let i = 0; i < supporterAmounts.length; i++) {
           if (!supporterUnlocked[i]) {
-            const amount = parseFloat(String(supporterAmounts[i] || '0'));
-            totalSupporterStakesOnUserCasts += amount;
+            try {
+              const amountBigInt = BigInt(String(supporterAmounts[i] || '0'));
+              totalSupporterStakesOnUserCasts += amountBigInt;
+            } catch (e) {
+              // Skip invalid amounts
+            }
           }
         }
       }
+
+      // Calculate total from caster + supporter stakes
+      totalStakedOnUserCasts = totalCasterStakesOnUserCasts + totalSupporterStakesOnUserCasts;
     } catch (dbError: any) {
       console.error('[User Stats API] Error querying user casts:', dbError);
       // Continue with 0 values if query fails
+      totalStakedOnUserCasts = BigInt(0);
+      totalCasterStakesOnUserCasts = BigInt(0);
+      totalSupporterStakesOnUserCasts = BigInt(0);
     }
+
+    // Convert from wei (18 decimals) to token units
+    const totalStakedOnUserCastsNum = Number(totalStakedOnUserCasts) / 1e18;
+    const totalCasterStakesOnUserCastsNum = Number(totalCasterStakesOnUserCasts) / 1e18;
+    const totalSupporterStakesOnUserCastsNum = Number(totalSupporterStakesOnUserCasts) / 1e18;
 
     return NextResponse.json({
       totalUserStaked: totalUserStakedNum.toString(),
@@ -243,10 +259,10 @@ export async function GET(req: NextRequest) {
       totalSupporterStaked: totalSupporterStakedNum.toString(),
       totalBuildersSupported: supportedFidsMap.size,
       topSupportedFids,
-      // New fields for stakes on user's casts
-      totalStakedOnUserCasts: totalStakedOnUserCasts.toString(),
-      totalCasterStakesOnUserCasts: totalCasterStakesOnUserCasts.toString(),
-      totalSupporterStakesOnUserCasts: totalSupporterStakesOnUserCasts.toString(),
+      // New fields for stakes on user's casts (converted from wei to token units)
+      totalStakedOnUserCasts: totalStakedOnUserCastsNum.toString(),
+      totalCasterStakesOnUserCasts: totalCasterStakesOnUserCastsNum.toString(),
+      totalSupporterStakesOnUserCasts: totalSupporterStakesOnUserCastsNum.toString(),
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err: any) {
     console.error('[User Stats API] Error:', err);
