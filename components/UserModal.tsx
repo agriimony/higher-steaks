@@ -322,7 +322,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </div>
                   
                   <div className="flex items-center justify-between pl-3">
-                  <span className="text-xs text-black/60">On <span className="text-xs font-bold text-black">{userStats?.totalSupporters ?? 0}</span> others</span>
+                  <span className="text-xs text-black/60">By <span className="text-xs font-bold text-black">{userStats?.totalSupporters ?? 0}</span> others</span>
                     <div className="flex items-center gap-1.5">
                       <img 
                         src="/higher-logo.png" 
