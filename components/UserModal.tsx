@@ -100,7 +100,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   const fetchNotificationStatus = async () => {
     try {
       // First check if miniapp is added via Neynar context
-      if (context?.added && context?.notificationDetails) {
+      if (context && (context as any).added && (context as any).notificationDetails) {
         setNotificationsEnabled(true);
         return;
       }
@@ -131,7 +131,8 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         const result = await addMiniApp();
         
         if (result && 'added' in result && result.added) {
-          if (result.notificationDetails) {
+          const notificationDetails = (result as any).notificationDetails;
+          if (notificationDetails) {
             // Mini app was added and notifications were enabled
             console.log('[UserModal] Mini app added with notifications enabled');
             setNotificationsEnabled(true);
@@ -544,7 +545,8 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   
                   if (result && 'added' in result && result.added) {
                     setShowNotificationPrompt(false);
-                    if (result.notificationDetails) {
+                    const notificationDetails = (result as any).notificationDetails;
+                    if (notificationDetails) {
                       setNotificationsEnabled(true);
                     } else {
                       // Wait for webhook to process
