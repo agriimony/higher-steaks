@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     // Query Neynar API for notification token
     // Reference: https://docs.neynar.com/reference/fetch-notification-tokens
     const response = await neynar.fetchNotificationTokens({
-      fids: [fid.toString()],
+      fids: [fid],
       limit: 1,
     });
     

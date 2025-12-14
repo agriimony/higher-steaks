@@ -86,7 +86,7 @@ async function getNotificationToken(fid: number): Promise<{ token: string; url: 
     // Query Neynar API for notification tokens
     // Reference: https://docs.neynar.com/reference/fetch-notification-tokens
     const response = await neynar.fetchNotificationTokens({
-      fids: [fid.toString()],
+      fids: [fid],
       limit: 1,
     });
     
