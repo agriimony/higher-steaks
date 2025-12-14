@@ -382,6 +382,20 @@ export function SupporterModal({
         onLockSuccess?.(createLockUpHash, castHash);
       }
       onStakeSuccess?.();
+
+      // Trigger supporter notification (only for supporter stakes on other users' casts)
+      if (userFid && castData && castData.fid !== userFid && metadata) {
+        fetch('/api/notifications/send-supporter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            castHash,
+            supporterFid: userFid,
+            amount: metadata.amount,
+            txHash: createLockUpHash,
+          }),
+        }).catch(err => console.error('[SupporterModal] Failed to send supporter notification:', err));
+      }
     }
   }, [isCreateLockUpSuccess, createLockUpHash, onStakeSuccess, onLockSuccess, castHash]);
 

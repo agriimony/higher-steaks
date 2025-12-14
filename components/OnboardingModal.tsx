@@ -481,6 +481,20 @@ export function OnboardingModal({
         onLockSuccess?.(createLockUpHash, castHashForCallback);
       }
       onStakeSuccess?.();
+
+      // Trigger supporter notification (only for supporter stakes on other users' casts)
+      if (castHashForCallback && otherUserCast && otherUserCast.casterFid !== userFid && metadata) {
+        fetch('/api/notifications/send-supporter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            castHash: castHashForCallback,
+            supporterFid: userFid,
+            amount: metadata.amount,
+            txHash: createLockUpHash,
+          }),
+        }).catch(err => console.error('[OnboardingModal] Failed to send supporter notification:', err));
+      }
     }
   }, [
     isCreateLockUpSuccess,

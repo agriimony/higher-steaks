@@ -85,6 +85,7 @@ export default function HigherSteakMenu() {
   const [balance, setBalance] = useState<TokenBalance | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
   const [balanceError, setBalanceError] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
   const [duneStakedData, setDuneStakedData] = useState<{
     totalStaked: string;
     lockups: LockupDetail[];
@@ -448,6 +449,21 @@ export default function HigherSteakMenu() {
     fetchLeaderboard();
   }, []);
 
+  // Fetch notification status when user changes
+  useEffect(() => {
+    if (user?.fid) {
+      fetch(`/api/user/notifications/status?fid=${user.fid}`)
+        .then(res => res.json())
+        .then(data => setNotificationsEnabled(data.enabled || false))
+        .catch(err => {
+          console.error('[page] Error fetching notification status:', err);
+          setNotificationsEnabled(false);
+        });
+    } else {
+      setNotificationsEnabled(null);
+    }
+  }, [user?.fid]);
+
   // Handle simulated profile changes in development mode
   useEffect(() => {
     if (isDevelopmentMode && simulatedProfile) {
@@ -732,6 +748,11 @@ export default function HigherSteakMenu() {
                   <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800">
                     @{user.username}
                   </span>
+                  {notificationsEnabled !== null && (
+                    <span className="text-[0.65rem] sm:text-xs text-gray-600" title={notificationsEnabled ? 'Notifications enabled' : 'Notifications disabled'}>
+                      {notificationsEnabled ? '🔔' : '🔕'}
+                    </span>
+                  )}
                 </>
               ) : (
                 <>

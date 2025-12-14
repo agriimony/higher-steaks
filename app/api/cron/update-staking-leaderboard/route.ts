@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { syncLockupsFromDune } from '@/lib/indexers/lockupsFromDune';
+import { checkAndSendExpiredStakeNotifications } from '@/lib/services/notification-service';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,9 +26,15 @@ export async function GET(request: NextRequest) {
 
     console.log('=== Staking leaderboard updated successfully (Dune) ===', { castsUpserted });
 
+    // Check for expired stakes and send notifications
+    console.log('=== Checking for expired stakes and sending notifications ===');
+    const notificationsSent = await checkAndSendExpiredStakeNotifications();
+    console.log('=== Expired stake notifications sent ===', { notificationsSent });
+
     return NextResponse.json({
       success: true,
       castsUpserted,
+      notificationsSent,
       timestamp: new Date().toISOString(),
     });
     

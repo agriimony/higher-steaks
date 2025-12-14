@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { sdk } from '@farcaster/miniapp-sdk';
 
 interface UserModalProps {
   onClose: () => void;
@@ -54,6 +55,9 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -88,7 +92,60 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
     };
 
     fetchStats();
+    fetchNotificationStatus();
   }, [userFid]);
+
+  const fetchNotificationStatus = async () => {
+    try {
+      const response = await fetch(`/api/user/notifications/status?fid=${userFid}`);
+      if (response.ok) {
+        const data = await response.json();
+        setNotificationsEnabled(data.enabled || false);
+      }
+    } catch (err) {
+      console.error('[UserModal] Error fetching notification status:', err);
+      setNotificationsEnabled(false);
+    }
+  };
+
+  const handleNotificationToggle = async (enabled: boolean) => {
+    setLoadingNotifications(true);
+    try {
+      if (enabled) {
+        // Check if miniapp is added first
+        try {
+          await sdk.actions.addMiniApp();
+          // After adding miniapp, wait a bit for webhook to process
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (err: any) {
+          // If user cancels or error, show prompt
+          if (err?.message?.includes('cancelled') || err?.message?.includes('rejected')) {
+            setShowNotificationPrompt(true);
+            setLoadingNotifications(false);
+            return;
+          }
+          console.error('[UserModal] Error adding miniapp:', err);
+        }
+      }
+
+      // Update notification status
+      const response = await fetch('/api/user/notifications/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fid: userFid, enabled }),
+      });
+
+      if (response.ok) {
+        setNotificationsEnabled(enabled);
+        // Refresh status to get actual state from Neynar
+        await fetchNotificationStatus();
+      }
+    } catch (err) {
+      console.error('[UserModal] Error toggling notifications:', err);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
 
   // Handle escape key to close
   useEffect(() => {
@@ -393,10 +450,91 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </div>
                 </div>
               )}
+
+              {/* Notifications Toggle */}
+              <div className="mt-3 pt-3 border-t border-black/20">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-black">Notifications</span>
+                    {notificationsEnabled === null ? (
+                      <span className="text-xs text-black/40">Loading...</span>
+                    ) : notificationsEnabled ? (
+                      <span className="text-xs text-green-600">On</span>
+                    ) : (
+                      <span className="text-xs text-black/40">Off</span>
+                    )}
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={notificationsEnabled === true}
+                      onChange={(e) => handleNotificationToggle(e.target.checked)}
+                      disabled={loadingNotifications || notificationsEnabled === null}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
+                  </label>
+                </div>
+                <p className="text-xs text-black/60 mt-1">
+                  Get notified when your stakes expire or supporters add stakes to your casts
+                </p>
+              </div>
             </div>
           </>
         )}
       </div>
+
+      {/* Notification Prompt Modal */}
+      {showNotificationPrompt && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
+          <div 
+            className="bg-[#fefdfb] border-2 border-black rounded-none p-4 max-w-md w-full relative font-mono"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowNotificationPrompt(false)}
+              className="absolute top-2 right-2 text-black/40 hover:text-black transition"
+              aria-label="Close"
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+            <h3 className="text-base font-bold mb-2 text-black">
+              Add Mini App Required
+            </h3>
+            <p className="text-xs text-black/70 mb-4">
+              To enable notifications, you need to add the Higher Steaks mini app to your Farcaster client first.
+            </p>
+            <button
+              onClick={async () => {
+                try {
+                  await sdk.actions.addMiniApp();
+                  setShowNotificationPrompt(false);
+                  // Retry enabling notifications
+                  await handleNotificationToggle(true);
+                } catch (err) {
+                  console.error('[UserModal] Error adding miniapp:', err);
+                }
+              }}
+              className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition"
+            >
+              Add Mini App
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
