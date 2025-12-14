@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useMiniApp } from '@neynar/react';
+import { sdk } from '@farcaster/miniapp-sdk';
 
 interface UserModalProps {
   onClose: () => void;
@@ -51,8 +51,6 @@ function formatTokenAmount(amount: string): string {
 }
 
 export function UserModal({ onClose, userFid }: UserModalProps) {
-  // @ts-ignore - Neynar React types may not be fully up to date
-  const { isSDKLoaded, addMiniApp, context } = useMiniApp() || {};
   const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,13 +97,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
 
   const fetchNotificationStatus = async () => {
     try {
-      // First check if miniapp is added via Neynar context
-      if (context && (context as any).added && (context as any).notificationDetails) {
-        setNotificationsEnabled(true);
-        return;
-      }
-      
-      // Fallback to API check
+      // Query our API endpoint which checks our database
       const response = await fetch(`/api/user/notifications/status?fid=${userFid}`);
       if (response.ok) {
         const data = await response.json();
@@ -118,41 +110,48 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   };
 
   const handleNotificationToggle = async (enabled: boolean) => {
-    if (!isSDKLoaded || !addMiniApp) {
-      console.warn('[UserModal] SDK not loaded yet or addMiniApp not available');
-      return;
-    }
-
     setLoadingNotifications(true);
     try {
       if (enabled) {
-        // Use Neynar's addMiniApp hook - this will trigger webhook events
-        // that Neynar uses to manage notification tokens
-        const result = await addMiniApp();
-        
-        if (result && 'added' in result && result.added) {
-          const notificationDetails = (result as any).notificationDetails;
-          if (notificationDetails) {
-            // Mini app was added and notifications were enabled
-            console.log('[UserModal] Mini app added with notifications enabled');
-            setNotificationsEnabled(true);
-          } else {
-            // Mini app was added but notifications not enabled yet
-            // Wait a bit for webhook to process, then refresh
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            await fetchNotificationStatus();
+        // Use Farcaster SDK's addMiniApp - this will trigger webhook events
+        // that our webhook endpoint will use to store notification tokens
+        try {
+          const result = await sdk.actions.addMiniApp();
+          
+          if (result && 'added' in result && result.added) {
+            const notificationDetails = (result as any).notificationDetails;
+            if (notificationDetails) {
+              // Mini app was added and notifications were enabled
+              console.log('[UserModal] Mini app added with notifications enabled');
+              // Wait a bit for webhook to process, then refresh
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              await fetchNotificationStatus();
+            } else {
+              // Mini app was added but notifications not enabled yet
+              // Wait a bit for webhook to process, then refresh
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              await fetchNotificationStatus();
+            }
+          } else if (result && 'added' in result && !result.added) {
+            // User rejected or invalid manifest
+            if ('reason' in result && result.reason === 'rejected_by_user') {
+              setShowNotificationPrompt(true);
+            } else {
+              console.error('[UserModal] Failed to add miniapp:', (result as any).reason);
+            }
           }
-        } else if (result && 'added' in result && !result.added) {
-          // User rejected or invalid manifest
-          if ('reason' in result && result.reason === 'rejected_by_user') {
+        } catch (err: any) {
+          // If user cancels or rejects, show prompt
+          if (err?.message?.includes('cancelled') || err?.message?.includes('rejected') || err?.message?.includes('User rejected')) {
             setShowNotificationPrompt(true);
-          } else {
-            console.error('[UserModal] Failed to add miniapp:', (result as any).reason);
+            setLoadingNotifications(false);
+            return;
           }
+          console.error('[UserModal] Error adding miniapp:', err);
         }
       } else {
         // For disabling, we can't directly disable via SDK
-        // Neynar handles this through the client UI or webhook events
+        // Farcaster client handles this through the UI, which triggers webhook events
         // Just refresh status to reflect current state
         await fetchNotificationStatus();
       }
@@ -535,19 +534,16 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
             </p>
             <button
               onClick={async () => {
-                if (!isSDKLoaded || !addMiniApp) {
-                  console.warn('[UserModal] SDK not loaded yet or addMiniApp not available');
-                  return;
-                }
-
                 try {
-                  const result = await addMiniApp();
+                  const result = await sdk.actions.addMiniApp();
                   
                   if (result && 'added' in result && result.added) {
                     setShowNotificationPrompt(false);
                     const notificationDetails = (result as any).notificationDetails;
                     if (notificationDetails) {
-                      setNotificationsEnabled(true);
+                      // Wait for webhook to process
+                      await new Promise(resolve => setTimeout(resolve, 1500));
+                      await fetchNotificationStatus();
                     } else {
                       // Wait for webhook to process
                       await new Promise(resolve => setTimeout(resolve, 1500));
@@ -561,8 +557,13 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                       console.error('[UserModal] Failed to add miniapp:', (result as any).reason);
                     }
                   }
-                } catch (err) {
-                  console.error('[UserModal] Error adding miniapp:', err);
+                } catch (err: any) {
+                  if (err?.message?.includes('cancelled') || err?.message?.includes('rejected') || err?.message?.includes('User rejected')) {
+                    // User cancelled, just close the prompt
+                    setShowNotificationPrompt(false);
+                  } else {
+                    console.error('[UserModal] Error adding miniapp:', err);
+                  }
                 }
               }}
               className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition"

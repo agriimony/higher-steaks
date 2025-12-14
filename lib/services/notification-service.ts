@@ -1,4 +1,3 @@
-import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { sql } from '@vercel/postgres';
 
 // Format token amount with K/M/B suffixes (same as UserModal)
@@ -72,32 +71,25 @@ async function markNotificationSent(
   }
 }
 
-// Get notification token from Neynar API
+// Get notification token from database (stored via webhook events)
 async function getNotificationToken(fid: number): Promise<{ token: string; url: string } | null> {
   try {
-    const apiKey = process.env.NEYNAR_API_KEY;
-    if (!apiKey) {
-      console.error('[notification-service] NEYNAR_API_KEY not configured');
+    // Query database for enabled notification token
+    const result = await sql`
+      SELECT token, notification_url 
+      FROM notification_tokens 
+      WHERE fid = ${fid} AND enabled = true 
+      LIMIT 1
+    `;
+    
+    if (result.rows.length === 0) {
       return null;
     }
 
-    const neynar = new NeynarAPIClient({ apiKey });
-    
-    // Query Neynar API for notification tokens
-    // Reference: https://docs.neynar.com/reference/fetch-notification-tokens
-    const response = await neynar.fetchNotificationTokens({
-      fids: [fid],
-      limit: 1,
-    });
-    
-    const tokenData = response.notification_tokens?.[0];
-    if (!tokenData || tokenData.status !== 'enabled' || !tokenData.token || !tokenData.url) {
-      return null;
-    }
-
+    const row = result.rows[0];
     return {
-      token: tokenData.token,
-      url: tokenData.url,
+      token: row.token,
+      url: row.notification_url,
     };
   } catch (err) {
     console.error('[notification-service] Error getting notification token:', err);
@@ -105,7 +97,7 @@ async function getNotificationToken(fid: number): Promise<{ token: string; url: 
   }
 }
 
-// Send notification via Neynar API
+// Send notification via Farcaster notification URL
 async function sendNotification(
   fid: number,
   title: string,
@@ -113,27 +105,59 @@ async function sendNotification(
   targetUrl: string
 ): Promise<boolean> {
   try {
-    const apiKey = process.env.NEYNAR_API_KEY;
-    if (!apiKey) {
-      console.error('[notification-service] NEYNAR_API_KEY not configured');
+    // Get token from database
+    const tokenData = await getNotificationToken(fid);
+    if (!tokenData) {
+      console.log(`[notification-service] No notification token for FID ${fid}`);
       return false;
     }
 
-    const neynar = new NeynarAPIClient({ apiKey });
+    // Send to Farcaster notification URL
+    // Reference: https://miniapps.farcaster.xyz/docs/guides/notifications
+    const notificationId = `higher-steaks-${Date.now()}-${fid}`;
     
-    // Send notification via Neynar API
-    // Reference: https://docs.neynar.com/reference/publish-frame-notifications
-    // We can target specific FIDs directly
-    await neynar.publishFrameNotifications({
-      targetFids: [fid],
-      notification: {
+    const response = await fetch(tokenData.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        notificationId,
         title,
         body,
-        target_url: targetUrl,
-      },
+        targetUrl,
+        tokens: [tokenData.token],
+      }),
     });
 
-    return true;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[notification-service] Failed to send notification: ${response.status} ${errorText}`);
+      
+      // Handle invalid tokens - remove from database
+      if (response.status === 400 || response.status === 401) {
+        await sql`
+          UPDATE notification_tokens
+          SET enabled = false, updated_at = NOW()
+          WHERE fid = ${fid} AND token = ${tokenData.token}
+        `;
+      }
+      
+      return false;
+    }
+
+    const result = await response.json();
+    
+    // Handle response: remove invalid tokens, track rate-limited tokens
+    if (result.invalidTokens && result.invalidTokens.length > 0) {
+      for (const invalidToken of result.invalidTokens) {
+        await sql`
+          UPDATE notification_tokens
+          SET enabled = false, updated_at = NOW()
+          WHERE fid = ${fid} AND token = ${invalidToken}
+        `;
+      }
+    }
+
+    return result.successfulTokens && result.successfulTokens.length > 0;
   } catch (err) {
     console.error('[notification-service] Error sending notification:', err);
     return false;

@@ -1,9 +1,8 @@
 'use client';
 
-import { MiniAppProvider as NeynarMiniAppProvider } from '@neynar/react';
-
 export function MiniAppProvider({ children }: { children: React.ReactNode }) {
-  // Use Neynar's MiniAppProvider for notification support
-  return <NeynarMiniAppProvider>{children}</NeynarMiniAppProvider>;
+  // MiniAppProvider just wraps children
+  // ready() is called in the page component after content loads
+  return <>{children}</>;
 }
 

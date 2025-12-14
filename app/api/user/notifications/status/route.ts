@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { NeynarAPIClient } from '@neynar/nodejs-sdk';
+import { sql } from '@vercel/postgres';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,25 +24,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.NEYNAR_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: 'NEYNAR_API_KEY not configured' },
-        { status: 500 }
-      );
-    }
-
-    const neynar = new NeynarAPIClient({ apiKey });
+    // Query database for enabled notification token
+    const result = await sql`
+      SELECT enabled FROM notification_tokens 
+      WHERE fid = ${fid} AND enabled = true 
+      LIMIT 1
+    `;
     
-    // Query Neynar API for notification token
-    // Reference: https://docs.neynar.com/reference/fetch-notification-tokens
-    const response = await neynar.fetchNotificationTokens({
-      fids: [fid],
-      limit: 1,
-    });
-    
-    const tokenData = response.notification_tokens?.[0];
-    const enabled = tokenData?.status === 'enabled';
+    const enabled = result.rows.length > 0;
 
     return NextResponse.json({ enabled });
   } catch (err: any) {
@@ -66,13 +55,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Note: Actual token storage/enabling is handled by Neynar via webhook events
+    // Note: Actual token storage/enabling is handled by webhook events
     // This endpoint just returns success - the user must add the miniapp first
-    // which will trigger the webhook event that stores the token in Neynar
+    // which will trigger the webhook event that stores the token in our database
     
     return NextResponse.json({ 
       success: true,
-      message: 'Notification preference updated. Token management is handled by Neynar.',
+      message: 'Notification preference updated. Token management is handled via webhook events.',
     });
   } catch (err: any) {
     console.error('[notifications/status] Error:', err);
