@@ -14,7 +14,7 @@
     "subtitle": "The Higher Steakhaus",
     "description": "Come see what the higher network is cooking",
     "primaryCategory": "social",
-    "webhookUrl": "https://api.neynar.com/f/app/e9eb3ce8-2dd2-4fa7-869f-c895403cb76f/event",
+    "webhookUrl": "https://higher-steaks.vercel.app/api/webhooks/notifications",
     "tags": ["higher", "network", "discovery", "staking", "interface"]
   }
 }
