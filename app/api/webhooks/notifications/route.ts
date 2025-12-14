@@ -13,15 +13,30 @@ export async function POST(request: NextRequest) {
   try {
     // Read the raw request body as text for verification
     const requestText = await request.text();
+    console.log('[webhooks/notifications] Raw request body:', requestText);
+    
     const requestJson = JSON.parse(requestText);
+    console.log('[webhooks/notifications] Parsed request JSON:', JSON.stringify(requestJson, null, 2));
+    console.log('[webhooks/notifications] Request JSON keys:', Object.keys(requestJson));
+    console.log('[webhooks/notifications] requestJson.event:', requestJson.event);
+    console.log('[webhooks/notifications] requestJson.notificationDetails:', requestJson.notificationDetails);
 
     // Verify and parse the webhook event
     // This extracts the fid from the signature and validates the event
     let parsedData;
     try {
       parsedData = await parseWebhookEvent(requestJson, verifyAppKeyWithNeynar);
+      console.log('[webhooks/notifications] Parsed data:', JSON.stringify(parsedData, null, 2));
+      console.log('[webhooks/notifications] Parsed data keys:', Object.keys(parsedData));
+      console.log('[webhooks/notifications] parsedData.fid:', parsedData.fid);
+      console.log('[webhooks/notifications] parsedData.event:', (parsedData as any).event);
     } catch (e: unknown) {
       const error = e as ParseWebhookEvent.ErrorType;
+      console.error('[webhooks/notifications] Verification error details:', {
+        name: error.name,
+        message: (error as any).message,
+        error: JSON.stringify(error, null, 2),
+      });
       
       switch (error.name) {
         case 'VerifyJsonFarcasterSignature.InvalidDataError':
@@ -58,10 +73,26 @@ export async function POST(request: NextRequest) {
     // Extract data from verified event
     // The parsedData contains the verified fid, and we can safely read event data from the original request
     const fid = parsedData.fid;
-    const eventType = requestJson.event as string;
-    const notificationDetails = requestJson.notificationDetails as { url: string; token: string } | undefined;
+    
+    // Try multiple possible paths for event data
+    const eventType = requestJson.event 
+      || (requestJson as any).event?.event 
+      || (parsedData as any).event 
+      || (parsedData as any).event?.event;
+    
+    const notificationDetails = requestJson.notificationDetails 
+      || (requestJson as any).event?.notificationDetails
+      || (parsedData as any).notificationDetails
+      || (parsedData as any).event?.notificationDetails;
 
-    console.log('[webhooks/notifications] Verified event:', eventType, { fid, hasNotificationDetails: !!notificationDetails });
+    console.log('[webhooks/notifications] Extracted values:', {
+      fid,
+      eventType,
+      notificationDetails,
+      'requestJson.event': requestJson.event,
+      'requestJson.notificationDetails': requestJson.notificationDetails,
+      'parsedData keys': Object.keys(parsedData),
+    });
 
     if (!fid) {
       console.warn('[webhooks/notifications] Missing fid in verified event');
