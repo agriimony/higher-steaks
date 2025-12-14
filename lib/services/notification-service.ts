@@ -91,7 +91,7 @@ async function getNotificationToken(fid: number): Promise<{ token: string; url: 
     });
     
     const tokenData = response.notification_tokens?.[0];
-    if (!tokenData || tokenData.status !== 'enabled') {
+    if (!tokenData || tokenData.status !== 'enabled' || !tokenData.token || !tokenData.url) {
       return null;
     }
 
