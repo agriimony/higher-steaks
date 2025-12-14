@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@farcaster/miniapp-node": "^0.1.11",
     "@farcaster/miniapp-sdk": "^0.2.1",
     "@farcaster/miniapp-wagmi-connector": "^1.1.0",
     "@neynar/nodejs-sdk": "^3.34.0",
