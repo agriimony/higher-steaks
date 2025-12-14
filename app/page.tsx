@@ -492,6 +492,11 @@ export default function HigherSteakMenu() {
 
   // Handle balance pill click
   const handleBalancePillClick = () => {
+    // Close UserModal if it's open
+    if (showUserModal) {
+      setShowUserModal(false);
+      return;
+    }
     if (user?.fid) {
       fetchTokenBalance(user.fid);
       setShowStakingModal(true);
@@ -504,6 +509,11 @@ export default function HigherSteakMenu() {
   };
 
   const handleFabClick = () => {
+    // Close UserModal if it's open
+    if (showUserModal) {
+      setShowUserModal(false);
+      return;
+    }
     // Close any other open modals first
     setShowStakingModal(false);
     // Then open onboarding modal
