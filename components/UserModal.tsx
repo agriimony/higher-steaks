@@ -107,7 +107,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
       onClick={onClose}
     >
       <div 
-        className="bg-[#fefdfb] border-2 border-black rounded-none p-6 max-w-2xl w-full relative font-mono shadow-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-[#fefdfb] border-2 border-black rounded-none p-4 max-w-2xl w-full relative font-mono shadow-2xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
         style={{
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.5), 0 10px 25px rgba(0, 0, 0, 0.3)'
@@ -115,13 +115,13 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
       >
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-black/40 hover:text-black transition"
+          className="absolute top-2 right-2 text-black/40 hover:text-black transition"
           aria-label="Close"
         >
           <svg 
             xmlns="http://www.w3.org/2000/svg" 
-            width="20" 
-            height="20" 
+            width="18" 
+            height="18" 
             viewBox="0 0 24 24" 
             fill="none" 
             stroke="currentColor" 
@@ -134,7 +134,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
           </svg>
         </button>
 
-        <h2 className="text-xl font-bold mb-6 text-black border-b-2 border-black pb-2">
+        <h2 className="text-lg font-bold mb-3 text-black border-b-2 border-black pb-1.5">
           Stats
         </h2>
 
@@ -158,36 +158,36 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         ) : (
           <>
             {/* Network Stats Section */}
-            <div className="mb-8 pb-6 border-b-2 border-black">
-              <h3 className="text-lg font-bold mb-4 text-black">
+            <div className="mb-4 pb-3 border-b-2 border-black">
+              <h3 className="text-base font-bold mb-2 text-black">
                 Network Stats
               </h3>
               
-              <div className="space-y-3">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-black/70">Total HIGHER Staked</span>
-                  <div className="flex items-center gap-2">
+                  <span className="text-xs text-black/70">Total HIGHER Staked</span>
+                  <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
                       alt="HIGHER" 
-                      className="w-4 h-4 rounded-full"
+                      className="w-3 h-3 rounded-full"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
-                    <span className="text-sm font-bold text-black">
+                    <span className="text-xs font-bold text-black">
                       {networkStats ? formatTokenAmount(networkStats.totalHigherStaked) : '0.00'}
                     </span>
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between pl-4">
+                <div className="flex items-center justify-between pl-3">
                   <span className="text-xs text-black/60">Caster Stakes</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
                       alt="HIGHER" 
-                      className="w-3 h-3 rounded-full"
+                      className="w-2.5 h-2.5 rounded-full"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -198,13 +198,13 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between pl-4">
+                <div className="flex items-center justify-between pl-3">
                   <span className="text-xs text-black/60">Supporter Stakes</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
                       alt="HIGHER" 
-                      className="w-3 h-3 rounded-full"
+                      className="w-2.5 h-2.5 rounded-full"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -215,9 +215,9 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-black/20">
-                  <span className="text-sm text-black/70">Total Casts with Active Stakes</span>
-                  <span className="text-sm font-bold text-black">
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/20">
+                  <span className="text-xs text-black/70">Total Casts with Active Stakes</span>
+                  <span className="text-xs font-bold text-black">
                     {networkStats?.totalCastsStakedOn ?? 0}
                   </span>
                 </div>
@@ -226,35 +226,35 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
 
             {/* User Stats Section */}
             <div>
-              <h3 className="text-lg font-bold mb-4 text-black">
+              <h3 className="text-base font-bold mb-2 text-black">
                 Your Stats
               </h3>
               
-              <div className="space-y-3 mb-6">
+              <div className="space-y-1.5 mb-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-black/70">Total HIGHER Staked</span>
-                  <div className="flex items-center gap-2">
+                  <span className="text-xs text-black/70">Total HIGHER Staked</span>
+                  <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
                       alt="HIGHER" 
-                      className="w-4 h-4 rounded-full"
+                      className="w-3 h-3 rounded-full"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
-                    <span className="text-sm font-bold text-black">
+                    <span className="text-xs font-bold text-black">
                       {userStats ? formatTokenAmount(userStats.totalUserStaked) : '0.00'}
                     </span>
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between pl-4">
+                <div className="flex items-center justify-between pl-3">
                   <span className="text-xs text-black/60">Caster Stakes</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
                       alt="HIGHER" 
-                      className="w-3 h-3 rounded-full"
+                      className="w-2.5 h-2.5 rounded-full"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -265,13 +265,13 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between pl-4">
+                <div className="flex items-center justify-between pl-3">
                   <span className="text-xs text-black/60">Supporter Stakes</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
                       alt="HIGHER" 
-                      className="w-3 h-3 rounded-full"
+                      className="w-2.5 h-2.5 rounded-full"
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none';
                       }}
@@ -282,44 +282,44 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-black/20">
-                  <span className="text-sm text-black/70">Higher Builders Supported</span>
-                  <span className="text-sm font-bold text-black">
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/20">
+                  <span className="text-xs text-black/70">Higher Builders Supported</span>
+                  <span className="text-xs font-bold text-black">
                     {userStats?.totalBuildersSupported ?? 0}
                   </span>
                 </div>
               </div>
 
               {/* Stakes on User's Casts Section */}
-              <div className="mt-6 pt-6 border-t border-black/20">
-                <h4 className="text-sm font-bold mb-3 text-black">
+              <div className="mt-3 pt-3 border-t border-black/20">
+                <h4 className="text-xs font-bold mb-2 text-black">
                   Staked on Your Casts
                 </h4>
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-black/70">Total HIGHER Staked</span>
-                    <div className="flex items-center gap-2">
+                    <span className="text-xs text-black/70">Total HIGHER Staked</span>
+                    <div className="flex items-center gap-1.5">
                       <img 
                         src="/higher-logo.png" 
                         alt="HIGHER" 
-                        className="w-4 h-4 rounded-full"
+                        className="w-3 h-3 rounded-full"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
                       />
-                      <span className="text-sm font-bold text-black">
+                      <span className="text-xs font-bold text-black">
                         {userStats?.totalStakedOnUserCasts ? formatTokenAmount(userStats.totalStakedOnUserCasts) : '0.00'}
                       </span>
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between pl-4">
+                  <div className="flex items-center justify-between pl-3">
                     <span className="text-xs text-black/60">Caster Stakes</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <img 
                         src="/higher-logo.png" 
                         alt="HIGHER" 
-                        className="w-3 h-3 rounded-full"
+                        className="w-2.5 h-2.5 rounded-full"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
@@ -330,13 +330,13 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                     </div>
                   </div>
                   
-                  <div className="flex items-center justify-between pl-4">
+                  <div className="flex items-center justify-between pl-3">
                     <span className="text-xs text-black/60">Supporter Stakes</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       <img 
                         src="/higher-logo.png" 
                         alt="HIGHER" 
-                        className="w-3 h-3 rounded-full"
+                        className="w-2.5 h-2.5 rounded-full"
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
@@ -351,24 +351,24 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
 
               {/* Top Supported FIDs */}
               {userStats && userStats.topSupportedFids.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-black/20">
-                  <h4 className="text-sm font-bold mb-3 text-black">
+                <div className="mt-3 pt-3 border-t border-black/20">
+                  <h4 className="text-xs font-bold mb-2 text-black">
                     Top Supported Builders
                   </h4>
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                     {userStats.topSupportedFids.map((builder) => (
                       <a
                         key={builder.fid}
                         href={`https://farcaster.xyz/${builder.username}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-2 hover:bg-gray-50 transition-colors rounded"
+                        className="flex items-center gap-2 p-1.5 hover:bg-gray-50 transition-colors rounded"
                       >
                         {builder.pfpUrl && (
                           <img 
                             src={builder.pfpUrl} 
                             alt={builder.username}
-                            className="w-8 h-8 rounded-full border border-black/20"
+                            className="w-6 h-6 rounded-full border border-black/20"
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
                             }}
@@ -388,7 +388,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                           <img 
                             src="/higher-logo.png" 
                             alt="HIGHER" 
-                            className="w-3 h-3 rounded-full"
+                            className="w-2.5 h-2.5 rounded-full"
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
                             }}
