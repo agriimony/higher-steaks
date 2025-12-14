@@ -74,22 +74,39 @@ export async function POST(request: NextRequest) {
     // The parsedData contains the verified fid, and we can safely read event data from the original request
     const fid = parsedData.fid;
     
-    // Try multiple possible paths for event data
-    const eventType = requestJson.event 
-      || (requestJson as any).event?.event 
-      || (parsedData as any).event 
-      || (parsedData as any).event?.event;
+    // Extract event type - handle both string and object formats
+    let eventType: string | undefined;
+    if (typeof requestJson.event === 'string') {
+      eventType = requestJson.event;
+    } else if (requestJson.event && typeof requestJson.event === 'object' && 'event' in requestJson.event) {
+      eventType = (requestJson.event as any).event;
+    } else if ((parsedData as any).event) {
+      if (typeof (parsedData as any).event === 'string') {
+        eventType = (parsedData as any).event;
+      } else if (typeof (parsedData as any).event === 'object' && 'event' in (parsedData as any).event) {
+        eventType = (parsedData as any).event.event;
+      }
+    }
     
-    const notificationDetails = requestJson.notificationDetails 
-      || (requestJson as any).event?.notificationDetails
-      || (parsedData as any).notificationDetails
-      || (parsedData as any).event?.notificationDetails;
+    // Extract notification details - handle multiple possible paths
+    let notificationDetails: { url: string; token: string } | undefined;
+    if (requestJson.notificationDetails) {
+      notificationDetails = requestJson.notificationDetails;
+    } else if (requestJson.event && typeof requestJson.event === 'object' && 'notificationDetails' in requestJson.event) {
+      notificationDetails = (requestJson.event as any).notificationDetails;
+    } else if ((parsedData as any).notificationDetails) {
+      notificationDetails = (parsedData as any).notificationDetails;
+    } else if ((parsedData as any).event && typeof (parsedData as any).event === 'object' && 'notificationDetails' in (parsedData as any).event) {
+      notificationDetails = (parsedData as any).event.notificationDetails;
+    }
 
     console.log('[webhooks/notifications] Extracted values:', {
       fid,
       eventType,
+      'eventType type': typeof eventType,
       notificationDetails,
       'requestJson.event': requestJson.event,
+      'requestJson.event type': typeof requestJson.event,
       'requestJson.notificationDetails': requestJson.notificationDetails,
       'parsedData keys': Object.keys(parsedData),
     });
