@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
+import { sql } from '@vercel/postgres';
 import { fetchAllLatestResults } from '@/lib/dune';
 import { getHigherCast } from '@/lib/services/db-service';
 import { buildInFilter, normalizeAddr, normalizeHash, convertAmount } from '../stakes/utils';
@@ -38,6 +39,9 @@ export async function GET(req: NextRequest) {
         totalSupporterStaked: '0',
         totalBuildersSupported: 0,
         topSupportedFids: [],
+        totalStakedOnUserCasts: '0',
+        totalCasterStakesOnUserCasts: '0',
+        totalSupporterStakesOnUserCasts: '0',
       });
     }
     const walletsSet = new Set<string>();
@@ -53,6 +57,9 @@ export async function GET(req: NextRequest) {
         totalSupporterStaked: '0',
         totalBuildersSupported: 0,
         topSupportedFids: [],
+        totalStakedOnUserCasts: '0',
+        totalCasterStakesOnUserCasts: '0',
+        totalSupporterStakesOnUserCasts: '0',
       });
     }
 
@@ -182,12 +189,64 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // Query casts where user is the creator to get stakes on their casts
+    let totalStakedOnUserCasts = 0;
+    let totalCasterStakesOnUserCasts = 0;
+    let totalSupporterStakesOnUserCasts = 0;
+
+    try {
+      const userCastsResult = await sql`
+        SELECT 
+          total_higher_staked,
+          caster_stake_amounts,
+          caster_stake_unlocked,
+          supporter_stake_amounts,
+          supporter_stake_unlocked
+        FROM leaderboard_entries
+        WHERE creator_fid = ${fid}
+        AND cast_state IN ('higher', 'expired')
+      `;
+
+      for (const row of userCastsResult.rows) {
+        // Add total staked on this cast
+        const totalStaked = parseFloat(row.total_higher_staked || '0');
+        totalStakedOnUserCasts += totalStaked;
+
+        // Sum caster stakes (stakes the user made on their own casts)
+        const casterAmounts = row.caster_stake_amounts || [];
+        const casterUnlocked = row.caster_stake_unlocked || [];
+        for (let i = 0; i < casterAmounts.length; i++) {
+          if (!casterUnlocked[i]) {
+            const amount = parseFloat(String(casterAmounts[i] || '0'));
+            totalCasterStakesOnUserCasts += amount;
+          }
+        }
+
+        // Sum supporter stakes (stakes others made on the user's casts)
+        const supporterAmounts = row.supporter_stake_amounts || [];
+        const supporterUnlocked = row.supporter_stake_unlocked || [];
+        for (let i = 0; i < supporterAmounts.length; i++) {
+          if (!supporterUnlocked[i]) {
+            const amount = parseFloat(String(supporterAmounts[i] || '0'));
+            totalSupporterStakesOnUserCasts += amount;
+          }
+        }
+      }
+    } catch (dbError: any) {
+      console.error('[User Stats API] Error querying user casts:', dbError);
+      // Continue with 0 values if query fails
+    }
+
     return NextResponse.json({
       totalUserStaked: totalUserStakedNum.toString(),
       totalCasterStaked: totalCasterStakedNum.toString(),
       totalSupporterStaked: totalSupporterStakedNum.toString(),
       totalBuildersSupported: supportedFidsMap.size,
       topSupportedFids,
+      // New fields for stakes on user's casts
+      totalStakedOnUserCasts: totalStakedOnUserCasts.toString(),
+      totalCasterStakesOnUserCasts: totalCasterStakesOnUserCasts.toString(),
+      totalSupporterStakesOnUserCasts: totalSupporterStakesOnUserCasts.toString(),
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err: any) {
     console.error('[User Stats API] Error:', err);

@@ -26,6 +26,9 @@ interface UserStats {
     pfpUrl: string;
     totalAmount: string;
   }>;
+  totalStakedOnUserCasts?: string;
+  totalCasterStakesOnUserCasts?: string;
+  totalSupporterStakesOnUserCasts?: string;
 }
 
 // Format token amount with K/M/B suffixes
@@ -284,6 +287,65 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   <span className="text-sm font-bold text-black">
                     {userStats?.totalBuildersSupported ?? 0}
                   </span>
+                </div>
+              </div>
+
+              {/* Stakes on User's Casts Section */}
+              <div className="mt-6 pt-6 border-t border-black/20">
+                <h4 className="text-sm font-bold mb-3 text-black">
+                  Staked on Your Casts
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-black/70">Total HIGHER Staked</span>
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="/higher-logo.png" 
+                        alt="HIGHER" 
+                        className="w-4 h-4 rounded-full"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <span className="text-sm font-bold text-black">
+                        {userStats?.totalStakedOnUserCasts ? formatTokenAmount(userStats.totalStakedOnUserCasts) : '0.00'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between pl-4">
+                    <span className="text-xs text-black/60">Caster Stakes</span>
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="/higher-logo.png" 
+                        alt="HIGHER" 
+                        className="w-3 h-3 rounded-full"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <span className="text-xs font-bold text-black">
+                        {userStats?.totalCasterStakesOnUserCasts ? formatTokenAmount(userStats.totalCasterStakesOnUserCasts) : '0.00'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center justify-between pl-4">
+                    <span className="text-xs text-black/60">Supporter Stakes</span>
+                    <div className="flex items-center gap-2">
+                      <img 
+                        src="/higher-logo.png" 
+                        alt="HIGHER" 
+                        className="w-3 h-3 rounded-full"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                      <span className="text-xs font-bold text-black">
+                        {userStats?.totalSupporterStakesOnUserCasts ? formatTokenAmount(userStats.totalSupporterStakesOnUserCasts) : '0.00'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
