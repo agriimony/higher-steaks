@@ -132,12 +132,14 @@ export async function POST(request: NextRequest) {
     switch (eventType) {
       case 'miniapp_added':
         if (notificationDetails) {
-          // Store notification token if provided
+          // Store notification token - replace any existing token for this FID
           await sql`
             INSERT INTO notification_tokens (fid, token, notification_url, enabled)
             VALUES (${fid}, ${notificationDetails.token}, ${notificationDetails.url}, ${!!notificationDetails.token})
-            ON CONFLICT (fid, token) 
+            ON CONFLICT (fid) 
             DO UPDATE SET 
+              token = ${notificationDetails.token},
+              notification_url = ${notificationDetails.url},
               enabled = ${!!notificationDetails.token},
               updated_at = NOW()
           `;
@@ -146,23 +148,24 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'miniapp_removed':
-        // Mark all tokens for this FID as disabled
+        // Delete the token row for this FID (miniapp was removed, token is no longer valid)
         await sql`
-          UPDATE notification_tokens
-          SET enabled = false, updated_at = NOW()
+          DELETE FROM notification_tokens
           WHERE fid = ${fid}
         `;
-        console.log('[webhooks/notifications] Disabled tokens for miniapp_removed event, fid:', fid);
+        console.log('[webhooks/notifications] Deleted token for miniapp_removed event, fid:', fid);
         break;
 
       case 'notifications_enabled':
         if (notificationDetails) {
-          // Store/update notification token and enable
+          // Store/update notification token and enable - replace any existing token for this FID
           await sql`
             INSERT INTO notification_tokens (fid, token, notification_url, enabled)
             VALUES (${fid}, ${notificationDetails.token}, ${notificationDetails.url}, true)
-            ON CONFLICT (fid, token)
+            ON CONFLICT (fid)
             DO UPDATE SET
+              token = ${notificationDetails.token},
+              notification_url = ${notificationDetails.url},
               enabled = true,
               updated_at = NOW()
           `;
@@ -171,13 +174,12 @@ export async function POST(request: NextRequest) {
         break;
 
       case 'notifications_disabled':
-        // Disable all tokens for this FID
+        // Delete the token row for this FID (notifications disabled, token is no longer valid)
         await sql`
-          UPDATE notification_tokens
-          SET enabled = false, updated_at = NOW()
+          DELETE FROM notification_tokens
           WHERE fid = ${fid}
         `;
-        console.log('[webhooks/notifications] Disabled notifications, fid:', fid);
+        console.log('[webhooks/notifications] Deleted token for notifications_disabled event, fid:', fid);
         break;
 
       default:

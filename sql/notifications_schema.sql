@@ -1,13 +1,13 @@
 -- Notification tokens table (stores tokens from Farcaster webhook events)
+-- Only one token per FID - new tokens replace old ones
 CREATE TABLE IF NOT EXISTS notification_tokens (
   id SERIAL PRIMARY KEY,
-  fid INTEGER NOT NULL,
+  fid INTEGER NOT NULL UNIQUE,
   token TEXT NOT NULL,
   notification_url TEXT NOT NULL,
   enabled BOOLEAN DEFAULT false,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(fid, token)
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_notification_tokens_fid ON notification_tokens(fid);
