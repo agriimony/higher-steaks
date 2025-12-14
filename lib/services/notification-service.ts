@@ -125,13 +125,11 @@ async function sendNotification(
     // Reference: https://docs.neynar.com/reference/publish-frame-notifications
     // We can target specific FIDs directly
     await neynar.publishFrameNotifications({
-      sendFrameNotificationsReqBody: {
-        targetFids: [fid],
-        notification: {
-          title,
-          body,
-          target_url: targetUrl,
-        },
+      targetFids: [fid],
+      notification: {
+        title,
+        body,
+        target_url: targetUrl,
       },
     });
 
