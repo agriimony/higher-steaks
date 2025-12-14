@@ -29,6 +29,7 @@ interface UserStats {
   totalStakedOnUserCasts?: string;
   totalCasterStakesOnUserCasts?: string;
   totalSupporterStakesOnUserCasts?: string;
+  totalSupporters?: number;
 }
 
 // Format token amount with K/M/B suffixes
@@ -165,7 +166,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
               
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-black/70">Total HIGHER Staked</span>
+                  <span className="text-xs text-black/70">Total Belief in the Network</span>
                   <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
@@ -182,7 +183,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 </div>
                 
                 <div className="flex items-center justify-between pl-3">
-                  <span className="text-xs text-black/60">Caster Stakes</span>
+                  <span className="text-xs text-black/60">Belief in self</span>
                   <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
@@ -199,7 +200,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 </div>
                 
                 <div className="flex items-center justify-between pl-3">
-                  <span className="text-xs text-black/60">Supporter Stakes</span>
+                  <span className="text-xs text-black/60">Belief in others</span>
                   <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
@@ -216,7 +217,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 </div>
                 
                 <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/20">
-                  <span className="text-xs text-black/70">Total Casts with Active Stakes</span>
+                  <span className="text-xs text-black/70">Total Casts Cooking</span>
                   <span className="text-xs font-bold text-black">
                     {networkStats?.totalCastsStakedOn ?? 0}
                   </span>
@@ -232,7 +233,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
               
               <div className="space-y-1.5 mb-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-black/70">Total HIGHER Staked</span>
+                  <span className="text-xs text-black/70">You have staked</span>
                   <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
@@ -249,7 +250,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 </div>
                 
                 <div className="flex items-center justify-between pl-3">
-                  <span className="text-xs text-black/60">Caster Stakes</span>
+                  <span className="text-xs text-black/60">On yourself</span>
                   <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
@@ -266,7 +267,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 </div>
                 
                 <div className="flex items-center justify-between pl-3">
-                  <span className="text-xs text-black/60">Supporter Stakes</span>
+                  <span className="text-xs text-black/60">On <span className="text-xs font-bold text-black">{userStats?.totalBuildersSupported ?? 0}</span> others</span>
                   <div className="flex items-center gap-1.5">
                     <img 
                       src="/higher-logo.png" 
@@ -281,23 +282,13 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                     </span>
                   </div>
                 </div>
-                
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/20">
-                  <span className="text-xs text-black/70">Higher Builders Supported</span>
-                  <span className="text-xs font-bold text-black">
-                    {userStats?.totalBuildersSupported ?? 0}
-                  </span>
-                </div>
               </div>
 
               {/* Stakes on User's Casts Section */}
               <div className="mt-3 pt-3 border-t border-black/20">
-                <h4 className="text-xs font-bold mb-2 text-black">
-                  Staked on Your Casts
-                </h4>
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-black/70">Total HIGHER Staked</span>
+                    <span className="text-xs text-black/70">Staked on you</span>
                     <div className="flex items-center gap-1.5">
                       <img 
                         src="/higher-logo.png" 
@@ -314,7 +305,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </div>
                   
                   <div className="flex items-center justify-between pl-3">
-                    <span className="text-xs text-black/60">Caster Stakes</span>
+                    <span className="text-xs text-black/60">By yourself</span>
                     <div className="flex items-center gap-1.5">
                       <img 
                         src="/higher-logo.png" 
@@ -331,7 +322,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </div>
                   
                   <div className="flex items-center justify-between pl-3">
-                    <span className="text-xs text-black/60">Supporter Stakes</span>
+                  <span className="text-xs text-black/60">On <span className="text-xs font-bold text-black">{userStats?.totalSupporters ?? 0}</span> others</span>
                     <div className="flex items-center gap-1.5">
                       <img 
                         src="/higher-logo.png" 

@@ -193,6 +193,7 @@ export async function GET(req: NextRequest) {
     let totalStakedOnUserCasts = BigInt(0);
     let totalCasterStakesOnUserCasts = BigInt(0);
     let totalSupporterStakesOnUserCasts = BigInt(0);
+    const uniqueSupporterFids = new Set<number>();
 
     try {
       const userCastsResult = await sql`
@@ -200,6 +201,7 @@ export async function GET(req: NextRequest) {
           caster_stake_amounts,
           caster_stake_unlocked,
           supporter_stake_amounts,
+          supporter_stake_fids,
           supporter_stake_unlocked
         FROM leaderboard_entries
         WHERE creator_fid = ${fid}
@@ -225,12 +227,18 @@ export async function GET(req: NextRequest) {
         // Sum supporter stakes (stakes others made on the user's casts)
         // Amounts are stored as wei (string representation of BigInt)
         const supporterAmounts = row.supporter_stake_amounts || [];
+        const supporterFids = row.supporter_stake_fids || [];
         const supporterUnlocked = row.supporter_stake_unlocked || [];
         for (let i = 0; i < supporterAmounts.length; i++) {
           if (!supporterUnlocked[i]) {
             try {
               const amountBigInt = BigInt(String(supporterAmounts[i] || '0'));
               totalSupporterStakesOnUserCasts += amountBigInt;
+
+              // Track unique supporter FIDs
+              if (i < supporterFids.length && supporterFids[i]) {
+                uniqueSupporterFids.add(Number(supporterFids[i]));
+              }
             } catch (e) {
               // Skip invalid amounts
             }
@@ -263,6 +271,7 @@ export async function GET(req: NextRequest) {
       totalStakedOnUserCasts: totalStakedOnUserCastsNum.toString(),
       totalCasterStakesOnUserCasts: totalCasterStakesOnUserCastsNum.toString(),
       totalSupporterStakesOnUserCasts: totalSupporterStakesOnUserCastsNum.toString(),
+      totalSupporters: uniqueSupporterFids.size,
     }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (err: any) {
     console.error('[User Stats API] Error:', err);
