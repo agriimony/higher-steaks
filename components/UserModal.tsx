@@ -144,6 +144,8 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
       e.stopPropagation();
     }
     
+    console.log('[UserModal] Add Mini App clicked');
+    
     // Check if SDK is available
     if (!sdk || !sdk.actions) {
       console.error('[UserModal] SDK not available');
@@ -159,12 +161,12 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
     setIsOptimistic(true);
     
     try {
+      console.log('[UserModal] Calling sdk.actions.addMiniApp()...');
       const result = await sdk.actions.addMiniApp();
+      console.log('[UserModal] addMiniApp result:', result);
       
       if (result && 'added' in result && result.added) {
-        // Mini app was successfully added
-        // When addMiniApp() succeeds, notifications are typically enabled automatically
-        // Keep optimistic state and wait for webhook to confirm
+        console.log('[UserModal] Mini app added, waiting for webhook confirmation...');
         
         // Wait for webhook to process (database update might be delayed)
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -177,9 +179,11 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         let retries = 5;
         let confirmed = false;
         while (retries > 0 && !confirmed) {
+          console.log('[UserModal] Checking notification status, attempt', 6 - retries);
           const response = await fetch(`/api/user/notifications/status?fid=${userFid}`);
           if (response.ok) {
             const data = await response.json();
+            console.log('[UserModal] Status response:', data);
             if (data.enabled === true) {
               // Database confirmed notifications are enabled
               setNotificationsEnabled(true);
@@ -192,6 +196,8 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
             }
             // If database says disabled, keep optimistic state and retry
             // (webhook might still be processing)
+          } else {
+            console.warn('[UserModal] Status fetch failed with status', response.status);
           }
           // Wait before retrying
           if (retries > 1) {
@@ -203,13 +209,18 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         // If we never got confirmation after retries, keep the optimistic state
         // The webhook will eventually update, and the next time the modal opens
         // it will show the correct state
+        if (!confirmed) {
+          console.log('[UserModal] Did not get DB confirmation, keeping optimistic state');
+        }
       } else if (result && 'added' in result && !result.added) {
         // User rejected or failed to add - revert optimistic state
+        console.log('[UserModal] addMiniApp returned added: false', result);
         setMiniappAdded(false);
         setNotificationsEnabled(false);
         setIsOptimistic(false);
       } else {
         // Unexpected result format - refresh state to be safe
+        console.warn('[UserModal] Unexpected addMiniApp result format:', result);
         await checkMiniappAdded();
         // Don't call fetchNotificationStatus here as it might revert optimistic state
         // Instead, keep optimistic state and let it sync naturally
@@ -231,11 +242,14 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         errorName === 'usercancellederror' ||
         errorName === 'userrejectederror';
       
-      if (!isUserCancellation) {
+      if (isUserCancellation) {
+        console.log('[UserModal] User cancelled addMiniApp');
+      } else {
         console.error('[UserModal] Error adding miniapp:', err);
       }
     } finally {
       setUpdatingThreshold(false);
+      console.log('[UserModal] addMiniApp flow complete');
     }
   };
 
