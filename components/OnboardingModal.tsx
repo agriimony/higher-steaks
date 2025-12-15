@@ -154,6 +154,7 @@ export function OnboardingModal({
   const [selectedCastIndex, setSelectedCastIndex] = useState<number | null>(null);
   const [stakeAmount, setStakeAmount] = useState('');
   const [lockupDuration, setLockupDuration] = useState<string>('');
+  const [lockupUnit, setLockupUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   const [stakeError, setStakeError] = useState<string | null>(null);
   
   // Staking transaction state
@@ -1100,7 +1101,10 @@ export function OnboardingModal({
   }, []);
 
   const handleSetAmount = useCallback((percentage: number) => {
-    const amount = percentage === 1 ? connectedWalletBalance : connectedWalletBalance * percentage;
+    // Calculate based on percentage of available balance
+    let amount = percentage === 1 ? connectedWalletBalance : connectedWalletBalance * percentage;
+    // Always round DOWN to 2 decimals to avoid exceeding balance due to rounding
+    amount = Math.floor(amount * 100) / 100;
     setStakeAmount(amount.toFixed(2));
     setStakeError(null);
     transactionErrorReportedRef.current = false;
@@ -1144,6 +1148,7 @@ export function OnboardingModal({
     onCommitStakeAmount,
     onCommitLockupDuration,
     onSetAmount,
+    onLockupUnitChange,
     onStake,
     onCancel,
     errorMessage
@@ -1159,6 +1164,7 @@ export function OnboardingModal({
     onCommitStakeAmount: (value: string) => void;
     onCommitLockupDuration: (value: string) => void;
     onSetAmount: (percentage: number) => void;
+    onLockupUnitChange: (unit: 'minute' | 'day' | 'week' | 'month' | 'year') => void;
     onStake: (hash: string, amount: string, duration: string, unit: 'minute' | 'day' | 'week' | 'month' | 'year') => void;
     onCancel: () => void;
     errorMessage: string | null;
@@ -1170,6 +1176,7 @@ export function OnboardingModal({
     // Sync local inputs when parent resets due to active cast change or success/cancel
     useEffect(() => { setLocalStakeAmount(stakeAmount); }, [stakeAmount]);
     useEffect(() => { setLocalLockupDuration(lockupDuration); }, [lockupDuration]);
+    useEffect(() => { setLocalLockupUnit(initialLockupUnit); }, [initialLockupUnit]);
 
     const commitIfChanged = (prev: string, next: string, commit: (v: string) => void) => {
       if (prev !== next) commit(next);
@@ -1231,7 +1238,11 @@ export function OnboardingModal({
             />
             <select
               value={localLockupUnit}
-              onChange={(e) => setLocalLockupUnit(e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year')}
+              onChange={(e) => {
+                const unit = e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year';
+                setLocalLockupUnit(unit);
+                onLockupUnitChange(unit);
+              }}
               className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
             >
               <option value="minute">Minute(s)</option>
@@ -1515,7 +1526,7 @@ export function OnboardingModal({
                 key={`staking-form-${castsRef.current[activeCardIndex].hash}-${selectedCastIndex}`}
                 stakeAmount={stakeAmount}
                 lockupDuration={lockupDuration}
-                initialLockupUnit="day"
+                initialLockupUnit={lockupUnit}
                 isLoadingTransaction={isLoadingTransaction}
                 connectedWalletBalance={connectedWalletBalance}
                 castHash={castsRef.current[activeCardIndex].hash}
@@ -1524,6 +1535,7 @@ export function OnboardingModal({
                 onCommitStakeAmount={commitStakeAmount}
                 onCommitLockupDuration={commitLockupDuration}
                 onSetAmount={handleSetAmount}
+                onLockupUnitChange={setLockupUnit}
                 onStake={handleStake}
                 onCancel={handleCancelStake}
                 errorMessage={stakeError}
