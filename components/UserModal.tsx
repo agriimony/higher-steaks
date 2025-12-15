@@ -126,20 +126,45 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   };
 
   const handleAddMiniApp = async () => {
+    setUpdatingThreshold(true); // Reuse this state for loading indicator
     try {
       const result = await sdk.actions.addMiniApp();
       
       if (result && 'added' in result && result.added) {
-        // Wait a bit for webhook to process, then refresh
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        console.log('[UserModal] Mini app added successfully');
+        
+        // Immediately update miniappAdded state since we know it was added
+        setMiniappAdded(true);
+        
+        // Check if notifications were enabled in the result
+        const notificationDetails = (result as any).notificationDetails;
+        if (notificationDetails) {
+          console.log('[UserModal] Notifications enabled during add');
+          // Notifications were enabled, wait for webhook to process
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        } else {
+          console.log('[UserModal] Mini app added but notifications not enabled yet');
+          // Wait a bit for webhook to process even if notifications not enabled
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+        
+        // Refresh both states to get latest from context and database
         await checkMiniappAdded();
         await fetchNotificationStatus();
       } else if (result && 'added' in result && !result.added) {
+        // User rejected or failed to add
         if ('reason' in result && result.reason === 'rejected_by_user') {
           console.log('[UserModal] User rejected adding miniapp');
         } else {
           console.error('[UserModal] Failed to add miniapp:', (result as any).reason);
         }
+        // Ensure state reflects that miniapp is not added
+        setMiniappAdded(false);
+      } else {
+        // Unexpected result format
+        console.warn('[UserModal] Unexpected result format from addMiniApp:', result);
+        // Refresh state to be safe
+        await checkMiniappAdded();
       }
     } catch (err: any) {
       if (err?.message?.includes('cancelled') || err?.message?.includes('rejected') || err?.message?.includes('User rejected')) {
@@ -147,6 +172,10 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
       } else {
         console.error('[UserModal] Error adding miniapp:', err);
       }
+      // Ensure state reflects that miniapp is not added on error
+      setMiniappAdded(false);
+    } finally {
+      setUpdatingThreshold(false);
     }
   };
 
@@ -494,13 +523,14 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   // State 1: Miniapp not added
                   <div>
                     <p className="text-xs text-black/60 mb-2">
-                      Get notified when your stakes expire or supporters add stakes to your casts
+                      Get notified on stake expiry or about new supporters
                     </p>
                     <button
                       onClick={handleAddMiniApp}
-                      className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition rounded"
+                      disabled={updatingThreshold}
+                      className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
                     >
-                      Add Mini App & Enable Notifications
+                      {updatingThreshold ? 'Adding...' : 'Add Mini App & Enable Notifications'}
                     </button>
                   </div>
                 ) : notificationsEnabled ? (
