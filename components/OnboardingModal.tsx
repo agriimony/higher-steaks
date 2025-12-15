@@ -1173,9 +1173,7 @@ export function OnboardingModal({
     const [localLockupDuration, setLocalLockupDuration] = React.useState(lockupDuration);
     const [localLockupUnit, setLocalLockupUnit] = React.useState<'minute' | 'day' | 'week' | 'month' | 'year'>(initialLockupUnit);
 
-    // Sync local inputs when parent resets due to active cast change or success/cancel
-    useEffect(() => { setLocalStakeAmount(stakeAmount); }, [stakeAmount]);
-    useEffect(() => { setLocalLockupDuration(lockupDuration); }, [lockupDuration]);
+    // Sync unit when parent initialLockupUnit changes (e.g. after stake / reopen)
     useEffect(() => { setLocalLockupUnit(initialLockupUnit); }, [initialLockupUnit]);
 
     const commitIfChanged = (prev: string, next: string, commit: (v: string) => void) => {
