@@ -203,25 +203,48 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         await checkMiniappAdded();
       }
     } catch (err: any) {
+      // Log the full error object to understand what we're dealing with
       console.error('[UserModal] Exception caught in handleAddMiniApp:', err);
+      console.error('[UserModal] Full error object:', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
       console.error('[UserModal] Error type:', typeof err);
       console.error('[UserModal] Error message:', err?.message);
       console.error('[UserModal] Error name:', err?.name);
-      console.error('[UserModal] Error stack:', err?.stack);
+      console.error('[UserModal] Error code:', err?.code);
+      console.error('[UserModal] Error toString:', err?.toString());
       
-      // Only log as "cancelled" if it's actually a user cancellation
-      // Check for specific cancellation patterns
-      const errorMessage = err?.message?.toLowerCase() || '';
-      const errorName = err?.name?.toLowerCase() || '';
+      // Check if this is actually a user cancellation or a different error
+      // The SDK might throw errors for other reasons (not in Farcaster client, SDK not ready, etc.)
+      const errorMessage = String(err?.message || '').toLowerCase();
+      const errorName = String(err?.name || '').toLowerCase();
+      const errorString = String(err || '').toLowerCase();
       
-      if (errorMessage.includes('cancelled') || 
-          errorMessage.includes('rejected') || 
-          errorMessage.includes('user rejected') ||
-          errorName.includes('cancel') ||
-          errorName.includes('reject')) {
+      // Only treat as cancellation if it's explicitly a user cancellation
+      // Other errors (like SDK not available, not in Farcaster client) should be handled differently
+      const isUserCancellation = 
+        errorMessage.includes('user cancelled') ||
+        errorMessage.includes('user rejected') ||
+        errorMessage.includes('rejected by user') ||
+        errorMessage === 'cancelled' ||
+        errorName === 'UserCancelledError' ||
+        errorName === 'UserRejectedError';
+      
+      if (isUserCancellation) {
         console.log('[UserModal] User cancelled adding miniapp');
       } else {
-        console.error('[UserModal] Unexpected error adding miniapp:', err);
+        // This might be an SDK error (not in Farcaster client, SDK not ready, etc.)
+        console.error('[UserModal] Error adding miniapp - this may indicate:', {
+          error: err,
+          message: err?.message,
+          name: err?.name,
+          possibleReasons: [
+            'Not running in Farcaster client',
+            'SDK not initialized',
+            'Network error',
+            'Other SDK error'
+          ]
+        });
+        // Don't treat this as a cancellation - it might be a different issue
+        // Still set miniappAdded to false, but log it differently
       }
       // Ensure state reflects that miniapp is not added on error
       setMiniappAdded(false);
