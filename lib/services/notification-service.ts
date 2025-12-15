@@ -1,4 +1,5 @@
 import { sql } from '@vercel/postgres';
+import { formatUnits } from 'viem';
 
 // Format token amount with K/M/B suffixes (same as UserModal)
 function formatTokenAmount(amount: string): string {
@@ -190,7 +191,7 @@ async function sendNotification(
 export async function sendStakeExpiredNotification(
   fid: number,
   lockupId: string,
-  amount: string,
+  amount: string, // amount in wei
   castOwner: { fid: number; username: string }
 ): Promise<boolean> {
   const referenceId = lockupId;
@@ -200,7 +201,17 @@ export async function sendStakeExpiredNotification(
     return false;
   }
 
-  const formattedAmount = formatTokenAmount(amount);
+  // Convert from wei to HIGHER units for display
+  let amountHigher = '0';
+  try {
+    const wei = BigInt(amount ?? '0');
+    amountHigher = formatUnits(wei, 18);
+  } catch {
+    // Fallback: use raw amount string if parsing fails
+    amountHigher = amount;
+  }
+
+  const formattedAmount = formatTokenAmount(amountHigher);
   const title = 'Higher Steak Cooked!';
   const body = `Your stake of ${formattedAmount} HIGHER on @${castOwner.username} has completed. Withdraw now to continue supporting others!`;
   const targetUrl = `https://higher-steaks.vercel.app?fid=${fid}`;

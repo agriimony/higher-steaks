@@ -1238,7 +1238,12 @@ export function OnboardingModal({
               value={localLockupUnit}
               onChange={(e) => {
                 const unit = e.target.value as 'minute' | 'day' | 'week' | 'month' | 'year';
+                // Update local unit immediately for UI
                 setLocalLockupUnit(unit);
+                // Persist current amount/duration to parent so they survive any remounts
+                onCommitStakeAmount(localStakeAmount);
+                onCommitLockupDuration(localLockupDuration);
+                // Notify parent of unit change so it can be preserved too
                 onLockupUnitChange(unit);
               }}
               className="text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
