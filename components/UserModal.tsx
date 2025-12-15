@@ -559,12 +559,20 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   // State 1: Miniapp not added
                   <div>
                     <p className="text-xs text-black/60 mb-2">
-                      Get notified on stake expiry or new support
+                      Get notified on stake expiry and new support
                     </p>
                     <button
-                      onClick={handleAddMiniApp}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('[UserModal] Add Mini App button clicked, updatingThreshold:', updatingThreshold);
+                        if (!updatingThreshold) {
+                          handleAddMiniApp();
+                        }
+                      }}
                       disabled={updatingThreshold}
-                      className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition rounded disabled:bg-gray-400 disabled:cursor-not-allowed cursor-pointer"
+                      type="button"
                     >
                       {updatingThreshold ? 'Adding...' : 'Add Mini App & Enable Notifications'}
                     </button>
