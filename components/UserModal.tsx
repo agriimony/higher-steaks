@@ -56,8 +56,9 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean | null>(null);
-  const [loadingNotifications, setLoadingNotifications] = useState(false);
-  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+  const [notificationThreshold, setNotificationThreshold] = useState<number>(10);
+  const [miniappAdded, setMiniappAdded] = useState<boolean | null>(null);
+  const [updatingThreshold, setUpdatingThreshold] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -93,7 +94,19 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
 
     fetchStats();
     fetchNotificationStatus();
+    checkMiniappAdded();
   }, [userFid]);
+
+  // Check if miniapp is added via SDK context (client-side only)
+  const checkMiniappAdded = async () => {
+    try {
+      const context = await sdk.context;
+      setMiniappAdded(context?.client?.added || false);
+    } catch (err) {
+      console.error('[UserModal] Error checking miniapp added status:', err);
+      setMiniappAdded(false);
+    }
+  };
 
   const fetchNotificationStatus = async () => {
     try {
@@ -102,6 +115,9 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
       if (response.ok) {
         const data = await response.json();
         setNotificationsEnabled(data.enabled || false);
+        if (data.enabled && data.threshold !== undefined) {
+          setNotificationThreshold(data.threshold);
+        }
       }
     } catch (err) {
       console.error('[UserModal] Error fetching notification status:', err);
@@ -109,58 +125,62 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
     }
   };
 
-  const handleNotificationToggle = async (enabled: boolean) => {
-    setLoadingNotifications(true);
+  const handleAddMiniApp = async () => {
     try {
-      if (enabled) {
-        // Use Farcaster SDK's addMiniApp - this will trigger webhook events
-        // that our webhook endpoint will use to store notification tokens
-        try {
-          const result = await sdk.actions.addMiniApp();
-          
-          if (result && 'added' in result && result.added) {
-            const notificationDetails = (result as any).notificationDetails;
-            if (notificationDetails) {
-              // Mini app was added and notifications were enabled
-              console.log('[UserModal] Mini app added with notifications enabled');
-              // Wait a bit for webhook to process, then refresh
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              await fetchNotificationStatus();
-            } else {
-              // Mini app was added but notifications not enabled yet
-              // Wait a bit for webhook to process, then refresh
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              await fetchNotificationStatus();
-            }
-          } else if (result && 'added' in result && !result.added) {
-            // User rejected or invalid manifest
-            if ('reason' in result && result.reason === 'rejected_by_user') {
-              setShowNotificationPrompt(true);
-            } else {
-              console.error('[UserModal] Failed to add miniapp:', (result as any).reason);
-            }
-          }
-        } catch (err: any) {
-          // If user cancels or rejects, show prompt
-          if (err?.message?.includes('cancelled') || err?.message?.includes('rejected') || err?.message?.includes('User rejected')) {
-            setShowNotificationPrompt(true);
-            setLoadingNotifications(false);
-            return;
-          }
-          console.error('[UserModal] Error adding miniapp:', err);
-        }
-      } else {
-        // For disabling, we can't directly disable via SDK
-        // Farcaster client handles this through the UI, which triggers webhook events
-        // Just refresh status to reflect current state
+      const result = await sdk.actions.addMiniApp();
+      
+      if (result && 'added' in result && result.added) {
+        // Wait a bit for webhook to process, then refresh
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await checkMiniappAdded();
         await fetchNotificationStatus();
+      } else if (result && 'added' in result && !result.added) {
+        if ('reason' in result && result.reason === 'rejected_by_user') {
+          console.log('[UserModal] User rejected adding miniapp');
+        } else {
+          console.error('[UserModal] Failed to add miniapp:', (result as any).reason);
+        }
       }
-    } catch (err) {
-      console.error('[UserModal] Error toggling notifications:', err);
-    } finally {
-      setLoadingNotifications(false);
+    } catch (err: any) {
+      if (err?.message?.includes('cancelled') || err?.message?.includes('rejected') || err?.message?.includes('User rejected')) {
+        console.log('[UserModal] User cancelled adding miniapp');
+      } else {
+        console.error('[UserModal] Error adding miniapp:', err);
+      }
     }
   };
+
+  const handleThresholdUpdate = async (newThreshold: number) => {
+    if (newThreshold <= 0 || isNaN(newThreshold)) {
+      return;
+    }
+
+    setUpdatingThreshold(true);
+    try {
+      const response = await fetch('/api/user/notifications/threshold', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fid: userFid,
+          threshold: newThreshold,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotificationThreshold(data.threshold);
+        console.log('[UserModal] Threshold updated to', data.threshold);
+      } else {
+        const error = await response.json();
+        console.error('[UserModal] Failed to update threshold:', error);
+      }
+    } catch (err) {
+      console.error('[UserModal] Error updating threshold:', err);
+    } finally {
+      setUpdatingThreshold(false);
+    }
+  };
+
 
   // Handle escape key to close
   useEffect(() => {
@@ -466,113 +486,84 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 </div>
               )}
 
-              {/* Notifications Toggle */}
+              {/* Notifications Section */}
               <div className="mt-3 pt-3 border-t border-black/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-black">Notifications</span>
-                    {notificationsEnabled === null ? (
-                      <span className="text-xs text-black/40">Loading...</span>
-                    ) : notificationsEnabled ? (
-                      <span className="text-xs text-green-600">On</span>
-                    ) : (
-                      <span className="text-xs text-black/40">Off</span>
-                    )}
+                {miniappAdded === null ? (
+                  <div className="text-xs text-black/40">Loading...</div>
+                ) : !miniappAdded ? (
+                  // State 1: Miniapp not added
+                  <div>
+                    <p className="text-xs text-black/60 mb-2">
+                      Get notified when your stakes expire or supporters add stakes to your casts
+                    </p>
+                    <button
+                      onClick={handleAddMiniApp}
+                      className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition rounded"
+                    >
+                      Add Mini App & Enable Notifications
+                    </button>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
+                ) : notificationsEnabled ? (
+                  // State 2: Miniapp added + notifications enabled
+                  <div>
+                    <label className="text-xs font-bold text-black mb-1 block">
+                      Notification Threshold (USD)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={notificationThreshold}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value);
+                          if (!isNaN(value) && value >= 0) {
+                            setNotificationThreshold(value);
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = parseFloat(e.target.value);
+                          if (!isNaN(value) && value > 0) {
+                            handleThresholdUpdate(value);
+                          } else {
+                            setNotificationThreshold(10);
+                          }
+                        }}
+                        disabled={updatingThreshold}
+                        className="flex-1 border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-black/20 disabled:bg-gray-100 disabled:text-gray-500"
+                        placeholder="10.00"
+                      />
+                      {updatingThreshold && (
+                        <span className="text-xs text-black/40">Saving...</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-black/60 mt-1">
+                      Supporter notifications will only trigger when above this threshold
+                    </p>
+                  </div>
+                ) : (
+                  // State 3: Miniapp added + notifications disabled
+                  <div>
+                    <label className="text-xs font-bold text-black mb-1 block">
+                      Notifications Disabled
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={notificationsEnabled === true}
-                      onChange={(e) => handleNotificationToggle(e.target.checked)}
-                      disabled={loadingNotifications || notificationsEnabled === null}
-                      className="sr-only peer"
+                      type="text"
+                      value="N.A."
+                      disabled
+                      className="w-full border border-black/10 rounded px-2 py-1 text-xs font-mono bg-gray-100 text-gray-500 cursor-not-allowed"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-black/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black"></div>
-                  </label>
-                </div>
-                <p className="text-xs text-black/60 mt-1">
-                  Get notified when your stakes expire or supporters add stakes to your casts
-                </p>
+                    <p className="text-xs text-black/60 mt-1 italic">
+                      Please re-enable notifications in client
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </>
         )}
       </div>
 
-      {/* Notification Prompt Modal */}
-      {showNotificationPrompt && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-4">
-          <div 
-            className="bg-[#fefdfb] border-2 border-black rounded-none p-4 max-w-md w-full relative font-mono"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setShowNotificationPrompt(false)}
-              className="absolute top-2 right-2 text-black/40 hover:text-black transition"
-              aria-label="Close"
-            >
-              <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width="18" 
-                height="18" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-            <h3 className="text-base font-bold mb-2 text-black">
-              Add Mini App Required
-            </h3>
-            <p className="text-xs text-black/70 mb-4">
-              To enable notifications, you need to add the Higher Steaks mini app to your Farcaster client first.
-            </p>
-            <button
-              onClick={async () => {
-                try {
-                  const result = await sdk.actions.addMiniApp();
-                  
-                  if (result && 'added' in result && result.added) {
-                    setShowNotificationPrompt(false);
-                    const notificationDetails = (result as any).notificationDetails;
-                    if (notificationDetails) {
-                      // Wait for webhook to process
-                      await new Promise(resolve => setTimeout(resolve, 1500));
-                      await fetchNotificationStatus();
-                    } else {
-                      // Wait for webhook to process
-                      await new Promise(resolve => setTimeout(resolve, 1500));
-                      await fetchNotificationStatus();
-                    }
-                  } else if (result && 'added' in result && !result.added) {
-                    // User rejected, just close the prompt
-                    if ('reason' in result && result.reason === 'rejected_by_user') {
-                      setShowNotificationPrompt(false);
-                    } else {
-                      console.error('[UserModal] Failed to add miniapp:', (result as any).reason);
-                    }
-                  }
-                } catch (err: any) {
-                  if (err?.message?.includes('cancelled') || err?.message?.includes('rejected') || err?.message?.includes('User rejected')) {
-                    // User cancelled, just close the prompt
-                    setShowNotificationPrompt(false);
-                  } else {
-                    console.error('[UserModal] Error adding miniapp:', err);
-                  }
-                }
-              }}
-              className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition"
-            >
-              Add Mini App
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

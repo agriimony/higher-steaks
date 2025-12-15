@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS notification_tokens (
   token TEXT NOT NULL,
   notification_url TEXT NOT NULL,
   enabled BOOLEAN DEFAULT false,
+  threshold_usd DECIMAL(10, 2) DEFAULT 10.00,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

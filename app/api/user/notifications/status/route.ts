@@ -24,16 +24,22 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Query database for enabled notification token
+    // Query database for enabled notification token and threshold
     const result = await sql`
-      SELECT enabled FROM notification_tokens 
+      SELECT enabled, threshold_usd FROM notification_tokens 
       WHERE fid = ${fid} AND enabled = true 
       LIMIT 1
     `;
     
     const enabled = result.rows.length > 0;
+    const threshold = enabled && result.rows[0].threshold_usd 
+      ? parseFloat(result.rows[0].threshold_usd.toString()) 
+      : undefined;
 
-    return NextResponse.json({ enabled });
+    return NextResponse.json({ 
+      enabled,
+      ...(threshold !== undefined && { threshold })
+    });
   } catch (err: any) {
     console.error('[notifications/status] Error:', err);
     return NextResponse.json(

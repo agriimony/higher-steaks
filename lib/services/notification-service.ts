@@ -72,11 +72,11 @@ async function markNotificationSent(
 }
 
 // Get notification token from database (stored via webhook events)
-async function getNotificationToken(fid: number): Promise<{ token: string; url: string } | null> {
+async function getNotificationToken(fid: number): Promise<{ token: string; url: string; threshold?: number } | null> {
   try {
     // Query database for enabled notification token
     const result = await sql`
-      SELECT token, notification_url 
+      SELECT token, notification_url, threshold_usd 
       FROM notification_tokens 
       WHERE fid = ${fid} AND enabled = true 
       LIMIT 1
@@ -90,10 +90,32 @@ async function getNotificationToken(fid: number): Promise<{ token: string; url: 
     return {
       token: row.token,
       url: row.notification_url,
+      threshold: row.threshold_usd ? parseFloat(row.threshold_usd.toString()) : undefined,
     };
   } catch (err) {
     console.error('[notification-service] Error getting notification token:', err);
     return null;
+  }
+}
+
+// Get notification threshold for a user (defaults to $10 if not found)
+async function getNotificationThreshold(fid: number): Promise<number> {
+  try {
+    const result = await sql`
+      SELECT threshold_usd 
+      FROM notification_tokens 
+      WHERE fid = ${fid} AND enabled = true 
+      LIMIT 1
+    `;
+    
+    if (result.rows.length === 0 || !result.rows[0].threshold_usd) {
+      return 10.00; // Default threshold
+    }
+
+    return parseFloat(result.rows[0].threshold_usd.toString());
+  } catch (err) {
+    console.error('[notification-service] Error getting notification threshold:', err);
+    return 10.00; // Default threshold on error
   }
 }
 
@@ -201,13 +223,16 @@ export async function sendSupporterNotification(
   description: string,
   supporterUsername: string
 ): Promise<boolean> {
-  // Check $10 USD minimum
+  // Get user's notification threshold from database (defaults to $10)
+  const threshold = await getNotificationThreshold(castOwnerFid);
+  
+  // Check threshold USD minimum
   const pricePerToken = await getHigherPrice();
   const amountNum = parseFloat(amount.replace(/,/g, ''));
   const usdValue = amountNum * pricePerToken;
   
-  if (usdValue < 10) {
-    console.log(`[notification-service] Supporter stake ${usdValue} USD below $10 minimum`);
+  if (usdValue < threshold) {
+    console.log(`[notification-service] Supporter stake ${usdValue} USD below ${threshold} USD threshold for fid ${castOwnerFid}`);
     return false;
   }
 

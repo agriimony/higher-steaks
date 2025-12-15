@@ -133,14 +133,16 @@ export async function POST(request: NextRequest) {
       case 'miniapp_added':
         if (notificationDetails) {
           // Store notification token - replace any existing token for this FID
+          // Default threshold is 10.00 USD
           await sql`
-            INSERT INTO notification_tokens (fid, token, notification_url, enabled)
-            VALUES (${fid}, ${notificationDetails.token}, ${notificationDetails.url}, ${!!notificationDetails.token})
+            INSERT INTO notification_tokens (fid, token, notification_url, enabled, threshold_usd)
+            VALUES (${fid}, ${notificationDetails.token}, ${notificationDetails.url}, ${!!notificationDetails.token}, 10.00)
             ON CONFLICT (fid) 
             DO UPDATE SET 
               token = ${notificationDetails.token},
               notification_url = ${notificationDetails.url},
               enabled = ${!!notificationDetails.token},
+              threshold_usd = COALESCE(notification_tokens.threshold_usd, 10.00),
               updated_at = NOW()
           `;
           console.log('[webhooks/notifications] Stored token for miniapp_added event, fid:', fid);
@@ -159,14 +161,16 @@ export async function POST(request: NextRequest) {
       case 'notifications_enabled':
         if (notificationDetails) {
           // Store/update notification token and enable - replace any existing token for this FID
+          // Preserve existing threshold or default to 10.00 USD
           await sql`
-            INSERT INTO notification_tokens (fid, token, notification_url, enabled)
-            VALUES (${fid}, ${notificationDetails.token}, ${notificationDetails.url}, true)
+            INSERT INTO notification_tokens (fid, token, notification_url, enabled, threshold_usd)
+            VALUES (${fid}, ${notificationDetails.token}, ${notificationDetails.url}, true, 10.00)
             ON CONFLICT (fid)
             DO UPDATE SET
               token = ${notificationDetails.token},
               notification_url = ${notificationDetails.url},
               enabled = true,
+              threshold_usd = COALESCE(notification_tokens.threshold_usd, 10.00),
               updated_at = NOW()
           `;
           console.log('[webhooks/notifications] Enabled notifications, fid:', fid);
