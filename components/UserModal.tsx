@@ -59,6 +59,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   const [notificationThreshold, setNotificationThreshold] = useState<number>(10);
   const [miniappAdded, setMiniappAdded] = useState<boolean | null>(null);
   const [updatingThreshold, setUpdatingThreshold] = useState(false);
+  const [isOptimistic, setIsOptimistic] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -114,14 +115,25 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
       const response = await fetch(`/api/user/notifications/status?fid=${userFid}`);
       if (response.ok) {
         const data = await response.json();
-        setNotificationsEnabled(data.enabled || false);
-        if (data.enabled && data.threshold !== undefined) {
-          setNotificationThreshold(data.threshold);
+        // Only update if we're not in an optimistic state, or if database confirms enabled
+        // This prevents reverting optimistic state while waiting for webhook
+        if (!isOptimistic || data.enabled === true) {
+          setNotificationsEnabled(data.enabled || false);
+          if (data.enabled && data.threshold !== undefined) {
+            setNotificationThreshold(data.threshold);
+          }
+          // If database confirms enabled, clear optimistic flag
+          if (data.enabled === true) {
+            setIsOptimistic(false);
+          }
         }
       }
     } catch (err) {
       console.error('[UserModal] Error fetching notification status:', err);
-      setNotificationsEnabled(false);
+      // Only set to false if not optimistic
+      if (!isOptimistic) {
+        setNotificationsEnabled(false);
+      }
     }
   };
 
@@ -132,64 +144,69 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
     // This ensures the UI updates right away, even before the SDK call completes
     setMiniappAdded(true);
     setNotificationsEnabled(true);
+    setIsOptimistic(true);
     
     try {
       const result = await sdk.actions.addMiniApp();
       
       if (result && 'added' in result && result.added) {
         // Mini app was successfully added
-        // Check if notifications were enabled in the result
-        const notificationDetails = (result as any).notificationDetails;
+        // When addMiniApp() succeeds, notifications are typically enabled automatically
+        // Keep optimistic state and wait for webhook to confirm
         
-        if (notificationDetails) {
-          // Notifications were enabled, state is already set optimistically
-          // Wait for webhook to process (database update might be delayed)
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Refresh both states to get latest from context and database
-          await checkMiniappAdded();
-          
-          // Retry fetching notification status a few times in case webhook is delayed
-          let retries = 3;
-          while (retries > 0) {
-            const response = await fetch(`/api/user/notifications/status?fid=${userFid}`);
-            if (response.ok) {
-              const data = await response.json();
-              if (data.enabled === true) {
-                // Database confirmed notifications are enabled
-                setNotificationsEnabled(true);
-                if (data.threshold !== undefined) {
-                  setNotificationThreshold(data.threshold);
-                }
-                break;
+        // Wait for webhook to process (database update might be delayed)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Refresh miniapp added status from context
+        await checkMiniappAdded();
+        
+        // Retry fetching notification status a few times in case webhook is delayed
+        // Keep optimistic state until we get confirmation
+        let retries = 5;
+        let confirmed = false;
+        while (retries > 0 && !confirmed) {
+          const response = await fetch(`/api/user/notifications/status?fid=${userFid}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.enabled === true) {
+              // Database confirmed notifications are enabled
+              setNotificationsEnabled(true);
+              setIsOptimistic(false); // Clear optimistic flag since we have confirmation
+              if (data.threshold !== undefined) {
+                setNotificationThreshold(data.threshold);
               }
+              confirmed = true;
+              break;
             }
-            // Wait before retrying
-            if (retries > 1) {
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-            retries--;
+            // If database says disabled, keep optimistic state and retry
+            // (webhook might still be processing)
           }
-        } else {
-          // Mini app added but notifications not enabled yet
-          // Wait for webhook, then refresh
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          await checkMiniappAdded();
-          await fetchNotificationStatus();
+          // Wait before retrying
+          if (retries > 1) {
+            await new Promise(resolve => setTimeout(resolve, 1500));
+          }
+          retries--;
         }
+        
+        // If we never got confirmation after retries, keep the optimistic state
+        // The webhook will eventually update, and the next time the modal opens
+        // it will show the correct state
       } else if (result && 'added' in result && !result.added) {
         // User rejected or failed to add - revert optimistic state
         setMiniappAdded(false);
         setNotificationsEnabled(false);
+        setIsOptimistic(false);
       } else {
         // Unexpected result format - refresh state to be safe
         await checkMiniappAdded();
-        await fetchNotificationStatus();
+        // Don't call fetchNotificationStatus here as it might revert optimistic state
+        // Instead, keep optimistic state and let it sync naturally
       }
     } catch (err: any) {
       // Revert optimistic state on error
       setMiniappAdded(false);
       setNotificationsEnabled(false);
+      setIsOptimistic(false);
       
       // Only log actual errors (not user cancellations)
       const errorMessage = String(err?.message || '').toLowerCase();
