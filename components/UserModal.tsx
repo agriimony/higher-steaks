@@ -614,10 +614,10 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 ) : notificationsEnabled ? (
                   // State 2: Miniapp added + notifications enabled
                   <div>
-                    <label className="text-xs font-bold text-black mb-1 block">
-                      Notification Threshold (USD)
-                    </label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <label className="text-xs font-bold text-black mb-0">
+                        Notification Threshold (USD)
+                      </label>
                       <input
                         type="number"
                         step="1"
@@ -638,13 +638,15 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                           }
                         }}
                         disabled={updatingThreshold}
-                        className="flex-1 border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-black/20 disabled:bg-gray-100 disabled:text-gray-500"
+                        className="w-24 border border-black/20 rounded px-2 py-1 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-black/20 disabled:bg-gray-100 disabled:text-gray-500 text-right"
                         placeholder="10.00"
                       />
-                      {updatingThreshold && (
-                        <span className="text-xs text-black/40">Saving...</span>
-                      )}
                     </div>
+                    {updatingThreshold && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-black/40">Saving...</span>
+                      </div>
+                    )}
                     <p className="text-xs text-black/60 mt-1">
                       Get notified when new support is added
                     </p>
