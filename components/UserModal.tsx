@@ -137,7 +137,19 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
     }
   };
 
-  const handleAddMiniApp = async () => {
+  const handleAddMiniApp = async (e?: React.MouseEvent) => {
+    // Prevent any default behavior or event bubbling
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    // Check if SDK is available
+    if (!sdk || !sdk.actions) {
+      console.error('[UserModal] SDK not available');
+      return;
+    }
+    
     setUpdatingThreshold(true);
     
     // Optimistically set both states immediately when button is pressed
@@ -573,7 +585,11 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                       Get notified on stake expiry and new support
                     </p>
                     <button
-                      onClick={handleAddMiniApp}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleAddMiniApp(e);
+                      }}
                       disabled={updatingThreshold}
                       className="w-full bg-purple-600 text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
                       type="button"
