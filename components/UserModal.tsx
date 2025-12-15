@@ -128,7 +128,9 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   const handleAddMiniApp = async () => {
     setUpdatingThreshold(true); // Reuse this state for loading indicator
     try {
+      console.log('[UserModal] Calling addMiniApp()...');
       const result = await sdk.actions.addMiniApp();
+      console.log('[UserModal] addMiniApp() result:', result);
       
       if (result && 'added' in result && result.added) {
         console.log('[UserModal] Mini app added successfully');
@@ -143,10 +145,6 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
           // Optimistically set notifications as enabled immediately
           // The webhook will update the database, but we show the correct UI right away
           setNotificationsEnabled(true);
-          // Set default threshold if not already set
-          if (notificationThreshold === 10) {
-            // Keep default, will be confirmed by database refresh
-          }
         } else {
           console.log('[UserModal] Mini app added but notifications not enabled yet');
           // Still wait for webhook in case notifications get enabled
@@ -189,24 +187,41 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         }
       } else if (result && 'added' in result && !result.added) {
         // User rejected or failed to add
+        console.log('[UserModal] addMiniApp returned added: false, result:', result);
         if ('reason' in result && result.reason === 'rejected_by_user') {
           console.log('[UserModal] User rejected adding miniapp');
         } else {
-          console.error('[UserModal] Failed to add miniapp:', (result as any).reason);
+          console.error('[UserModal] Failed to add miniapp, reason:', (result as any).reason);
         }
         // Ensure state reflects that miniapp is not added
         setMiniappAdded(false);
       } else {
         // Unexpected result format
         console.warn('[UserModal] Unexpected result format from addMiniApp:', result);
+        console.warn('[UserModal] Result type:', typeof result, 'Keys:', result ? Object.keys(result) : 'null/undefined');
         // Refresh state to be safe
         await checkMiniappAdded();
       }
     } catch (err: any) {
-      if (err?.message?.includes('cancelled') || err?.message?.includes('rejected') || err?.message?.includes('User rejected')) {
+      console.error('[UserModal] Exception caught in handleAddMiniApp:', err);
+      console.error('[UserModal] Error type:', typeof err);
+      console.error('[UserModal] Error message:', err?.message);
+      console.error('[UserModal] Error name:', err?.name);
+      console.error('[UserModal] Error stack:', err?.stack);
+      
+      // Only log as "cancelled" if it's actually a user cancellation
+      // Check for specific cancellation patterns
+      const errorMessage = err?.message?.toLowerCase() || '';
+      const errorName = err?.name?.toLowerCase() || '';
+      
+      if (errorMessage.includes('cancelled') || 
+          errorMessage.includes('rejected') || 
+          errorMessage.includes('user rejected') ||
+          errorName.includes('cancel') ||
+          errorName.includes('reject')) {
         console.log('[UserModal] User cancelled adding miniapp');
       } else {
-        console.error('[UserModal] Error adding miniapp:', err);
+        console.error('[UserModal] Unexpected error adding miniapp:', err);
       }
       // Ensure state reflects that miniapp is not added on error
       setMiniappAdded(false);
