@@ -140,17 +140,53 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         const notificationDetails = (result as any).notificationDetails;
         if (notificationDetails) {
           console.log('[UserModal] Notifications enabled during add');
-          // Notifications were enabled, wait for webhook to process
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          // Optimistically set notifications as enabled immediately
+          // The webhook will update the database, but we show the correct UI right away
+          setNotificationsEnabled(true);
+          // Set default threshold if not already set
+          if (notificationThreshold === 10) {
+            // Keep default, will be confirmed by database refresh
+          }
         } else {
           console.log('[UserModal] Mini app added but notifications not enabled yet');
-          // Wait a bit for webhook to process even if notifications not enabled
-          await new Promise(resolve => setTimeout(resolve, 1500));
+          // Still wait for webhook in case notifications get enabled
         }
         
+        // Wait for webhook to process (database update might be delayed)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
         // Refresh both states to get latest from context and database
+        // This ensures we have the correct state even if webhook was delayed
         await checkMiniappAdded();
-        await fetchNotificationStatus();
+        
+        // Retry fetching notification status a few times in case webhook is delayed
+        // This ensures we eventually get the correct state from the database
+        if (notificationDetails) {
+          // Notifications were enabled, retry until we confirm from database
+          let retries = 3;
+          while (retries > 0) {
+            const response = await fetch(`/api/user/notifications/status?fid=${userFid}`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.enabled === true) {
+                // Database confirmed notifications are enabled, update state and break
+                setNotificationsEnabled(true);
+                if (data.threshold !== undefined) {
+                  setNotificationThreshold(data.threshold);
+                }
+                break;
+              }
+            }
+            // Wait before retrying
+            if (retries > 1) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            retries--;
+          }
+        } else {
+          // Just fetch once if notifications weren't enabled
+          await fetchNotificationStatus();
+        }
       } else if (result && 'added' in result && !result.added) {
         // User rejected or failed to add
         if ('reason' in result && result.reason === 'rejected_by_user') {
@@ -523,7 +559,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   // State 1: Miniapp not added
                   <div>
                     <p className="text-xs text-black/60 mb-2">
-                      Get notified on stake expiry or about new supporters
+                      Get notified on stake expiry or new support
                     </p>
                     <button
                       onClick={handleAddMiniApp}
@@ -542,7 +578,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
-                        step="0.01"
+                        step="1"
                         min="0"
                         value={notificationThreshold}
                         onChange={(e) => {
@@ -568,7 +604,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                       )}
                     </div>
                     <p className="text-xs text-black/60 mt-1">
-                      Supporter notifications will only trigger when above this threshold
+                      Get notified when new support added above this threshold
                     </p>
                   </div>
                 ) : (
