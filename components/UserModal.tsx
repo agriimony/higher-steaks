@@ -126,48 +126,37 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   };
 
   const handleAddMiniApp = async () => {
-    setUpdatingThreshold(true); // Reuse this state for loading indicator
+    setUpdatingThreshold(true);
+    
+    // Optimistically set both states immediately when button is pressed
+    // This ensures the UI updates right away, even before the SDK call completes
+    setMiniappAdded(true);
+    setNotificationsEnabled(true);
+    
     try {
-      console.log('[UserModal] Calling addMiniApp()...');
       const result = await sdk.actions.addMiniApp();
-      console.log('[UserModal] addMiniApp() result:', result);
       
       if (result && 'added' in result && result.added) {
-        console.log('[UserModal] Mini app added successfully');
-        
-        // Immediately update miniappAdded state since we know it was added
-        setMiniappAdded(true);
-        
+        // Mini app was successfully added
         // Check if notifications were enabled in the result
         const notificationDetails = (result as any).notificationDetails;
+        
         if (notificationDetails) {
-          console.log('[UserModal] Notifications enabled during add');
-          // Optimistically set notifications as enabled immediately
-          // The webhook will update the database, but we show the correct UI right away
-          setNotificationsEnabled(true);
-        } else {
-          console.log('[UserModal] Mini app added but notifications not enabled yet');
-          // Still wait for webhook in case notifications get enabled
-        }
-        
-        // Wait for webhook to process (database update might be delayed)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Refresh both states to get latest from context and database
-        // This ensures we have the correct state even if webhook was delayed
-        await checkMiniappAdded();
-        
-        // Retry fetching notification status a few times in case webhook is delayed
-        // This ensures we eventually get the correct state from the database
-        if (notificationDetails) {
-          // Notifications were enabled, retry until we confirm from database
+          // Notifications were enabled, state is already set optimistically
+          // Wait for webhook to process (database update might be delayed)
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Refresh both states to get latest from context and database
+          await checkMiniappAdded();
+          
+          // Retry fetching notification status a few times in case webhook is delayed
           let retries = 3;
           while (retries > 0) {
             const response = await fetch(`/api/user/notifications/status?fid=${userFid}`);
             if (response.ok) {
               const data = await response.json();
               if (data.enabled === true) {
-                // Database confirmed notifications are enabled, update state and break
+                // Database confirmed notifications are enabled
                 setNotificationsEnabled(true);
                 if (data.threshold !== undefined) {
                   setNotificationThreshold(data.threshold);
@@ -182,72 +171,40 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
             retries--;
           }
         } else {
-          // Just fetch once if notifications weren't enabled
+          // Mini app added but notifications not enabled yet
+          // Wait for webhook, then refresh
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          await checkMiniappAdded();
           await fetchNotificationStatus();
         }
       } else if (result && 'added' in result && !result.added) {
-        // User rejected or failed to add
-        console.log('[UserModal] addMiniApp returned added: false, result:', result);
-        if ('reason' in result && result.reason === 'rejected_by_user') {
-          console.log('[UserModal] User rejected adding miniapp');
-        } else {
-          console.error('[UserModal] Failed to add miniapp, reason:', (result as any).reason);
-        }
-        // Ensure state reflects that miniapp is not added
+        // User rejected or failed to add - revert optimistic state
         setMiniappAdded(false);
+        setNotificationsEnabled(false);
       } else {
-        // Unexpected result format
-        console.warn('[UserModal] Unexpected result format from addMiniApp:', result);
-        console.warn('[UserModal] Result type:', typeof result, 'Keys:', result ? Object.keys(result) : 'null/undefined');
-        // Refresh state to be safe
+        // Unexpected result format - refresh state to be safe
         await checkMiniappAdded();
+        await fetchNotificationStatus();
       }
     } catch (err: any) {
-      // Log the full error object to understand what we're dealing with
-      console.error('[UserModal] Exception caught in handleAddMiniApp:', err);
-      console.error('[UserModal] Full error object:', JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
-      console.error('[UserModal] Error type:', typeof err);
-      console.error('[UserModal] Error message:', err?.message);
-      console.error('[UserModal] Error name:', err?.name);
-      console.error('[UserModal] Error code:', err?.code);
-      console.error('[UserModal] Error toString:', err?.toString());
+      // Revert optimistic state on error
+      setMiniappAdded(false);
+      setNotificationsEnabled(false);
       
-      // Check if this is actually a user cancellation or a different error
-      // The SDK might throw errors for other reasons (not in Farcaster client, SDK not ready, etc.)
+      // Only log actual errors (not user cancellations)
       const errorMessage = String(err?.message || '').toLowerCase();
       const errorName = String(err?.name || '').toLowerCase();
-      const errorString = String(err || '').toLowerCase();
       
-      // Only treat as cancellation if it's explicitly a user cancellation
-      // Other errors (like SDK not available, not in Farcaster client) should be handled differently
       const isUserCancellation = 
         errorMessage.includes('user cancelled') ||
         errorMessage.includes('user rejected') ||
         errorMessage.includes('rejected by user') ||
-        errorMessage === 'cancelled' ||
-        errorName === 'UserCancelledError' ||
-        errorName === 'UserRejectedError';
+        errorName === 'usercancellederror' ||
+        errorName === 'userrejectederror';
       
-      if (isUserCancellation) {
-        console.log('[UserModal] User cancelled adding miniapp');
-      } else {
-        // This might be an SDK error (not in Farcaster client, SDK not ready, etc.)
-        console.error('[UserModal] Error adding miniapp - this may indicate:', {
-          error: err,
-          message: err?.message,
-          name: err?.name,
-          possibleReasons: [
-            'Not running in Farcaster client',
-            'SDK not initialized',
-            'Network error',
-            'Other SDK error'
-          ]
-        });
-        // Don't treat this as a cancellation - it might be a different issue
-        // Still set miniappAdded to false, but log it differently
+      if (!isUserCancellation) {
+        console.error('[UserModal] Error adding miniapp:', err);
       }
-      // Ensure state reflects that miniapp is not added on error
-      setMiniappAdded(false);
     } finally {
       setUpdatingThreshold(false);
     }
@@ -272,7 +229,6 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
       if (response.ok) {
         const data = await response.json();
         setNotificationThreshold(data.threshold);
-        console.log('[UserModal] Threshold updated to', data.threshold);
       } else {
         const error = await response.json();
         console.error('[UserModal] Failed to update threshold:', error);
@@ -600,16 +556,9 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                       Get notified on stake expiry and new support
                     </p>
                     <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        console.log('[UserModal] Add Mini App button clicked, updatingThreshold:', updatingThreshold);
-                        if (!updatingThreshold) {
-                          handleAddMiniApp();
-                        }
-                      }}
+                      onClick={handleAddMiniApp}
                       disabled={updatingThreshold}
-                      className="w-full bg-black text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition rounded disabled:bg-gray-400 disabled:cursor-not-allowed cursor-pointer"
+                      className="w-full bg-purple-600 text-white text-xs font-bold py-2 px-4 hover:bg-black/80 transition rounded disabled:bg-gray-400 disabled:cursor-not-allowed"
                       type="button"
                     >
                       {updatingThreshold ? 'Adding...' : 'Add Mini App & Enable Notifications'}
@@ -650,7 +599,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                       )}
                     </div>
                     <p className="text-xs text-black/60 mt-1">
-                      Get notified when new support added above this threshold
+                      Get notified when new support is added
                     </p>
                   </div>
                 ) : (
