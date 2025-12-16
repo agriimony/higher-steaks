@@ -310,7 +310,7 @@ export async function checkAndSendExpiredStakeNotifications(): Promise<number> {
         const lockupId = casterLockupIds[i]?.toString();
         const amount = casterAmounts[i]?.toString() || '0';
 
-        if (unlockTime && unlockTime <= currentTime && !isUnlocked && lockupId) {
+        if (unlockTime && unlockTime <= currentTime && unlockTime > currentTime - 24 * 60 * 60 && !isUnlocked && lockupId) {
           const success = await sendStakeExpiredNotification(
             creatorFid,
             lockupId,
@@ -337,7 +337,7 @@ export async function checkAndSendExpiredStakeNotifications(): Promise<number> {
         const amount = supporterAmounts[i]?.toString() || '0';
         const supporterFid = supporterFids[i];
 
-        if (unlockTime && unlockTime <= currentTime && !isUnlocked && lockupId && supporterFid) {
+        if (unlockTime && unlockTime <= currentTime && unlockTime > currentTime - 24 * 60 * 60 && !isUnlocked && lockupId && supporterFid) {
           // For supporter stakes, notify the supporter (not the cast owner)
           // The cast owner is the "castOwner" in the notification message
           const success = await sendStakeExpiredNotification(
