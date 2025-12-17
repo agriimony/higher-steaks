@@ -73,6 +73,19 @@ function isTruthyBoolean(v: any): boolean {
 	return false;
 }
 
+// Parse a token amount string into a number, handling both wei and decimal formats.
+function parseTokenAmount(amount: string): number {
+	let amountNum = 0;
+	try {
+		// attempt format as wei
+		amountNum = parseFloat(formatUnits(BigInt(amount), 18));
+	} catch {
+		// fallback to parseFloat directly
+		amountNum = parseFloat(amount);
+	}
+	return isFinite(amountNum) ? amountNum : 0;
+}
+
 function toInt(v: any): number {
 	const n = typeof v === 'number' ? v : parseInt(String(v || '0'), 10);
 	return Number.isFinite(n) ? n : 0;
@@ -150,20 +163,8 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 		const supporterStakeLockTimes: number[] = [];
 		const supporterStakeUnlocked: boolean[] = [];
 
-		let totalHigherStaked = 0;
-
 		for (const r of castRows) {
 			const amount = String(r.amount ?? '0');
-			// Dune may return token amount in wei or decimals depending on query; we keep a string but compute number for totals using formatUnits(wei,18) if it looks like bigint
-			let amountNum = 0;
-			try {
-				// attempt format as wei
-				amountNum = parseFloat(formatUnits(BigInt(amount), 18));
-			} catch {
-				// fallback to parseFloat directly
-				amountNum = parseFloat(amount);
-			}
-			totalHigherStaked += isFinite(amountNum) ? amountNum : 0;
 
 			const sender = String(r.sender || '').toLowerCase();
 			const senderFid = senderToFid.get(sender) || 0;
@@ -189,6 +190,43 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 				supporterStakeLockTimes.push(lockTime);
 				supporterStakeUnlocked.push(unlocked);
 			}
+		}
+
+		// Only keep supporter stakes whose unlock time matches at least one caster unlock time
+		const casterUnlockSet = new Set(
+			casterStakeUnlockTimes.filter(t => typeof t === 'number' && Number.isFinite(t))
+		);
+
+		const filteredSupporterLockupIds: number[] = [];
+		const filteredSupporterAmounts: string[] = [];
+		const filteredSupporterFids: number[] = [];
+		const filteredSupporterUnlockTimes: number[] = [];
+		const filteredSupporterLockTimes: number[] = [];
+		const filteredSupporterUnlocked: boolean[] = [];
+
+		for (let i = 0; i < supporterStakeUnlockTimes.length; i++) {
+			const unlockTime = supporterStakeUnlockTimes[i];
+
+			// Require explicit match to a caster unlock time to keep this supporter stake
+			if (!casterUnlockSet.has(unlockTime)) {
+				continue;
+			}
+
+			filteredSupporterLockupIds.push(supporterStakeLockupIds[i]);
+			filteredSupporterAmounts.push(supporterStakeAmounts[i]);
+			filteredSupporterFids.push(supporterStakeFids[i]);
+			filteredSupporterUnlockTimes.push(supporterStakeUnlockTimes[i]);
+			filteredSupporterLockTimes.push(supporterStakeLockTimes[i]);
+			filteredSupporterUnlocked.push(supporterStakeUnlocked[i]);
+		}
+
+		// Recompute totalHigherStaked from caster + valid supporter stakes
+		let totalHigherStaked = 0;
+		for (const amt of casterStakeAmounts) {
+			totalHigherStaked += parseTokenAmount(amt);
+		}
+		for (const amt of filteredSupporterAmounts) {
+			totalHigherStaked += parseTokenAmount(amt);
 		}
 
 		// Calculate cast_state based on actual caster stake data
@@ -230,12 +268,12 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			casterStakeUnlockTimes,
 			casterStakeLockTimes,
 			casterStakeUnlocked,
-			supporterStakeLockupIds,
-			supporterStakeAmounts,
-			supporterStakeFids,
-			supporterStakeUnlockTimes,
-			supporterStakeLockTimes,
-			supporterStakeUnlocked,
+			supporterStakeLockupIds: filteredSupporterLockupIds,
+			supporterStakeAmounts: filteredSupporterAmounts,
+			supporterStakeFids: filteredSupporterFids,
+			supporterStakeUnlockTimes: filteredSupporterUnlockTimes,
+			supporterStakeLockTimes: filteredSupporterLockTimes,
+			supporterStakeUnlocked: filteredSupporterUnlocked,
 			castState: calculatedState, // Use calculated state instead of castMeta?.state
 		};
 

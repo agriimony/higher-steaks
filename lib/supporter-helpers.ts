@@ -100,32 +100,29 @@ export function aggregateSupporterStakes(
 }
 
 /**
- * Filter valid supporter stakes with both conditions:
- * 1. currentTime < unlockTime (stake has not expired)
- * 2. unlockTime > min caster stake unlockTime (supporter must be staked longer than min caster stake)
- * 
- * Note: This function requires unlock times for supporter stakes, which may not be available in the database.
- * For now, we'll filter based on what we can verify.
+ * Filter valid supporter stakes based on unlock time matching.
+ *
+ * Rules:
+ * - We no longer check for "not expired" (no currentTime comparison).
+ * - A supporter stake is considered valid if its unlockTime matches
+ *   at least one of the corresponding caster stake unlock times.
+ *
+ * If a supporter stake has no unlockTime, we currently keep it (cannot validate).
  */
 export function filterValidSupporterStakes(
   supporterStakes: Array<{ fid: number; pfp: string; totalAmount: string; unlockTime?: number }>,
-  minCasterUnlockTime: number,
-  currentTime: number
+  casterUnlockTimes: number[]
 ): Array<{ fid: number; pfp: string; totalAmount: string }> {
+  const casterUnlockSet = new Set(casterUnlockTimes.filter(t => typeof t === 'number' && Number.isFinite(t)));
+
   return supporterStakes.filter(stake => {
-    // Condition 1: stake has not expired (if unlockTime is available)
-    if (stake.unlockTime !== undefined && stake.unlockTime <= currentTime) {
-      return false;
+    // If unlockTime is not available, we can't validate; include for now
+    if (stake.unlockTime === undefined) {
+      return true;
     }
-    
-    // Condition 2: unlockTime > min caster stake unlockTime (if unlockTime is available)
-    if (stake.unlockTime !== undefined && stake.unlockTime <= minCasterUnlockTime) {
-      return false;
-    }
-    
-    // If unlockTime is not available, we can't filter, so include it
-    // This will be enhanced when we add supporter_stake_unlock_times column
-    return true;
+
+    // Keep only if unlockTime matches at least one caster unlock time
+    return casterUnlockSet.has(stake.unlockTime);
   });
 }
 
