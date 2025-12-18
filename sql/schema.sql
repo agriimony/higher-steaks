@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS leaderboard_entries (
   supporter_stake_lockup_ids INTEGER[] DEFAULT '{}',
   supporter_stake_amounts NUMERIC[] DEFAULT '{}',
   supporter_stake_fids INTEGER[] DEFAULT '{}',
-  supporter_stake_pfps TEXT[] DEFAULT '{}',
   supporter_stake_unlock_times INTEGER[] DEFAULT '{}',
   supporter_stake_lock_times BIGINT[] DEFAULT '{}', -- ADDED: Missing column
   supporter_stake_unlocked BOOLEAN[] DEFAULT '{}',

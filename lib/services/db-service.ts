@@ -21,7 +21,6 @@ export interface HigherCastData {
 	supporterStakeLockupIds: number[];
 	supporterStakeAmounts: string[];
 	supporterStakeFids: number[];
-	supporterStakePfps: string[];
 	supporterStakeUnlockTimes: number[];
 	supporterStakeUnlocked: boolean[];
 	// NEW: lock times
@@ -66,7 +65,6 @@ export async function getHigherCast(hash: string): Promise<HigherCastData | null
 					supporter_stake_lockup_ids,
 					supporter_stake_amounts,
 					supporter_stake_fids,
-					supporter_stake_pfps,
 					supporter_stake_unlock_times,
 					supporter_stake_unlocked,
 					supporter_stake_lock_times,
@@ -96,7 +94,6 @@ export async function getHigherCast(hash: string): Promise<HigherCastData | null
 					supporter_stake_lockup_ids,
 					supporter_stake_amounts,
 					supporter_stake_fids,
-					supporter_stake_pfps,
 					supporter_stake_unlock_times,
 					supporter_stake_unlocked,
 					supporter_stake_lock_times,
@@ -136,7 +133,6 @@ export async function getHigherCast(hash: string): Promise<HigherCastData | null
 			supporterStakeLockupIds: row.supporter_stake_lockup_ids || [],
 			supporterStakeAmounts: row.supporter_stake_amounts?.map((a: any) => a.toString()) || [],
 			supporterStakeFids: row.supporter_stake_fids || [],
-			supporterStakePfps: row.supporter_stake_pfps || [],
 			supporterStakeUnlockTimes: row.supporter_stake_unlock_times || [],
 			supporterStakeUnlocked: row.supporter_stake_unlocked || [],
 			supporterStakeLockTimes: row.supporter_stake_lock_times || [],
@@ -185,7 +181,6 @@ export async function castExistsInDB(hash: string): Promise<boolean> {
  * Column relationships:
  * - total_higher_staked = sum of all caster_stake_amounts + sum of all supporter_stake_amounts
  * - staker_fids = [creator_fid, ...supporter_stake_fids] (for backward compatibility)
- * - supporter_stake_pfps = array of profile picture URLs corresponding to supporter_stake_fids (same order)
  */
 export async function upsertHigherCast(data: {
 	castHash: string;
@@ -208,7 +203,6 @@ export async function upsertHigherCast(data: {
 	supporterStakeLockupIds?: number[];
 	supporterStakeAmounts?: string[];
 	supporterStakeFids?: number[];
-	supporterStakePfps?: string[]; // Array of PFP URLs corresponding to supporter_stake_fids (same order)
 	supporterStakeUnlockTimes?: number[];
 	supporterStakeUnlocked?: boolean[];
 	// NEW
@@ -245,7 +239,6 @@ export async function upsertHigherCast(data: {
         supporter_stake_lockup_ids,
         supporter_stake_amounts,
         supporter_stake_fids,
-        supporter_stake_pfps,
         supporter_stake_unlock_times,
         supporter_stake_unlocked,
         supporter_stake_lock_times,
@@ -272,7 +265,6 @@ export async function upsertHigherCast(data: {
         ${(data.supporterStakeLockupIds || []) as any},
         ${(data.supporterStakeAmounts || []) as any},
         ${(data.supporterStakeFids || []) as any},
-        ${(data.supporterStakePfps || []) as any},
         ${(data.supporterStakeUnlockTimes || []) as any},
         ${(data.supporterStakeUnlocked || []) as any},
         ${(data.supporterStakeLockTimes || []) as any},
@@ -299,7 +291,6 @@ export async function upsertHigherCast(data: {
         supporter_stake_lockup_ids = EXCLUDED.supporter_stake_lockup_ids,
         supporter_stake_amounts = EXCLUDED.supporter_stake_amounts,
         supporter_stake_fids = EXCLUDED.supporter_stake_fids,
-        supporter_stake_pfps = EXCLUDED.supporter_stake_pfps,
         supporter_stake_unlock_times = EXCLUDED.supporter_stake_unlock_times,
         supporter_stake_unlocked = EXCLUDED.supporter_stake_unlocked,
         supporter_stake_lock_times = EXCLUDED.supporter_stake_lock_times,

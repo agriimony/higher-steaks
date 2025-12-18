@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getHigherCast } from '@/lib/services/db-service';
 import { isValidCastHash } from '@/lib/cast-helpers';
-import { aggregateSupporterStakes } from '@/lib/supporter-helpers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -73,49 +72,60 @@ export async function GET(
       return sum + BigInt(stake.amount);
     }, BigInt(0)).toString();
 
-    // Filter valid supporter stakes using unlock times
-    // Supporter stakes are valid if:
-    // 1. currentTime < unlockTime (not expired)
-    // 2. unlockTime > minCasterUnlockTime (unlocks after earliest caster stake)
+    // Filter + aggregate valid supporter stakes (no PFPs stored in DB)
+    // Rules:
+    // - active = !unlocked (no expiry check)
+    // - valid = unlockTime matches at least one valid caster unlock time
     const supporterStakeUnlockTimes = castData.supporterStakeUnlockTimes || [];
     const supporterStakeUnlocked = castData.supporterStakeUnlocked || [];
-    
-    // Filter supporter stakes by unlock time and unlocked status
-    const validSupporterStakeIndices: number[] = [];
-    for (let i = 0; i < castData.supporterStakeLockupIds.length; i++) {
-      const unlockTime = supporterStakeUnlockTimes[i] || 0;
-      const unlocked = supporterStakeUnlocked[i] || false;
-      
-      // Valid if: not unlocked, not expired, and unlocks after min caster unlock time
-      if (!unlocked && unlockTime > currentTime && unlockTime > minCasterUnlockTime) {
-        validSupporterStakeIndices.push(i);
-      }
-    }
-    
-    // Build filtered arrays for aggregation
-    const validSupporterStakeFids = validSupporterStakeIndices.map(i => castData.supporterStakeFids[i] || 0);
-    const validSupporterStakeAmounts = validSupporterStakeIndices.map(i => castData.supporterStakeAmounts[i] || '0');
-    const validSupporterStakePfps = validSupporterStakeIndices.map(i => castData.supporterStakePfps[i] || '');
-    
-    // Aggregate supporter stakes per FID (only valid ones)
-    const aggregatedSupporterStakes = aggregateSupporterStakes(
-      validSupporterStakeFids,
-      validSupporterStakeAmounts,
-      validSupporterStakePfps
-    );
-    
-    const validSupporterStakes = aggregatedSupporterStakes;
+    const supporterStakeFids = castData.supporterStakeFids || [];
+    const supporterStakeAmounts = castData.supporterStakeAmounts || [];
 
-    // Calculate total supporter staked
-    const totalSupporterStaked = validSupporterStakes.reduce((sum, stake) => {
-      return sum + BigInt(stake.totalAmount);
-    }, BigInt(0)).toString();
+    const casterUnlockSet = new Set(validCasterUnlockTimes);
+    const supporterTotals = new Map<number, bigint>();
+
+    for (let i = 0; i < castData.supporterStakeLockupIds.length; i++) {
+      const unlocked = supporterStakeUnlocked[i] || false;
+      if (unlocked) continue;
+
+      const unlockTime = supporterStakeUnlockTimes[i] || 0;
+      if (!casterUnlockSet.has(unlockTime)) continue;
+
+      const fid = Number(supporterStakeFids[i] || 0);
+      if (!Number.isFinite(fid) || fid <= 0) continue;
+
+      const rawAmount = String(supporterStakeAmounts[i] || '0');
+      let amountWei: bigint;
+      try {
+        amountWei = BigInt(rawAmount);
+      } catch {
+        continue;
+      }
+      if (amountWei <= 0n) continue;
+
+      supporterTotals.set(fid, (supporterTotals.get(fid) || 0n) + amountWei);
+    }
+
+    const totalUniqueSupporters = supporterTotals.size;
+
+    // Sorted top 10 supporters by total active stake (wei)
+    const topSupporters = Array.from(supporterTotals.entries())
+      .sort((a, b) => (a[1] > b[1] ? -1 : a[1] < b[1] ? 1 : 0))
+      .slice(0, 10)
+      .map(([fid, totalAmount]) => ({
+        fid,
+        totalAmount: totalAmount.toString(),
+      }));
+
+    const totalSupporterStaked = Array.from(supporterTotals.values())
+      .reduce((sum, v) => sum + v, 0n)
+      .toString();
 
     // Get connected user's stake if userFid is provided
     const userFidParam = request.nextUrl.searchParams.get('userFid');
     const userFid = userFidParam ? parseInt(userFidParam, 10) : null;
-    const connectedUserStake = userFid
-      ? validSupporterStakes.find(stake => stake.fid === userFid)
+    const connectedUserStake = userFid && supporterTotals.has(userFid)
+      ? { fid: userFid, totalAmount: (supporterTotals.get(userFid) || 0n).toString() }
       : undefined;
 
     return NextResponse.json({
@@ -140,15 +150,9 @@ export async function GET(
         amount: stake.amount,
         unlockTime: stake.unlockTime,
       })),
-      supporterStakes: validSupporterStakes.map(stake => ({
-        fid: stake.fid,
-        pfp: stake.pfp,
-        totalAmount: stake.totalAmount,
-      })),
-      connectedUserStake: connectedUserStake ? {
-        fid: connectedUserStake.fid,
-        totalAmount: connectedUserStake.totalAmount,
-      } : undefined,
+      topSupporters,
+      totalUniqueSupporters,
+      connectedUserStake,
     });
 
   } catch (error: any) {

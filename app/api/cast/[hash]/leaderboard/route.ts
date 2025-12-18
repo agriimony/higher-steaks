@@ -76,12 +76,10 @@ export async function GET(
     const supporterStakeUnlockTimes = castData.supporterStakeUnlockTimes || [];
     const supporterStakeAmounts = castData.supporterStakeAmounts || [];
     const supporterStakeFids = castData.supporterStakeFids || [];
-    const supporterStakePfps = castData.supporterStakePfps || [];
 
     // Map to aggregate by FID
     const supporterWeightedStakesMap = new Map<number, {
       fid: number;
-      pfp: string;
       weightedStake: number;
     }>();
 
@@ -90,7 +88,6 @@ export async function GET(
       const lockTime = supporterStakeLockTimes[i] || 0;
       const unlockTime = supporterStakeUnlockTimes[i] || 0;
       const fid = supporterStakeFids[i] || 0;
-      const pfp = supporterStakePfps[i] || '';
 
       if (lockTime > 0 && unlockTime > 0 && amount > 0 && fid > 0) {
         const weighted = calculateWeightedStake(amount, lockTime, unlockTime, currentTime);
@@ -101,7 +98,6 @@ export async function GET(
         } else {
           supporterWeightedStakesMap.set(fid, {
             fid,
-            pfp,
             weightedStake: weighted,
           });
         }
@@ -113,7 +109,7 @@ export async function GET(
 
     // Fetch usernames from Neynar API
     const uniqueFids = supporters.map(s => s.fid);
-    const usernameMap = new Map<number, { username: string; displayName: string }>();
+    const userMap = new Map<number, { username: string; displayName: string; pfp: string }>();
 
     if (uniqueFids.length > 0) {
       try {
@@ -129,9 +125,10 @@ export async function GET(
             try {
               const userResponse = await neynarClient.fetchBulkUsers({ fids: batch });
               for (const user of userResponse.users) {
-                usernameMap.set(user.fid, {
+                userMap.set(user.fid, {
                   username: user.username,
                   displayName: user.display_name || user.username,
+                  pfp: user.pfp_url || '',
                 });
               }
             } catch (neynarError) {
@@ -149,8 +146,9 @@ export async function GET(
     // Add usernames to supporters
     supporters = supporters.map(supporter => ({
       ...supporter,
-      username: usernameMap.get(supporter.fid)?.username || `fid-${supporter.fid}`,
-      displayName: usernameMap.get(supporter.fid)?.displayName || `fid-${supporter.fid}`,
+      username: userMap.get(supporter.fid)?.username || `fid-${supporter.fid}`,
+      displayName: userMap.get(supporter.fid)?.displayName || `fid-${supporter.fid}`,
+      pfp: userMap.get(supporter.fid)?.pfp || '',
     }));
 
     // Sort: connected user first (if exists), then descending by weighted stake

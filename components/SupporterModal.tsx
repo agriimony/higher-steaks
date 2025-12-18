@@ -36,7 +36,8 @@ interface CastData {
   totalCasterStaked: string;
   totalSupporterStaked: string;
   casterStakes: Array<{ lockupId: number; amount: string; unlockTime: number }>;
-  supporterStakes: Array<{ fid: number; pfp: string; totalAmount: string }>;
+  topSupporters: Array<{ fid: number; totalAmount: string }>;
+  totalUniqueSupporters: number;
   connectedUserStake?: { fid: number; totalAmount: string };
 }
 
@@ -86,6 +87,7 @@ export function SupporterModal({
   const [lockupDurationUnit, setLockupDurationUnit] = useState<'minute' | 'day' | 'week' | 'month' | 'year'>('day');
   const [stakeError, setStakeError] = useState<string | null>(null);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState(false);
+  const [supporterPfpMap, setSupporterPfpMap] = useState<Record<number, string>>({});
   
   // Staking transaction state
   const [pendingCreateLockUp, setPendingCreateLockUp] = useState(false);
@@ -253,7 +255,8 @@ export function SupporterModal({
               totalCasterStaked: '0',
               totalSupporterStaked: '0',
               casterStakes: [],
-              supporterStakes: [],
+              topSupporters: [],
+              totalUniqueSupporters: 0,
               connectedUserStake: undefined,
             });
             setLoading(false);
@@ -273,6 +276,56 @@ export function SupporterModal({
       fetchCastData();
     }
   }, [castHash, userFid]);
+
+  // Fetch latest supporter PFPs for top supporters + connected user (if supporting)
+  useEffect(() => {
+    const fetchSupporterPfps = async () => {
+      if (!castData) return;
+
+      const fidsToFetch: number[] = [];
+      const seen = new Set<number>();
+
+      // Include connected user first (if supporting)
+      if (castData.connectedUserStake?.fid && castData.connectedUserStake.fid > 0) {
+        seen.add(castData.connectedUserStake.fid);
+        fidsToFetch.push(castData.connectedUserStake.fid);
+      }
+
+      // Include top supporters
+      for (const s of (castData.topSupporters || [])) {
+        if (!s?.fid || s.fid <= 0) continue;
+        if (seen.has(s.fid)) continue;
+        seen.add(s.fid);
+        fidsToFetch.push(s.fid);
+      }
+
+      if (fidsToFetch.length === 0) {
+        setSupporterPfpMap({});
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/user/profiles?fids=${encodeURIComponent(fidsToFetch.join(','))}`);
+        if (!res.ok) {
+          setSupporterPfpMap({});
+          return;
+        }
+        const data = await res.json();
+        const next: Record<number, string> = {};
+        for (const u of (data?.users ?? [])) {
+          const fid = Number(u?.fid || 0);
+          if (!Number.isFinite(fid) || fid <= 0) continue;
+          next[fid] = String(u?.pfpUrl || '');
+        }
+        setSupporterPfpMap(next);
+      } catch (e) {
+        console.error('[SupporterModal] Failed to fetch supporter PFPs:', e);
+        setSupporterPfpMap({});
+      }
+    };
+
+    fetchSupporterPfps();
+  }, [castData]);
 
 
   // Chain createLockUp after approve succeeds
@@ -628,10 +681,6 @@ export function SupporterModal({
     );
   }
 
-  // Separate connected user's stake from other supporters
-  const otherSupporterStakes = castData.supporterStakes.filter(
-    stake => !userFid || stake.fid !== userFid
-  );
   const connectedUserStake = castData.connectedUserStake;
 
   // Check if user is the caster
@@ -640,9 +689,20 @@ export function SupporterModal({
   // Format amounts
   const totalCasterStakedFormatted = formatUnits(BigInt(castData.totalCasterStaked || '0'), 18);
   const totalSupporterStakedFormatted = formatUnits(BigInt(castData.totalSupporterStaked || '0'), 18);
-  const connectedUserStakeFormatted = connectedUserStake 
-    ? formatUnits(BigInt(connectedUserStake.totalAmount || '0'), 18)
-    : null;
+
+  const connectedSupportingFid = connectedUserStake?.fid || null;
+  const displaySupporters: Array<{ fid: number; totalAmount: string }> = [];
+  if (connectedSupportingFid && connectedSupportingFid > 0) {
+    displaySupporters.push({ fid: connectedSupportingFid, totalAmount: connectedUserStake?.totalAmount || '0' });
+  }
+  for (const s of (castData.topSupporters || [])) {
+    if (!s?.fid || s.fid <= 0) continue;
+    if (connectedSupportingFid && s.fid === connectedSupportingFid) continue;
+    displaySupporters.push({ fid: s.fid, totalAmount: s.totalAmount || '0' });
+    if (displaySupporters.length >= 10) break; // cap to 10 total avatars (including connected user)
+  }
+  const displayedUniqueCount = new Set(displaySupporters.map(s => s.fid)).size;
+  const othersCount = Math.max(0, (castData.totalUniqueSupporters || 0) - displayedUniqueCount);
 
   return (
     <div 
@@ -760,34 +820,34 @@ export function SupporterModal({
         </div>
 
         {/* Supported By Section */}
-        {castData.supporterStakes.length > 0 && (
+        {(castData.totalUniqueSupporters > 0 || !!connectedUserStake) && (
           <button
             onClick={() => setShowLeaderboardModal(true)}
             className="w-full mb-4 pb-4 border-b border-black/20 text-left hover:bg-black/5 transition-colors rounded p-2 -ml-2 -mr-2"
           >
             <div className="text-xs font-bold text-black mb-2">Supported by:</div>
             <div className="flex flex-wrap gap-2 items-center">
-              {/* Show connected user's stake first if exists */}
-              {connectedUserStake && connectedUserStakeFormatted && (
-                <div className="flex items-center gap-2">
-                  <img 
-                    src={castData.supporterStakes.find(s => s.fid === userFid)?.pfp || ''} 
-                    alt="Your stake"
-                    className="w-8 h-8 rounded-full border border-black/20"
+              {displaySupporters.map((s, index) => {
+                const isConnected = connectedSupportingFid !== null && s.fid === connectedSupportingFid;
+                const pfp = supporterPfpMap[s.fid] || '';
+                return (
+                  <img
+                    key={`${s.fid}-${index}`}
+                    src={pfp}
+                    alt={isConnected ? 'You' : `Supporter ${s.fid}`}
+                    className={`w-8 h-8 rounded-full border flex-shrink-0 ${
+                      isConnected ? 'border-purple-500' : 'border-black/20'
+                    }`}
+                    title={`FID ${s.fid}`}
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
-                  <span className="text-xs text-black font-bold">{connectedUserStakeFormatted} HIGHER</span>
-                </div>
+                );
+              })}
+              {othersCount > 0 && (
+                <span className="text-xs text-black/60">.. and {othersCount} others</span>
               )}
-              {/* Show other supporters */}
-              {otherSupporterStakes.map((stake, index) => (
-                <img 
-                  key={`${stake.fid}-${index}`}
-                  src={stake.pfp || ''} 
-                  alt={`Supporter ${stake.fid}`}
-                  className="w-8 h-8 rounded-full border border-black/20"
-                  title={`@${stake.fid}`}
-                />
-              ))}
             </div>
             <div className="text-xs text-black/50 mt-2">Click to view leaderboard</div>
           </button>
