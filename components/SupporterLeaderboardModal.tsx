@@ -273,7 +273,7 @@ export function SupporterLeaderboardModal({
                     </div>
                     <div className="text-right flex-shrink-0">
                       <div className="text-xs font-bold text-black">
-                        {formatWeightedStake(supporter.weightedStake)} higher-days
+                        {formatWeightedStake(supporter.weightedStake)} h-d
                       </div>
                     </div>
                   </div>
