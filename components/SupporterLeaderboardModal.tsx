@@ -220,8 +220,8 @@ export function SupporterLeaderboardModal({
             </div>
           </div>
           <div className="text-right flex-shrink-0">
-            <div className="text-xs text-black/60 mb-1">Cumulative Weighted Stake</div>
-            <div className="font-bold text-black">
+            <div className="text-xs text-black/60 mb-1">Has believed for</div>
+            <div className="text-sm font-bold text-black">
               {formatWeightedStake(data.caster.weightedStake)} higher-days
             </div>
           </div>
