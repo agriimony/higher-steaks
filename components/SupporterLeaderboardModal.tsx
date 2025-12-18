@@ -229,7 +229,6 @@ export function SupporterLeaderboardModal({
 
         {/* Middle Section: Supporter Leaderboard */}
         <div className="mb-4">
-          <div className="text-xs font-bold text-black mb-3">Supporter Leaderboard</div>
           
           {data.supporters.length === 0 ? (
             <div className="text-center text-black/60 py-8">
@@ -248,7 +247,7 @@ export function SupporterLeaderboardModal({
                         : 'border-black/20'
                     }`}
                   >
-                    <div className="text-xs font-bold text-black/60 w-8 text-right">
+                    <div className="text-xs font-bold text-black/60 w-4 text-right">
                       #{supporter.rank}
                     </div>
                     <img 
@@ -256,7 +255,7 @@ export function SupporterLeaderboardModal({
                       alt={supporter.username}
                       className="w-8 h-8 rounded-full border border-black/20 flex-shrink-0"
                     />
-                    <div className="flex-1 min-w-0">
+                    <div className="text-s flex-1 min-w-0">
                       <a
                         href={`https://farcaster.xyz/${supporter.username}`}
                         target="_blank"
