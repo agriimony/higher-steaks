@@ -255,7 +255,7 @@ export function SupporterLeaderboardModal({
                       alt={supporter.username}
                       className="w-8 h-8 rounded-full border border-black/20 flex-shrink-0"
                     />
-                    <div className="text-s flex-1 min-w-0">
+                    <div className="text-sm flex-1 min-w-0">
                       <a
                         href={`https://farcaster.xyz/${supporter.username}`}
                         target="_blank"
@@ -272,8 +272,8 @@ export function SupporterLeaderboardModal({
                       )}
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <div className="text-xs font-bold text-black">
-                        {formatWeightedStake(supporter.weightedStake)} h-d
+                      <div className="text-sm font-bold text-black">
+                        {formatWeightedStake(supporter.weightedStake)}
                       </div>
                     </div>
                   </div>
