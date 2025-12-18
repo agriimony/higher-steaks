@@ -236,6 +236,7 @@ export function SupporterLeaderboardModal({
             </div>
           ) : (
             <div className="space-y-2">
+              <div className="text-xs text-black/60 text-center italic">Supported by...</div>
               {data.supporters.map((supporter) => {
                 const isConnectedUser = userFid !== null && supporter.fid === userFid;
                 return (
@@ -247,7 +248,6 @@ export function SupporterLeaderboardModal({
                         : 'border-black/20'
                     }`}
                   >
-                    <div className="text-xs text-black/60 text-center italic">Supported by...</div>
                     <div className="text-xs font-bold text-black/60 w-4 text-right">
                       #{supporter.rank}
                     </div>
