@@ -830,17 +830,32 @@ export function SupporterModal({
               {displaySupporters.map((s, index) => {
                 const isConnected = connectedSupportingFid !== null && s.fid === connectedSupportingFid;
                 const pfp = supporterPfpMap[s.fid] || '';
+                const baseClass = `w-8 h-8 rounded-full border flex-shrink-0 ${
+                  isConnected ? 'border-purple-500' : 'border-black/20'
+                }`;
+
+                // Important: don't render <img src="">, because it errors immediately and can
+                // permanently hide the element before PFPs are fetched.
+                if (!pfp) {
+                  return (
+                    <div
+                      key={`${s.fid}-${index}`}
+                      className={`${baseClass} bg-black/5`}
+                      title={`FID ${s.fid}`}
+                    />
+                  );
+                }
+
                 return (
                   <img
                     key={`${s.fid}-${index}`}
                     src={pfp}
                     alt={isConnected ? 'You' : `Supporter ${s.fid}`}
-                    className={`w-8 h-8 rounded-full border flex-shrink-0 ${
-                      isConnected ? 'border-purple-500' : 'border-black/20'
-                    }`}
+                    className={baseClass}
                     title={`FID ${s.fid}`}
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
+                    onError={() => {
+                      // Fallback to placeholder by clearing this fid's pfp (avoids permanent hide)
+                      setSupporterPfpMap(prev => ({ ...prev, [s.fid]: '' }));
                     }}
                   />
                 );
