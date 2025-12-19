@@ -147,11 +147,14 @@ export function StakingModal({
 
   // Use duneStakedData prop instead of internal fetching; fallback to legacy lockups if needed
   const duneItems = duneStakedData?.lockups ?? _legacyLockups ?? [];
-  // Normalize amounts so we always have an amountFormatted for display/sorting
-  const normalizedLockups = duneItems.map((l) => ({
-    ...l,
-    amountFormatted: l.amountFormatted ?? l.amount ?? '0',
-  }));
+  // Normalize amounts and lockupId field (API returns lockUpId, component expects lockupId)
+  const normalizedLockups = useMemo(() => {
+    return duneItems.map((l) => ({
+      ...l,
+      lockupId: l.lockupId || (l as any).lockUpId || String((l as any).lockUpId || ''),
+      amountFormatted: l.amountFormatted ?? l.amount ?? '0',
+    }));
+  }, [duneItems]);
 
   // Handle escape key to close
   useEffect(() => {
@@ -168,13 +171,13 @@ export function StakingModal({
   // Fetch cast text for lockups when data changes
   // Updated logic: check DB first, then Neynar, show Invalid cast if both fail
   useEffect(() => {
-    if (!duneItems.length) {
-      console.log('[StakingModal] No duneItems to process');
+    if (!normalizedLockups.length) {
+      console.log('[StakingModal] No normalizedLockups to process');
       return;
     }
     
-    console.log('[StakingModal] Processing lockups for cast texts:', duneItems.length, 'items');
-    duneItems.forEach((lockup, idx) => {
+    console.log('[StakingModal] Processing lockups for cast texts:', normalizedLockups.length, 'items');
+    normalizedLockups.forEach((lockup, idx) => {
       console.log(`[StakingModal] Lockup ${idx}:`, {
         lockupId: lockup.lockupId,
         castHash: lockup.castHash,
@@ -186,7 +189,7 @@ export function StakingModal({
     
     // Use Promise.all with map instead of forEach to avoid race conditions
     Promise.all(
-      duneItems.map(async (lockup) => {
+      normalizedLockups.map(async (lockup) => {
         // Use castHash if available, otherwise fall back to title
         const castHash = lockup.castHash || lockup.title;
         
@@ -306,7 +309,7 @@ export function StakingModal({
     }).catch((error) => {
       console.error('[StakingModal] Error fetching cast texts:', error);
     });
-  }, [duneItems]);
+  }, [normalizedLockups]);
 
   const derivedWallets = useMemo(() => {
     const map = new Map<string, number>();
@@ -327,7 +330,7 @@ export function StakingModal({
 
     wallets.forEach(seedFromList);
 
-    duneItems.forEach((item) => {
+    normalizedLockups.forEach((item) => {
       if (item.unlocked) return;
       const addr = item.receiver?.toLowerCase();
       if (!addr) return;
