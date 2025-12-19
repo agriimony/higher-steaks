@@ -45,9 +45,7 @@ export async function GET(
       );
     }
 
-    const currentTime = Math.floor(Date.now() / 1000);
-
-    // Filter valid caster stakes (not unlocked and currentTime < unlockTime)
+    // Filter valid caster stakes: !unlocked only (no expiry check)
     const casterStakeUnlocked = castData.casterStakeUnlocked || [];
     const validCasterStakes = castData.casterStakeLockupIds
       .map((lockupId, index) => ({
@@ -56,9 +54,9 @@ export async function GET(
         unlockTime: castData.casterStakeUnlockTimes[index] || 0,
         unlocked: casterStakeUnlocked[index] || false,
       }))
-      .filter(stake => !stake.unlocked && stake.unlockTime > currentTime);
+      .filter(stake => !stake.unlocked);
 
-    // Calculate min and max caster unlock times
+    // Calculate min and max caster unlock times from valid stakes
     const validCasterUnlockTimes = validCasterStakes.map(s => s.unlockTime);
     const minCasterUnlockTime = validCasterUnlockTimes.length > 0
       ? Math.min(...validCasterUnlockTimes)
@@ -75,13 +73,16 @@ export async function GET(
     // Filter + aggregate valid supporter stakes (no PFPs stored in DB)
     // Rules:
     // - active = !unlocked (no expiry check)
-    // - valid = unlockTime matches at least one valid caster unlock time
+    // - valid = unlockTime matches at least one caster unlockTime (ALL caster unlockTimes, not just valid ones)
     const supporterStakeUnlockTimes = castData.supporterStakeUnlockTimes || [];
     const supporterStakeUnlocked = castData.supporterStakeUnlocked || [];
     const supporterStakeFids = castData.supporterStakeFids || [];
     const supporterStakeAmounts = castData.supporterStakeAmounts || [];
 
-    const casterUnlockSet = new Set(validCasterUnlockTimes);
+    // Build Set of ALL caster unlockTimes (regardless of unlocked status or validity)
+    const casterUnlockSet = new Set(
+      castData.casterStakeUnlockTimes.filter((t: any) => typeof t === 'number' && Number.isFinite(t))
+    );
     const supporterTotals = new Map<number, bigint>();
 
     for (let i = 0; i < castData.supporterStakeLockupIds.length; i++) {

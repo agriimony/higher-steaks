@@ -171,9 +171,7 @@ export async function getStakesForCast(castHash: string): Promise<{
     return { casterStakes: [], supporterStakes: [] };
   }
 
-  const currentTime = Math.floor(Date.now() / 1000);
-
-  // Filter valid caster stakes (not unlocked and currentTime < unlockTime)
+  // Filter valid caster stakes: !unlocked only (no expiry check)
   const casterStakeUnlocked = cast.casterStakeUnlocked || [];
   const casterStakes = cast.casterStakeLockupIds
     .map((lockupId, index) => ({
@@ -182,15 +180,16 @@ export async function getStakesForCast(castHash: string): Promise<{
       unlockTime: cast.casterStakeUnlockTimes[index] || 0,
       unlocked: casterStakeUnlocked[index] || false,
     }))
-    .filter(stake => !stake.unlocked && stake.unlockTime > currentTime);
+    .filter(stake => !stake.unlocked);
 
-  // Filter valid supporter stakes (unlockTime > min caster stake unlockTime)
-  const minCasterUnlockTime = cast.casterStakeUnlockTimes.length > 0
-    ? Math.min(...cast.casterStakeUnlockTimes.filter(t => t > currentTime))
-    : 0;
-
+  // Filter valid supporter stakes: !unlocked && unlockTime matches at least one caster unlockTime
   const supporterStakeUnlockTimes = cast.supporterStakeUnlockTimes || [];
   const supporterStakeUnlocked = cast.supporterStakeUnlocked || [];
+
+  // Build Set of ALL caster unlockTimes (regardless of unlocked status)
+  const casterUnlockSet = new Set(
+    cast.casterStakeUnlockTimes.filter((t: any) => typeof t === 'number' && Number.isFinite(t))
+  );
 
   const supporterStakes = cast.supporterStakeLockupIds
     .map((lockupId, index) => ({
@@ -200,12 +199,9 @@ export async function getStakesForCast(castHash: string): Promise<{
       unlockTime: supporterStakeUnlockTimes[index] || 0,
       unlocked: supporterStakeUnlocked[index] || false,
     }))
-    .filter((stake, index) => {
-      // Supporter stakes are valid if:
-      // 1. Not unlocked
-      // 2. Not expired (currentTime < unlockTime)
-      // 3. Unlocks after min caster stake unlockTime
-      return !stake.unlocked && stake.unlockTime > currentTime && stake.unlockTime > minCasterUnlockTime;
+    .filter((stake) => {
+      // Valid supporter stake: !unlocked && unlockTime matches at least one caster unlockTime
+      return !stake.unlocked && casterUnlockSet.has(stake.unlockTime);
     });
 
   return { casterStakes, supporterStakes };

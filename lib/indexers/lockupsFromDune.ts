@@ -192,41 +192,28 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			}
 		}
 
-		// Only keep supporter stakes whose unlock time matches at least one caster unlock time
+		// Calculate totalHigherStaked using only valid stakes (for display)
+		// But store ALL supporter stakes in DB for historical calculations
 		const casterUnlockSet = new Set(
 			casterStakeUnlockTimes.filter(t => typeof t === 'number' && Number.isFinite(t))
 		);
 
-		const filteredSupporterLockupIds: number[] = [];
-		const filteredSupporterAmounts: string[] = [];
-		const filteredSupporterFids: number[] = [];
-		const filteredSupporterUnlockTimes: number[] = [];
-		const filteredSupporterLockTimes: number[] = [];
-		const filteredSupporterUnlocked: boolean[] = [];
-
-		for (let i = 0; i < supporterStakeUnlockTimes.length; i++) {
-			const unlockTime = supporterStakeUnlockTimes[i];
-
-			// Require explicit match to a caster unlock time to keep this supporter stake
-			if (!casterUnlockSet.has(unlockTime)) {
-				continue;
-			}
-
-			filteredSupporterLockupIds.push(supporterStakeLockupIds[i]);
-			filteredSupporterAmounts.push(supporterStakeAmounts[i]);
-			filteredSupporterFids.push(supporterStakeFids[i]);
-			filteredSupporterUnlockTimes.push(supporterStakeUnlockTimes[i]);
-			filteredSupporterLockTimes.push(supporterStakeLockTimes[i]);
-			filteredSupporterUnlocked.push(supporterStakeUnlocked[i]);
-		}
-
-		// Recompute totalHigherStaked from caster + valid supporter stakes
 		let totalHigherStaked = 0;
+		// Count all caster stakes (they're all stored)
 		for (const amt of casterStakeAmounts) {
 			totalHigherStaked += parseTokenAmount(amt);
 		}
-		for (const amt of filteredSupporterAmounts) {
-			totalHigherStaked += parseTokenAmount(amt);
+
+		// Count only valid supporter stakes for totalHigherStaked
+		for (let i = 0; i < supporterStakeUnlockTimes.length; i++) {
+			const unlockTime = supporterStakeUnlockTimes[i];
+			const unlocked = supporterStakeUnlocked[i] || false;
+
+			// Only count valid supporter stakes in totalHigherStaked
+			if (unlocked) continue;
+			if (!casterUnlockSet.has(unlockTime)) continue;
+
+			totalHigherStaked += parseTokenAmount(supporterStakeAmounts[i]);
 		}
 
 		// Calculate cast_state based on actual caster stake data
@@ -268,12 +255,13 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			casterStakeUnlockTimes,
 			casterStakeLockTimes,
 			casterStakeUnlocked,
-			supporterStakeLockupIds: filteredSupporterLockupIds,
-			supporterStakeAmounts: filteredSupporterAmounts,
-			supporterStakeFids: filteredSupporterFids,
-			supporterStakeUnlockTimes: filteredSupporterUnlockTimes,
-			supporterStakeLockTimes: filteredSupporterLockTimes,
-			supporterStakeUnlocked: filteredSupporterUnlocked,
+			// Store ALL supporter stakes (not filtered) for historical calculations
+			supporterStakeLockupIds,
+			supporterStakeAmounts,
+			supporterStakeFids,
+			supporterStakeUnlockTimes,
+			supporterStakeLockTimes,
+			supporterStakeUnlocked,
 			castState: calculatedState, // Use calculated state instead of castMeta?.state
 		};
 

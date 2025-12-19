@@ -200,9 +200,11 @@ export async function GET(req: NextRequest) {
         SELECT 
           caster_stake_amounts,
           caster_stake_unlocked,
+          caster_stake_unlock_times,
           supporter_stake_amounts,
           supporter_stake_fids,
-          supporter_stake_unlocked
+          supporter_stake_unlocked,
+          supporter_stake_unlock_times
         FROM leaderboard_entries
         WHERE creator_fid = ${fid}
         AND cast_state IN ('higher', 'expired')
@@ -210,6 +212,7 @@ export async function GET(req: NextRequest) {
 
       for (const row of userCastsResult.rows) {
         // Sum caster stakes (stakes the user made on their own casts)
+        // Valid caster stake: !unlocked only (no expiry check)
         // Amounts are stored as wei (string representation of BigInt)
         const casterAmounts = row.caster_stake_amounts || [];
         const casterUnlocked = row.caster_stake_unlocked || [];
@@ -225,12 +228,25 @@ export async function GET(req: NextRequest) {
         }
 
         // Sum supporter stakes (stakes others made on the user's casts)
+        // Valid supporter stake: !unlocked && unlockTime matches at least one caster unlockTime
         // Amounts are stored as wei (string representation of BigInt)
         const supporterAmounts = row.supporter_stake_amounts || [];
         const supporterFids = row.supporter_stake_fids || [];
         const supporterUnlocked = row.supporter_stake_unlocked || [];
+        const supporterUnlockTimes = row.supporter_stake_unlock_times || [];
+        const casterUnlockTimes = row.caster_stake_unlock_times || [];
+
+        // Build Set of ALL caster unlockTimes (regardless of unlocked status)
+        const casterUnlockSet = new Set(
+          casterUnlockTimes.filter((t: any) => typeof t === 'number' && Number.isFinite(t))
+        );
+
         for (let i = 0; i < supporterAmounts.length; i++) {
-          if (!supporterUnlocked[i]) {
+          const unlocked = supporterUnlocked[i] || false;
+          const unlockTime = supporterUnlockTimes[i] || 0;
+
+          // Valid supporter stake: !unlocked && unlockTime matches at least one caster unlockTime
+          if (!unlocked && casterUnlockSet.has(unlockTime)) {
             try {
               const amountBigInt = BigInt(String(supporterAmounts[i] || '0'));
               totalSupporterStakesOnUserCasts += amountBigInt;

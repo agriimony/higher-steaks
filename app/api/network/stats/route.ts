@@ -41,7 +41,7 @@ export async function GET() {
         const amount = casterAmounts[i];
         const unlocked = casterUnlocked[i] || false;
 
-        // Only count if not unlocked
+        // Valid caster stake: !unlocked only (no expiry check)
         if (!unlocked) {
           try {
             // Amounts are stored as wei (string representation of BigInt)
@@ -54,15 +54,24 @@ export async function GET() {
       }
 
       // Process supporter stakes
+      // Valid supporter stake: !unlocked && unlockTime matches at least one caster unlockTime
       const supporterAmounts = row.supporter_stake_amounts || [];
       const supporterUnlocked = row.supporter_stake_unlocked || [];
+      const supporterUnlockTimes = row.supporter_stake_unlock_times || [];
+      const casterUnlockTimes = row.caster_stake_unlock_times || [];
+
+      // Build Set of ALL caster unlockTimes (regardless of unlocked status)
+      const casterUnlockSet = new Set(
+        casterUnlockTimes.filter((t: any) => typeof t === 'number' && Number.isFinite(t))
+      );
 
       for (let i = 0; i < supporterAmounts.length; i++) {
         const amount = supporterAmounts[i];
         const unlocked = supporterUnlocked[i] || false;
+        const unlockTime = supporterUnlockTimes[i] || 0;
 
-        // Only count if not unlocked
-        if (!unlocked) {
+        // Valid supporter stake: !unlocked && unlockTime matches at least one caster unlockTime
+        if (!unlocked && casterUnlockSet.has(unlockTime)) {
           try {
             // Amounts are stored as wei (string representation of BigInt)
             const amountBigInt = BigInt(String(amount || '0'));
