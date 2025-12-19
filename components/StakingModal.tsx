@@ -171,21 +171,7 @@ export function StakingModal({
   // Fetch cast text for lockups when data changes
   // Updated logic: check DB first, then Neynar, show Invalid cast if both fail
   useEffect(() => {
-    if (!normalizedLockups.length) {
-      console.log('[StakingModal] No normalizedLockups to process');
-      return;
-    }
-    
-    console.log('[StakingModal] Processing lockups for cast texts:', normalizedLockups.length, 'items');
-    normalizedLockups.forEach((lockup, idx) => {
-      console.log(`[StakingModal] Lockup ${idx}:`, {
-        lockupId: lockup.lockupId,
-        castHash: lockup.castHash,
-        title: lockup.title,
-        hasCastHash: !!lockup.castHash,
-        hasTitle: !!lockup.title,
-      });
-    });
+    if (!normalizedLockups.length) return;
     
     // Use Promise.all with map instead of forEach to avoid race conditions
     Promise.all(
@@ -193,121 +179,82 @@ export function StakingModal({
         // Use castHash if available, otherwise fall back to title
         const castHash = lockup.castHash || lockup.title;
         
-        console.log(`[StakingModal] Processing lockup ${lockup.lockupId} with castHash:`, castHash);
-        
         if (!isValidCastHash(castHash)) {
-          console.log(`[StakingModal] Invalid cast hash for lockup ${lockup.lockupId}:`, castHash);
           return { lockupId: lockup.lockupId, description: null };
         }
         
         // Step 1: Check if cast exists in database
         try {
-          const dbUrl = `/api/cast/${castHash}`;
-          console.log(`[StakingModal] Fetching from DB for lockup ${lockup.lockupId}:`, dbUrl);
-          const dbResponse = await fetch(dbUrl);
+          const dbResponse = await fetch(`/api/cast/${castHash}`);
           if (dbResponse.ok) {
             const dbData = await dbResponse.json();
-            console.log(`[StakingModal] DB response for lockup ${lockup.lockupId}:`, {
-              state: dbData.state,
-              hasDescription: !!dbData.description,
-              description: dbData.description?.substring(0, 50) + '...',
-            });
             
             // If cast_state is 'higher' or 'expired', use DB data
             if (dbData.state === 'higher' || dbData.state === 'expired') {
-              const description = dbData.description ? truncateCastText(dbData.description) : null;
-              console.log(`[StakingModal] Using DB description for lockup ${lockup.lockupId}:`, description?.substring(0, 50));
               return {
                 lockupId: lockup.lockupId,
-                description,
+                description: dbData.description ? truncateCastText(dbData.description) : null,
               };
             }
             
             // If cast_state is 'valid' or 'invalid', fallback to Neynar validation
             if (dbData.state === 'valid' || dbData.state === 'invalid') {
               try {
-                const neynarUrl = `/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`;
-                console.log(`[StakingModal] Fetching from Neynar for lockup ${lockup.lockupId}:`, neynarUrl);
-                const neynarResponse = await fetch(neynarUrl);
+                const neynarResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
                 if (neynarResponse.ok) {
                   const neynarData = await neynarResponse.json();
-                  console.log(`[StakingModal] Neynar response for lockup ${lockup.lockupId}:`, {
-                    valid: neynarData.valid,
-                    hasDescription: !!neynarData.description,
-                    description: neynarData.description?.substring(0, 50) + '...',
-                  });
                   if (neynarData.valid && neynarData.description) {
-                    const description = truncateCastText(neynarData.description);
-                    console.log(`[StakingModal] Using Neynar description for lockup ${lockup.lockupId}:`, description?.substring(0, 50));
                     return {
                       lockupId: lockup.lockupId,
-                      description,
+                      description: truncateCastText(neynarData.description),
                     };
                   }
                 }
               } catch (error) {
-                console.error(`[StakingModal] Error validating cast via Neynar for lockup ${lockup.lockupId}:`, error);
+                // Silently handle error
               }
               // Neynar validation failed, show Invalid cast
-              console.log(`[StakingModal] Neynar validation failed for lockup ${lockup.lockupId}, marking as Invalid cast`);
               return {
                 lockupId: lockup.lockupId,
                 description: 'Invalid cast',
               };
             }
-          } else {
-            console.log(`[StakingModal] DB response not OK for lockup ${lockup.lockupId}:`, dbResponse.status);
           }
         } catch (error) {
-          console.error(`[StakingModal] Error checking DB for cast ${lockup.lockupId}:`, error);
+          // Silently handle error
         }
         
         // Step 2: If not found in DB, call /api/validate-cast (Neynar fallback)
         try {
-          const validateUrl = `/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`;
-          console.log(`[StakingModal] Fallback: Fetching from Neynar for lockup ${lockup.lockupId}:`, validateUrl);
-          const validateResponse = await fetch(validateUrl);
+          const validateResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
           if (validateResponse.ok) {
             const validateData = await validateResponse.json();
-            console.log(`[StakingModal] Fallback Neynar response for lockup ${lockup.lockupId}:`, {
-              valid: validateData.valid,
-              hasDescription: !!validateData.description,
-              description: validateData.description?.substring(0, 50) + '...',
-            });
             if (validateData.valid && validateData.description) {
-              const description = truncateCastText(validateData.description);
-              console.log(`[StakingModal] Using fallback Neynar description for lockup ${lockup.lockupId}:`, description?.substring(0, 50));
               return {
                 lockupId: lockup.lockupId,
-                description,
+                description: truncateCastText(validateData.description),
               };
             }
-          } else {
-            console.log(`[StakingModal] Fallback Neynar response not OK for lockup ${lockup.lockupId}:`, validateResponse.status);
           }
         } catch (error) {
-          console.error(`[StakingModal] Error validating cast via Neynar (fallback) for lockup ${lockup.lockupId}:`, error);
+          // Silently handle error
         }
         
         // Step 3: If both fail, display "Invalid cast"
-        console.log(`[StakingModal] All fetches failed for lockup ${lockup.lockupId}, marking as Invalid cast`);
         return {
           lockupId: lockup.lockupId,
           description: 'Invalid cast',
         };
       })
     ).then((results) => {
-      console.log('[StakingModal] All cast text fetches completed. Results:', results);
       // Update state once with all results to avoid race conditions
       const newCastTexts: Record<string, string | null> = {};
       results.forEach(({ lockupId, description }) => {
         newCastTexts[lockupId] = description;
-        console.log(`[StakingModal] Setting cast text for lockup ${lockupId}:`, description?.substring(0, 50) || 'null');
       });
-      console.log('[StakingModal] Final castTexts state:', newCastTexts);
       setCastTexts(newCastTexts);
     }).catch((error) => {
-      console.error('[StakingModal] Error fetching cast texts:', error);
+      // Silently handle error
     });
   }, [normalizedLockups]);
 
@@ -617,14 +564,6 @@ export function StakingModal({
                           {(() => {
                             const castHash = lockup.castHash || lockup.title;
                             const castText = castTexts[lockup.lockupId];
-                            
-                            console.log(`[StakingModal] Rendering cast text for lockup ${lockup.lockupId}:`, {
-                              lockupId: lockup.lockupId,
-                              castHash,
-                              hasCastText: !!castText,
-                              castText: castText?.substring(0, 50),
-                              allCastTexts: Object.keys(castTexts),
-                            });
                             
                             if (!isValidCastHash(castHash)) return null;
                             
