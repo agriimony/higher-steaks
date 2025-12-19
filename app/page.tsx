@@ -9,7 +9,7 @@ import { TransactionModal } from '@/components/TransactionModal';
 import { UserModal } from '@/components/UserModal';
 import { LandingPage } from '@/components/LandingPage';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
-import { useAccount } from 'wagmi';
+import { useAccount, useConnect } from 'wagmi';
 import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
 import { ALLOWED_FIDS } from '@/config/allowed-fids';
 
@@ -119,7 +119,16 @@ export default function HigherSteakMenu() {
   const [pixelDensity, setPixelDensity] = useState(1);
   const [viewportWidth, setViewportWidth] = useState(0);
   
-  const { address: wagmiAddress } = useAccount();
+  const { address: wagmiAddress, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
+  
+  // Auto-connect wallet if not connected (for desktop)
+  useEffect(() => {
+    if (!isConnected && connectors.length > 0) {
+      // Attempt to connect to the Farcaster Mini App connector
+      connect({ connector: connectors[0] });
+    }
+  }, [isConnected, connect, connectors]);
   
   // Handle stake success: refresh balance and staking details to get the new lockup
   const handleStakeSuccess = useCallback(() => {

@@ -7,7 +7,7 @@ import { farcasterMiniApp } from '@farcaster/miniapp-wagmi-connector';
 // Get RPC URL with fallbacks
 const getRpcUrl = (): string => {
   // Priority 1: Alchemy (most reliable)
-  if (process.env.NEXT_PUBLIC_ALCHEMY_API_KEY) {
+  if (process.env.ALCHEMY_API_KEY) {
     return `https://base-mainnet.g.alchemy.com/v2/${process.env.ALCHEMY_API_KEY}`;
   }
   
