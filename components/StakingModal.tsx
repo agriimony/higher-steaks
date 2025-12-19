@@ -169,9 +169,16 @@ export function StakingModal({
   // Updated logic: check DB first, then Neynar, show Invalid cast if both fail
   useEffect(() => {
     if (!duneItems.length) return;
-    duneItems.forEach(async (lockup) => {
-      if (isValidCastHash(lockup.title)) {
-        const castHash = lockup.title;
+    
+    // Use Promise.all with map instead of forEach to avoid race conditions
+    Promise.all(
+      duneItems.map(async (lockup) => {
+        // Use castHash if available, otherwise fall back to title
+        const castHash = lockup.castHash || lockup.title;
+        
+        if (!isValidCastHash(castHash)) {
+          return { lockupId: lockup.lockupId, description: null };
+        }
         
         // Step 1: Check if cast exists in database
         try {
@@ -181,32 +188,33 @@ export function StakingModal({
             
             // If cast_state is 'higher' or 'expired', use DB data
             if (dbData.state === 'higher' || dbData.state === 'expired') {
-              setCastTexts(prev => ({
-                ...prev,
-                [lockup.lockupId]: dbData.description ? truncateCastText(dbData.description) : null,
-              }));
-              return;
+              return {
+                lockupId: lockup.lockupId,
+                description: dbData.description ? truncateCastText(dbData.description) : null,
+              };
             }
             
             // If cast_state is 'valid' or 'invalid', fallback to Neynar validation
             if (dbData.state === 'valid' || dbData.state === 'invalid') {
-              const neynarResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
-              if (neynarResponse.ok) {
-                const neynarData = await neynarResponse.json();
-                if (neynarData.valid && neynarData.description) {
-                  setCastTexts(prev => ({
-                    ...prev,
-                    [lockup.lockupId]: truncateCastText(neynarData.description),
-                  }));
-                  return;
+              try {
+                const neynarResponse = await fetch(`/api/validate-cast?hash=${encodeURIComponent(castHash)}&isUrl=false`);
+                if (neynarResponse.ok) {
+                  const neynarData = await neynarResponse.json();
+                  if (neynarData.valid && neynarData.description) {
+                    return {
+                      lockupId: lockup.lockupId,
+                      description: truncateCastText(neynarData.description),
+                    };
+                  }
                 }
+              } catch (error) {
+                console.error('[StakingModal] Error validating cast via Neynar:', error);
               }
               // Neynar validation failed, show Invalid cast
-              setCastTexts(prev => ({
-                ...prev,
-                [lockup.lockupId]: 'Invalid cast',
-              }));
-              return;
+              return {
+                lockupId: lockup.lockupId,
+                description: 'Invalid cast',
+              };
             }
           }
         } catch (error) {
@@ -219,11 +227,10 @@ export function StakingModal({
           if (validateResponse.ok) {
             const validateData = await validateResponse.json();
             if (validateData.valid && validateData.description) {
-              setCastTexts(prev => ({
-                ...prev,
-                [lockup.lockupId]: truncateCastText(validateData.description),
-              }));
-              return;
+              return {
+                lockupId: lockup.lockupId,
+                description: truncateCastText(validateData.description),
+              };
             }
           }
         } catch (error) {
@@ -231,11 +238,20 @@ export function StakingModal({
         }
         
         // Step 3: If both fail, display "Invalid cast"
-        setCastTexts(prev => ({
-          ...prev,
-          [lockup.lockupId]: 'Invalid cast',
-        }));
-      }
+        return {
+          lockupId: lockup.lockupId,
+          description: 'Invalid cast',
+        };
+      })
+    ).then((results) => {
+      // Update state once with all results to avoid race conditions
+      const newCastTexts: Record<string, string | null> = {};
+      results.forEach(({ lockupId, description }) => {
+        newCastTexts[lockupId] = description;
+      });
+      setCastTexts(newCastTexts);
+    }).catch((error) => {
+      console.error('[StakingModal] Error fetching cast texts:', error);
     });
   }, [duneItems]);
 
@@ -542,13 +558,21 @@ export function StakingModal({
                             </div>
                           </div>
                           {/* Cast text or link */}
-                          {isValidCastHash(lockup.title) && castTexts[lockup.lockupId] ? (
-                            <p className="text-xs text-gray-400 truncate mt-1">
-                              {castTexts[lockup.lockupId]}
-                            </p>
-                          ) : isValidCastHash(lockup.title) ? (
-                            <p className="text-xs text-gray-400 italic mt-1">Higher cast not found</p>
-                          ) : null}
+                          {(() => {
+                            const castHash = lockup.castHash || lockup.title;
+                            if (!isValidCastHash(castHash)) return null;
+                            
+                            if (castTexts[lockup.lockupId]) {
+                              return (
+                                <p className="text-xs text-gray-400 truncate mt-1">
+                                  {castTexts[lockup.lockupId]}
+                                </p>
+                              );
+                            }
+                            return (
+                              <p className="text-xs text-gray-400 italic mt-1">Higher cast not found</p>
+                            );
+                          })()}
                         </div>
                       </li>
                     );
