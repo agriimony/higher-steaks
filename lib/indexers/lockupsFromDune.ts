@@ -134,6 +134,10 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 
 	for (const [castHash, castRows] of grouped.entries()) {
 		const { ownerFid, ownerWallets } = await resolveCastOwnerAndWallets(castHash);
+		
+		// Fetch existing DB cast first to preserve metadata if cast is deleted/expired in Farcaster
+		const existingDbCast = await getHigherCast(castHash);
+		
 		let castMeta = null as Awaited<ReturnType<typeof getCastByHash>> | null;
 		try {
 			castMeta = await getCastByHash(castHash); // for display fields if available
@@ -142,7 +146,7 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 		}
 
 		// If we couldn't resolve cast owner and have no metadata, skip this cast hash
-		if (ownerFid == null && !castMeta) {
+		if (ownerFid == null && !castMeta && !existingDbCast) {
 			continue;
 		}
 
@@ -240,15 +244,17 @@ export async function fetchAndAggregateLockupsFromDune(): Promise<Map<string, Ag
 			calculatedState = castMeta ? 'valid' : 'invalid';
 		}
 
+		// Preserve existing DB metadata if cast is deleted/expired in Farcaster
+		// Use castMeta if available (fresh from Neynar), otherwise fall back to existing DB values
 		const aggregated: AggregatedCast = {
 			castHash,
-			creatorFid: castMeta?.fid || ownerFid || 0,
-			creatorUsername: castMeta?.username || '',
-			creatorDisplayName: castMeta?.displayName,
-			creatorPfpUrl: castMeta?.pfpUrl,
-			castText: castMeta?.castText || '',
-			description: castMeta?.description || '',
-			castTimestamp: castMeta?.timestamp || new Date().toISOString(),
+			creatorFid: castMeta?.fid || existingDbCast?.creatorFid || ownerFid || 0,
+			creatorUsername: castMeta?.username || existingDbCast?.creatorUsername || '',
+			creatorDisplayName: castMeta?.displayName || existingDbCast?.creatorDisplayName,
+			creatorPfpUrl: castMeta?.pfpUrl || existingDbCast?.creatorPfpUrl,
+			castText: castMeta?.castText || existingDbCast?.castText || '',
+			description: castMeta?.description || existingDbCast?.description || '',
+			castTimestamp: castMeta?.timestamp || existingDbCast?.castTimestamp || new Date().toISOString(),
 			totalHigherStaked,
 			casterStakeLockupIds,
 			casterStakeAmounts,

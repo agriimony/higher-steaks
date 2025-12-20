@@ -273,12 +273,13 @@ export async function upsertHigherCast(data: {
       )
       ON CONFLICT (cast_hash) DO UPDATE SET
         creator_fid = EXCLUDED.creator_fid,
-        creator_username = EXCLUDED.creator_username,
-        creator_display_name = EXCLUDED.creator_display_name,
-        creator_pfp_url = EXCLUDED.creator_pfp_url,
-        cast_text = EXCLUDED.cast_text,
-        description = EXCLUDED.description,
-        cast_timestamp = EXCLUDED.cast_timestamp,
+        -- Preserve existing metadata if new values are null/empty (cast deleted/expired in Farcaster)
+        creator_username = COALESCE(NULLIF(EXCLUDED.creator_username, ''), leaderboard_entries.creator_username),
+        creator_display_name = COALESCE(NULLIF(EXCLUDED.creator_display_name, ''), leaderboard_entries.creator_display_name),
+        creator_pfp_url = COALESCE(NULLIF(EXCLUDED.creator_pfp_url, ''), leaderboard_entries.creator_pfp_url),
+        cast_text = COALESCE(NULLIF(EXCLUDED.cast_text, ''), leaderboard_entries.cast_text),
+        description = COALESCE(NULLIF(EXCLUDED.description, ''), leaderboard_entries.description),
+        cast_timestamp = COALESCE(EXCLUDED.cast_timestamp, leaderboard_entries.cast_timestamp),
         total_higher_staked = EXCLUDED.total_higher_staked,
         usd_value = EXCLUDED.usd_value,
         rank = EXCLUDED.rank,
