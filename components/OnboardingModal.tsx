@@ -1230,7 +1230,7 @@ export function OnboardingModal({
               type="number"
               value={localLockupDuration}
               onChange={(e) => setLocalLockupDuration(e.target.value)}
-              placeholder="1"
+              placeholder="0"
               min="1"
               className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black focus:outline-none focus:border-black"
             />

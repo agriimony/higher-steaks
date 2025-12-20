@@ -903,7 +903,7 @@ export function SupporterModal({
                       setLockupDuration(e.target.value);
                       setStakeError(null);
                     }}
-                    placeholder="1"
+                    placeholder="0"
                     min="1"
                     className="flex-1 text-sm font-mono bg-white border border-black/20 p-2 text-black placeholder-black/40 focus:outline-none focus:border-black"
                   />
