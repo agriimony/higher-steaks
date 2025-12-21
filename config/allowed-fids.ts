@@ -15,7 +15,8 @@ export const ALLOWED_FIDS = [
   9318,   // catra
   1553723, // highersteaks
   3036, // dwayne
-  318307, //madlog1c
+  318307, // madlog1c
+  955747, // cactuslockwood
   // Add more FIDs here
 ];
 
