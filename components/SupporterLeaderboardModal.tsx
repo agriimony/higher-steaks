@@ -237,49 +237,63 @@ export function SupporterLeaderboardModal({
           ) : (
             <div className="space-y-2">
               <div className="text-xs text-black/60 text-center italic">Supported by...</div>
-              {data.supporters.map((supporter) => {
-                const isConnectedUser = userFid !== null && supporter.fid === userFid;
-                return (
-                  <div
-                    key={supporter.fid}
-                    className={`flex items-center gap-3 p-2 rounded border ${
-                      isConnectedUser 
-                        ? 'bg-purple-50 border-purple-300' 
-                        : 'border-black/20'
-                    }`}
-                  >
-                    <div className="text-xs font-bold text-black/60 w-4 text-right">
-                      #{supporter.rank}
-                    </div>
-                    <img 
-                      src={supporter.pfp || ''} 
-                      alt={supporter.username}
-                      className="w-8 h-8 rounded-full border border-black/20 flex-shrink-0"
-                    />
-                    <div className="text-sm flex-1 min-w-0">
-                      <a
-                        href={`https://farcaster.xyz/${supporter.username}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`font-bold hover:text-purple-700 transition-colors block truncate ${
-                          isConnectedUser ? 'text-purple-700' : 'text-black'
-                        }`}
-                        title={`@${supporter.username}`}
-                      >
-                        @{supporter.username}
-                      </a>
-                      {supporter.displayName && supporter.displayName !== supporter.username && (
-                        <div className="text-xs text-black/60 truncate">{supporter.displayName}</div>
-                      )}
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-xs font-bold text-black">
-                        {formatWeightedStake(supporter.weightedStake)} h-days
+              {(() => {
+                // Reorder supporters: connected user first, then all others in rank order
+                const connectedUser = userFid !== null 
+                  ? data.supporters.find(s => s.fid === userFid)
+                  : null;
+                const otherSupporters = userFid !== null
+                  ? data.supporters.filter(s => s.fid !== userFid)
+                  : data.supporters;
+                
+                const displayOrder = connectedUser 
+                  ? [connectedUser, ...otherSupporters]
+                  : otherSupporters;
+                
+                return displayOrder.map((supporter) => {
+                  const isConnectedUser = userFid !== null && supporter.fid === userFid;
+                  return (
+                    <div
+                      key={supporter.fid}
+                      className={`flex items-center gap-3 p-2 rounded border ${
+                        isConnectedUser 
+                          ? 'bg-purple-50 border-purple-300' 
+                          : 'border-black/20'
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-black/60 w-4 text-right">
+                        #{supporter.rank}
+                      </div>
+                      <img 
+                        src={supporter.pfp || ''} 
+                        alt={supporter.username}
+                        className="w-8 h-8 rounded-full border border-black/20 flex-shrink-0"
+                      />
+                      <div className="text-sm flex-1 min-w-0">
+                        <a
+                          href={`https://farcaster.xyz/${supporter.username}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`font-bold hover:text-purple-700 transition-colors block truncate ${
+                            isConnectedUser ? 'text-purple-700' : 'text-black'
+                          }`}
+                          title={`@${supporter.username}`}
+                        >
+                          @{supporter.username}
+                        </a>
+                        {supporter.displayName && supporter.displayName !== supporter.username && (
+                          <div className="text-xs text-black/60 truncate">{supporter.displayName}</div>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <div className="text-xs font-bold text-black">
+                          {formatWeightedStake(supporter.weightedStake)} h-days
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
