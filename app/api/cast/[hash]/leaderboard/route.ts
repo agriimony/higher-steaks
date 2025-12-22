@@ -151,27 +151,23 @@ export async function GET(
       pfp: userMap.get(supporter.fid)?.pfp || '',
     }));
 
-    // Sort: connected user first (if exists), then descending by weighted stake
-    supporters.sort((a, b) => {
-      if (userFid !== null) {
-        if (a.fid === userFid && b.fid !== userFid) return -1;
-        if (a.fid !== userFid && b.fid === userFid) return 1;
-      }
-      return b.weightedStake - a.weightedStake;
-    });
+    // Sort by weighted stake descending (do NOT move connected user to front here)
+    // The frontend will handle displaying the connected user first while preserving correct ranks
+    supporters.sort((a, b) => b.weightedStake - a.weightedStake);
+
+    // Assign ranks based on sorted position (before pagination)
+    // This ensures ranks reflect actual position by weighted stake
+    const supportersWithRanks = supporters.map((supporter, index) => ({
+      ...supporter,
+      rank: index + 1, // 1-based rank based on sorted position
+    }));
 
     // Pagination
-    const totalSupporters = supporters.length;
+    const totalSupporters = supportersWithRanks.length;
     const totalPages = Math.max(1, Math.ceil(totalSupporters / ENTRIES_PER_PAGE));
     const startIndex = (page - 1) * ENTRIES_PER_PAGE;
     const endIndex = startIndex + ENTRIES_PER_PAGE;
-    const paginatedSupporters = supporters.slice(startIndex, endIndex);
-
-    // Add ranks (1-based, accounting for pagination)
-    const supportersWithRanks = paginatedSupporters.map((supporter, index) => ({
-      ...supporter,
-      rank: startIndex + index + 1,
-    }));
+    const paginatedSupporters = supportersWithRanks.slice(startIndex, endIndex);
 
     return NextResponse.json({
       caster: {
@@ -181,7 +177,7 @@ export async function GET(
         pfpUrl: castData.creatorPfpUrl,
         weightedStake: totalCasterWeightedStake,
       },
-      supporters: supportersWithRanks,
+      supporters: paginatedSupporters,
       totalPages,
       currentPage: page,
       totalSupporters,
