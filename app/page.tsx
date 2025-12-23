@@ -7,6 +7,7 @@ import { StakingModal } from '@/components/StakingModal';
 import { SupporterModal } from '@/components/SupporterModal';
 import { TransactionModal } from '@/components/TransactionModal';
 import { UserModal } from '@/components/UserModal';
+import { NetworkModal } from '@/components/NetworkModal';
 import { LandingPage } from '@/components/LandingPage';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 import { useAccount, useConnect } from 'wagmi';
@@ -105,6 +106,7 @@ export default function HigherSteakMenu() {
   const [showStakingModal, setShowStakingModal] = useState(false);
   const [showSupporterModal, setShowSupporterModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showNetworkModal, setShowNetworkModal] = useState(false);
   const [selectedCastHash, setSelectedCastHash] = useState<string | null>(null);
   const [simulatedFid, setSimulatedFid] = useState<number | null>(null); // For testing supporter vs caster view
   // FID switcher removed; simulatedFid now unused in UI (could be set via dev tools if needed)
@@ -530,6 +532,16 @@ export default function HigherSteakMenu() {
     setShowOnboardingModal(true);
   };
 
+  const handleNetworkModalClick = () => {
+    // Close all other modals
+    setShowStakingModal(false);
+    setShowSupporterModal(false);
+    setShowUserModal(false);
+    setShowOnboardingModal(false);
+    // Open network modal
+    setShowNetworkModal(true);
+  };
+
   const getWalletBalance = (): number => {
     if (!balance?.wallets || balance.wallets.length === 0) return 0;
     return balance.wallets.reduce((acc, wallet) => {
@@ -660,6 +672,13 @@ export default function HigherSteakMenu() {
             setShowUserModal(false);
             setShowSupporterModal(true);
           }}
+        />
+      )}
+
+      {/* Network Modal */}
+      {showNetworkModal && (
+        <NetworkModal
+          onClose={() => setShowNetworkModal(false)}
         />
       )}
 
@@ -925,7 +944,19 @@ export default function HigherSteakMenu() {
           <line x1="12" y1="5" x2="12" y2="19"></line>
           <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
-             </button>
+      </button>
+
+      {/* Network Modal Button */}
+      <button
+        onClick={handleNetworkModalClick}
+        className="fixed bottom-6 left-6 z-50 flex items-center gap-2 bg-white/95 backdrop-blur-sm border border-black/10 rounded-full px-2 py-1.5 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+        aria-label="Open network stats"
+      >
+        <span className="text-lg">🌐</span>
+        <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800">
+          Network
+        </span>
+      </button>
      </main>
      </>
    );
