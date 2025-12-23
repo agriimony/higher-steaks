@@ -20,12 +20,18 @@ interface UserStats {
   totalCasterStaked: string;
   totalSupporterStaked: string;
   totalBuildersSupported: number;
-  topSupportedFids: Array<{
-    fid: number;
-    username: string;
-    displayName: string;
-    pfpUrl: string;
+  topSupportedCasts: Array<{
+    castHash: string;
+    castText: string;
+    description: string;
+    castTimestamp: string;
+    creatorFid: number;
+    creatorUsername: string;
+    creatorDisplayName: string;
+    creatorPfpUrl: string;
     totalAmount: string;
+    rank: number | null;
+    castState: string;
   }>;
   totalStakedOnUserCasts?: string;
   totalCasterStakesOnUserCasts?: string;
@@ -47,6 +53,16 @@ function formatTokenAmount(amount: string): string {
     return (num / 1_000).toFixed(2) + 'K';
   } else {
     return num.toFixed(2);
+  }
+}
+
+// Format timestamp to readable date
+function formatTimestamp(timestamp: string): string {
+  try {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return timestamp;
   }
 }
 
@@ -534,54 +550,69 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                 </div>
               </div>
 
-              {/* Top Supported FIDs */}
-              {userStats && userStats.topSupportedFids.length > 0 && (
+              {/* Top Supported Casts */}
+              {userStats && userStats.topSupportedCasts.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-black/20">
                   <h4 className="text-xs font-bold mb-2 text-black">
-                    Top Supported Builders
+                    Casts You've Supported
                   </h4>
-                  <div className="space-y-1">
-                    {userStats.topSupportedFids.map((builder) => (
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {userStats.topSupportedCasts.map((cast) => (
                       <a
-                        key={builder.fid}
-                        href={`https://farcaster.xyz/${builder.username}`}
+                        key={cast.castHash}
+                        href={`https://farcaster.xyz/${cast.creatorUsername}/${cast.castHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 p-1.5 hover:bg-gray-50 transition-colors rounded"
+                        className="block bg-[#f9f7f1] p-3 border border-black/20 rounded-none hover:border-black/40 transition-colors"
                       >
-                        {builder.pfpUrl && (
-                          <img 
-                            src={builder.pfpUrl} 
-                            alt={builder.username}
-                            className="w-6 h-6 rounded-full border border-black/20"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-black truncate">
-                            @{builder.username}
-                          </div>
-                          {builder.displayName && builder.displayName !== builder.username && (
-                            <div className="text-xs text-black/60 truncate">
-                              {builder.displayName}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <img 
-                            src="/higher-logo.png" 
-                            alt="HIGHER" 
-                            className="w-2.5 h-2.5 rounded-full"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
-                          />
-                          <span className="text-xs font-bold text-black">
-                            {formatTokenAmount(builder.totalAmount)}
+                        <div className="text-xs text-black font-mono mb-2">
+                          <strong>started aiming higher and it worked out!</strong>{' '}
+                          <span className="hover:text-purple-700 hover:underline transition-colors">
+                            {cast.description}
                           </span>
                         </div>
+                        {cast.castTimestamp && (
+                          <div className="text-xs text-black/50 font-mono mb-2">
+                            {formatTimestamp(cast.castTimestamp)}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between border-t border-black/20 pt-2 mt-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            {cast.creatorPfpUrl && (
+                              <img 
+                                src={cast.creatorPfpUrl} 
+                                alt={cast.creatorUsername}
+                                className="w-5 h-5 rounded-full border border-black/20 flex-shrink-0"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                }}
+                              />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs text-black/60 truncate">
+                                by <span className="font-bold text-black">@{cast.creatorUsername}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                            <img 
+                              src="/higher-logo.png" 
+                              alt="HIGHER" 
+                              className="w-2.5 h-2.5 rounded-full"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                            <span className="text-xs font-bold text-black">
+                              {formatTokenAmount(cast.totalAmount)}
+                            </span>
+                          </div>
+                        </div>
+                        {cast.rank && (
+                          <div className="text-xs text-black/60 mt-1">
+                            Rank: #{cast.rank}
+                          </div>
+                        )}
                       </a>
                     ))}
                   </div>

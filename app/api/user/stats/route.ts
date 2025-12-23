@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
         totalCasterStaked: '0',
         totalSupporterStaked: '0',
         totalBuildersSupported: 0,
-        topSupportedFids: [],
+        topSupportedCasts: [],
         totalStakedOnUserCasts: '0',
         totalCasterStakesOnUserCasts: '0',
         totalSupporterStakesOnUserCasts: '0',
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
         totalCasterStaked: '0',
         totalSupporterStaked: '0',
         totalBuildersSupported: 0,
-        topSupportedFids: [],
+        topSupportedCasts: [],
         totalStakedOnUserCasts: '0',
         totalCasterStakesOnUserCasts: '0',
         totalSupporterStakesOnUserCasts: '0',
@@ -88,7 +88,8 @@ export async function GET(req: NextRequest) {
 
     let totalCasterStaked = BigInt(0);
     let totalSupporterStaked = BigInt(0);
-    const supportedFidsMap = new Map<number, { fid: number; totalAmount: bigint; castHash: string }>();
+    const supportedCastsMap = new Map<string, { castHash: string; totalAmount: bigint }>();
+    const uniqueSupportedFids = new Set<number>();
 
     // Process each lockup
     for (const r of rows) {
@@ -136,20 +137,21 @@ export async function GET(req: NextRequest) {
       } else if (stakeType === 'supporter' && castHash) {
         totalSupporterStaked += amountBigInt;
         
-        // Get creator FID from cast
+        // Track by castHash instead of creatorFid to show individual casts
+        const existing = supportedCastsMap.get(castHash);
+        if (existing) {
+          existing.totalAmount += amountBigInt;
+        } else {
+          supportedCastsMap.set(castHash, {
+            castHash,
+            totalAmount: amountBigInt,
+          });
+        }
+        
+        // Also track unique FIDs for totalBuildersSupported count
         const cast = castCache.get(castHash);
         if (cast && cast.creatorFid) {
-          const creatorFid = cast.creatorFid;
-          const existing = supportedFidsMap.get(creatorFid);
-          if (existing) {
-            existing.totalAmount += amountBigInt;
-          } else {
-            supportedFidsMap.set(creatorFid, {
-              fid: creatorFid,
-              totalAmount: amountBigInt,
-              castHash,
-            });
-          }
+          uniqueSupportedFids.add(cast.creatorFid);
         }
       }
     }
@@ -159,8 +161,8 @@ export async function GET(req: NextRequest) {
     const totalSupporterStakedNum = Number(totalSupporterStaked) / 1e18;
     const totalUserStakedNum = totalCasterStakedNum + totalSupporterStakedNum;
 
-    // Get top supported fids (sorted by total amount)
-    const topSupportedFidsData = Array.from(supportedFidsMap.values())
+    // Get top supported casts (sorted by total amount)
+    const topSupportedCastsData = Array.from(supportedCastsMap.values())
       .sort((a, b) => {
         if (a.totalAmount > b.totalAmount) return -1;
         if (a.totalAmount < b.totalAmount) return 1;
@@ -168,23 +170,43 @@ export async function GET(req: NextRequest) {
       })
       .slice(0, 10); // Top 10
 
-    // Fetch user profiles for top supported fids
-    const topSupportedFids = [];
-    if (topSupportedFidsData.length > 0) {
-      const fidsToFetch = topSupportedFidsData.map(d => d.fid);
+    // Build response with cast information
+    const topSupportedCasts = [];
+    if (topSupportedCastsData.length > 0) {
+      // Get unique creator FIDs to fetch profiles
+      const creatorFids = new Set<number>();
+      for (const data of topSupportedCastsData) {
+        const cast = castCache.get(data.castHash);
+        if (cast && cast.creatorFid) {
+          creatorFids.add(cast.creatorFid);
+        }
+      }
+
+      // Fetch user profiles for creators
+      const fidsToFetch = Array.from(creatorFids);
       const userProfiles = await neynar.fetchBulkUsers({ fids: fidsToFetch });
       const profileMap = new Map(
         userProfiles.users.map(u => [u.fid, u])
       );
 
-      for (const data of topSupportedFidsData) {
-        const profile = profileMap.get(data.fid);
-        topSupportedFids.push({
-          fid: data.fid,
-          username: profile?.username || `user-${data.fid}`,
-          displayName: profile?.display_name || profile?.username || `User ${data.fid}`,
-          pfpUrl: profile?.pfp_url || '',
+      // Build cast entries with full information
+      for (const data of topSupportedCastsData) {
+        const cast = castCache.get(data.castHash);
+        if (!cast) continue;
+
+        const profile = profileMap.get(cast.creatorFid);
+        topSupportedCasts.push({
+          castHash: data.castHash,
+          castText: cast.castText || '',
+          description: cast.description || '',
+          castTimestamp: cast.castTimestamp || '',
+          creatorFid: cast.creatorFid,
+          creatorUsername: cast.creatorUsername || profile?.username || `user-${cast.creatorFid}`,
+          creatorDisplayName: cast.creatorDisplayName || profile?.display_name || profile?.username || `User ${cast.creatorFid}`,
+          creatorPfpUrl: cast.creatorPfpUrl || profile?.pfp_url || '',
           totalAmount: (Number(data.totalAmount) / 1e18).toString(),
+          rank: cast.rank || null,
+          castState: cast.castState || 'valid',
         });
       }
     }
@@ -281,8 +303,8 @@ export async function GET(req: NextRequest) {
       totalUserStaked: totalUserStakedNum.toString(),
       totalCasterStaked: totalCasterStakedNum.toString(),
       totalSupporterStaked: totalSupporterStakedNum.toString(),
-      totalBuildersSupported: supportedFidsMap.size,
-      topSupportedFids,
+      totalBuildersSupported: uniqueSupportedFids.size,
+      topSupportedCasts,
       // New fields for stakes on user's casts (converted from wei to token units)
       totalStakedOnUserCasts: totalStakedOnUserCastsNum.toString(),
       totalCasterStakesOnUserCasts: totalCasterStakesOnUserCastsNum.toString(),
