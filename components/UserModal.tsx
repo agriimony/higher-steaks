@@ -730,7 +730,6 @@ export function UserModal({ onClose, userFid, onOpenSupporterModal }: UserModalP
                       </label>
                       <input
                         type="number"
-                        step="1"
                         min="0"
                         value={notificationThreshold}
                         onChange={(e) => {
