@@ -323,7 +323,8 @@ export default function HigherSteakMenu() {
   };
 
   const { pillStaked, pillWallet, pillTotal } = useMemo(() => {
-    const staked = parseFloat(duneStakedData?.totalStaked ?? balance?.lockedBalanceFormatted ?? '0') || 0;
+    // Use lockedBalanceFormatted from balance API as the source of truth
+    const staked = parseFloat(balance?.lockedBalanceFormatted ?? '0') || 0;
     const wallet = parseFloat(balance?.walletBalanceFormatted ?? '0') || 0;
     const total = staked + wallet;
     return {
@@ -331,7 +332,7 @@ export default function HigherSteakMenu() {
       pillWallet: formatTokenAmount(wallet.toString()),
       pillTotal: formatTokenAmount(total.toString()),
     };
-  }, [balance, duneStakedData]);
+  }, [balance]);
 
   // Detect pixel density and viewport width for responsive ASCII art
   useEffect(() => {

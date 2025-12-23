@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
     // Fetch from Dune; get a reasonable chunk to sort properly server-side
     const rows = await fetchAllLatestResults(QUERY_ID, {
       columns: COLUMNS,
-      limit: 100, // fetch a window; server-side sort then page
+      limit: 1000, // fetch a window; server-side sort then page
       filters,
     });
 
