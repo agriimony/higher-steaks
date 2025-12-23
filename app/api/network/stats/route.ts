@@ -3,11 +3,25 @@ import { sql } from '@vercel/postgres';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // Never cache
 
 export async function GET() {
   try {
     const currentTime = Math.floor(Date.now() / 1000);
     console.log('[Network Stats] Starting calculation at timestamp:', currentTime);
+    console.log('[Network Stats] POSTGRES_URL exists:', !!process.env.POSTGRES_URL);
+    console.log('[Network Stats] POSTGRES_URL_NON_POOLING exists:', !!process.env.POSTGRES_URL_NON_POOLING);
+
+    // Get current database time to verify we're getting fresh data
+    let dbTime: string | null = null;
+    try {
+      const timeResult = await sql`SELECT NOW() as current_time, COUNT(*) as total_rows FROM leaderboard_entries`;
+      dbTime = timeResult.rows[0]?.current_time || null;
+      console.log('[Network Stats] Database current time:', dbTime);
+      console.log('[Network Stats] Total rows in leaderboard_entries:', timeResult.rows[0]?.total_rows);
+    } catch (e) {
+      console.error('[Network Stats] Error getting database time:', e);
+    }
 
     // Query only non-expired casts (cast_state = 'higher')
     const result = await sql`
@@ -24,6 +38,22 @@ export async function GET() {
     `;
 
     console.log('[Network Stats] Query returned', result.rows.length, 'rows');
+    
+    // Log sample data from first row to verify it matches database
+    if (result.rows.length > 0) {
+      const sampleRow = result.rows[0];
+      console.log('[Network Stats] Sample row data:', {
+        cast_hash: sampleRow.cast_hash,
+        caster_stake_amounts_count: (sampleRow.caster_stake_amounts || []).length,
+        caster_stake_unlocked_count: (sampleRow.caster_stake_unlocked || []).length,
+        supporter_stake_amounts_count: (sampleRow.supporter_stake_amounts || []).length,
+        supporter_stake_unlocked_count: (sampleRow.supporter_stake_unlocked || []).length,
+        first_caster_amount: sampleRow.caster_stake_amounts?.[0],
+        first_caster_unlocked: sampleRow.caster_stake_unlocked?.[0],
+        first_supporter_amount: sampleRow.supporter_stake_amounts?.[0],
+        first_supporter_unlocked: sampleRow.supporter_stake_unlocked?.[0],
+      });
+    }
 
     let totalCasterStaked = BigInt(0);
     let totalSupporterStaked = BigInt(0);
@@ -135,6 +165,8 @@ export async function GET() {
     const totalHigherStakedNum = totalCasterStakedNum + totalSupporterStakedNum;
 
     console.log('[Network Stats] Final totals:');
+    console.log('  Database time:', dbTime);
+    console.log('  Calculation time:', new Date().toISOString());
     console.log('  Total Caster Staked (wei):', totalCasterStaked.toString());
     console.log('  Total Caster Staked (HIGHER):', totalCasterStakedNum.toFixed(2));
     console.log('  Total Supporter Staked (wei):', totalSupporterStaked.toString());
