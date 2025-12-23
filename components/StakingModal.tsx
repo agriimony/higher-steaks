@@ -119,6 +119,10 @@ export function StakingModal({
   // Cast text state
   const [castTexts, setCastTexts] = useState<Record<string, string | null>>({});
   
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 3;
+  
   // Current time state - updates every second for countdown timers
   const [currentTime, setCurrentTime] = useState(Math.floor(Date.now() / 1000));
   
@@ -343,6 +347,26 @@ export function StakingModal({
     return parseFormatted(b.amountFormatted) - parseFormatted(a.amountFormatted);
   });
 
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedLockups.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedLockups = sortedLockups.slice(startIndex, endIndex);
+
+  // Reset to page 1 when lockups change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortedLockups.length]);
+
+  // Pagination handlers
+  const handlePreviousPage = () => {
+    setCurrentPage(prev => Math.max(1, prev - 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage(prev => Math.min(totalPages, prev + 1));
+  };
+
   // Handle Unstake
   const handleUnstake = (lockup: LockupDetail) => {
     setUnstakeLockupId(lockup.lockupId);
@@ -489,8 +513,9 @@ export function StakingModal({
               {sortedLockups.length === 0 ? (
                 <p className="text-sm text-gray-600 italic">No active lockups</p>
               ) : (
+                <>
                 <ul className="space-y-3">
-              {sortedLockups.map((lockup) => {
+              {paginatedLockups.map((lockup) => {
                     const isConnected = wagmiAddress?.toLowerCase() === lockup.receiver.toLowerCase();
                     return (
                       <li key={lockup.lockupId} className="text-sm">
@@ -583,6 +608,29 @@ export function StakingModal({
                     );
                   })}
                 </ul>
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-black/20">
+                    <button
+                      onClick={handlePreviousPage}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white"
+                    >
+                      ← Previous
+                    </button>
+                    <span className="text-xs text-black/70 font-mono">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={handleNextPage}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+                </>
               )}
             </div>
 
