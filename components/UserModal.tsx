@@ -376,7 +376,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         </button>
 
         <h2 className="text-lg font-bold mb-3 text-black border-b-2 border-black pb-1.5">
-          Stats
+          Your Profile
         </h2>
 
         {loading ? (
@@ -399,7 +399,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
         ) : (
           <>
             {/* Network Stats Section */}
-            <div className="mb-4 pb-3 border-b-2 border-black">
+            {/*<div className="mb-4 pb-3 border-b-2 border-black">
               <h3 className="text-base font-bold mb-2 text-black">
                 Network Stats
               </h3>
@@ -463,14 +463,10 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   </span>
                 </div>
               </div>
-            </div>
+            </div>*/}
 
             {/* User Stats Section */}
-            <div>
-              <h3 className="text-base font-bold mb-2 text-black">
-                Your Stats
-              </h3>
-              
+            <div>         
               <div className="space-y-1.5 mb-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-black/70">You have staked</span>
@@ -619,7 +615,6 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                           className="block bg-[#f9f7f1] p-3 border border-black/20 rounded-none hover:border-black/40 transition-colors relative z-10"
                         >
                           <div className="text-xs text-black font-mono mb-2">
-                            <strong>started aiming higher and it worked out!</strong>{' '}
                             <span className="hover:text-purple-700 hover:underline transition-colors">
                               {cast.description}
                             </span>
