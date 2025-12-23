@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 
 interface UserModalProps {
@@ -76,6 +76,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
   const [miniappAdded, setMiniappAdded] = useState<boolean | null>(null);
   const [updatingThreshold, setUpdatingThreshold] = useState(false);
   const [isOptimistic, setIsOptimistic] = useState(false);
+  const [activeCastIndex, setActiveCastIndex] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -101,6 +102,8 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
 
         setNetworkStats(networkData);
         setUserStats(userData);
+        // Reset active cast index when stats change
+        setActiveCastIndex(0);
       } catch (err: any) {
         console.error('[UserModal] Error fetching stats:', err);
         setError(err?.message || 'Failed to load stats');
@@ -113,6 +116,33 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
     fetchNotificationStatus();
     checkMiniappAdded();
   }, [userFid]);
+
+  // Reset activeCastIndex if it's out of bounds when casts change
+  useEffect(() => {
+    if (userStats && userStats.topSupportedCasts.length > 0 && activeCastIndex >= userStats.topSupportedCasts.length) {
+      setActiveCastIndex(0);
+    }
+  }, [userStats, activeCastIndex]);
+
+  // Navigate to previous cast
+  const scrollToPrevious = useCallback(() => {
+    setActiveCastIndex(prev => {
+      if (prev > 0) {
+        return prev - 1;
+      }
+      return prev;
+    });
+  }, []);
+
+  // Navigate to next cast
+  const scrollToNext = useCallback(() => {
+    setActiveCastIndex(prev => {
+      if (userStats && prev < userStats.topSupportedCasts.length - 1) {
+        return prev + 1;
+      }
+      return prev;
+    });
+  }, [userStats]);
 
   // Check if miniapp is added via SDK context (client-side only)
   const checkMiniappAdded = async () => {
@@ -556,66 +586,114 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                   <h4 className="text-xs font-bold mb-2 text-black">
                     Casts You've Supported
                   </h4>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {userStats.topSupportedCasts.map((cast) => (
-                      <a
-                        key={cast.castHash}
-                        href={`https://farcaster.xyz/${cast.creatorUsername}/${cast.castHash}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block bg-[#f9f7f1] p-3 border border-black/20 rounded-none hover:border-black/40 transition-colors"
+                  
+                  {/* Single card display with navigation arrows */}
+                  <div className="mb-2 relative" style={{ overflow: 'visible' }}>
+                    {/* Left arrow button - positioned outside container, overlapping halfway */}
+                    {userStats.topSupportedCasts.length > 1 && activeCastIndex > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          scrollToPrevious();
+                        }}
+                        className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-black/80 hover:bg-black text-white p-2 rounded-full transition shadow-lg"
+                        aria-label="Previous cast"
                       >
-                        <div className="text-xs text-black font-mono mb-2">
-                          <strong>started aiming higher and it worked out!</strong>{' '}
-                          <span className="hover:text-purple-700 hover:underline transition-colors">
-                            {cast.description}
-                          </span>
-                        </div>
-                        {cast.castTimestamp && (
-                          <div className="text-xs text-black/50 font-mono mb-2">
-                            {formatTimestamp(cast.castTimestamp)}
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M15 18l-6-6 6-6"/>
+                        </svg>
+                      </button>
+                    )}
+                    
+                    {/* Single card */}
+                    {(() => {
+                      const cast = userStats.topSupportedCasts[activeCastIndex];
+                      if (!cast) return null;
+                      
+                      return (
+                        <a
+                          href={`https://farcaster.xyz/${cast.creatorUsername}/${cast.castHash}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block bg-[#f9f7f1] p-3 border border-black/20 rounded-none hover:border-black/40 transition-colors relative z-10"
+                        >
+                          <div className="text-xs text-black font-mono mb-2">
+                            <strong>started aiming higher and it worked out!</strong>{' '}
+                            <span className="hover:text-purple-700 hover:underline transition-colors">
+                              {cast.description}
+                            </span>
                           </div>
-                        )}
-                        <div className="flex items-center justify-between border-t border-black/20 pt-2 mt-2">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            {cast.creatorPfpUrl && (
+                          {cast.castTimestamp && (
+                            <div className="text-xs text-black/50 font-mono mb-2">
+                              {formatTimestamp(cast.castTimestamp)}
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between border-t border-black/20 pt-2 mt-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              {cast.creatorPfpUrl && (
+                                <img 
+                                  src={cast.creatorPfpUrl} 
+                                  alt={cast.creatorUsername}
+                                  className="w-5 h-5 rounded-full border border-black/20 flex-shrink-0"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                  }}
+                                />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs text-black/60 truncate">
+                                  by <span className="font-bold text-black">@{cast.creatorUsername}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
                               <img 
-                                src={cast.creatorPfpUrl} 
-                                alt={cast.creatorUsername}
-                                className="w-5 h-5 rounded-full border border-black/20 flex-shrink-0"
+                                src="/higher-logo.png" 
+                                alt="HIGHER" 
+                                className="w-2.5 h-2.5 rounded-full"
                                 onError={(e) => {
                                   (e.target as HTMLImageElement).style.display = 'none';
                                 }}
                               />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs text-black/60 truncate">
-                                by <span className="font-bold text-black">@{cast.creatorUsername}</span>
-                              </div>
+                              <span className="text-xs font-bold text-black">
+                                {formatTokenAmount(cast.totalAmount)}
+                              </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                            <img 
-                              src="/higher-logo.png" 
-                              alt="HIGHER" 
-                              className="w-2.5 h-2.5 rounded-full"
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                            <span className="text-xs font-bold text-black">
-                              {formatTokenAmount(cast.totalAmount)}
-                            </span>
-                          </div>
-                        </div>
-                        {cast.rank && (
-                          <div className="text-xs text-black/60 mt-1">
-                            Rank: #{cast.rank}
-                          </div>
-                        )}
-                      </a>
-                    ))}
+                          {cast.rank && (
+                            <div className="text-xs text-black/60 mt-1">
+                              Rank: #{cast.rank}
+                            </div>
+                          )}
+                        </a>
+                      );
+                    })()}
+                    
+                    {/* Right arrow button - positioned outside container, overlapping halfway */}
+                    {userStats.topSupportedCasts.length > 1 && activeCastIndex < userStats.topSupportedCasts.length - 1 && (
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          scrollToNext();
+                        }}
+                        className="absolute right-0 top-1/2 translate-x-1/2 -translate-y-1/2 z-20 bg-black/80 hover:bg-black text-white p-2 rounded-full transition shadow-lg"
+                        aria-label="Next cast"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 18l6-6-6-6"/>
+                        </svg>
+                      </button>
+                    )}
                   </div>
+                  
+                  {/* Card indicator (e.g., "1 of 3") */}
+                  {userStats.topSupportedCasts.length > 1 && (
+                    <div className="flex justify-center text-xs text-black/60 mb-2">
+                      {activeCastIndex + 1} of {userStats.topSupportedCasts.length}
+                    </div>
+                  )}
                 </div>
               )}
 
