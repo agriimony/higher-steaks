@@ -953,9 +953,6 @@ export default function HigherSteakMenu() {
         aria-label="Open network stats"
       >
         <span className="text-lg">🌐</span>
-        <span className="text-[0.65rem] sm:text-xs font-medium text-gray-800">
-          Network
-        </span>
       </button>
      </main>
      </>

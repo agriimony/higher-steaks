@@ -9,13 +9,6 @@ interface UserModalProps {
   onOpenSupporterModal?: (castHash: string) => void;
 }
 
-interface NetworkStats {
-  totalHigherStaked: string;
-  totalCasterStaked: string;
-  totalSupporterStaked: string;
-  totalCastsStakedOn: number;
-}
-
 interface UserStats {
   totalUserStaked: string;
   totalCasterStaked: string;
@@ -68,7 +61,6 @@ function formatTimestamp(timestamp: string): string {
 }
 
 export function UserModal({ onClose, userFid, onOpenSupporterModal }: UserModalProps) {
-  const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,23 +77,13 @@ export function UserModal({ onClose, userFid, onOpenSupporterModal }: UserModalP
       setError(null);
       
       try {
-        // Fetch both stats in parallel
-        const [networkResponse, userResponse] = await Promise.all([
-          fetch('/api/network/stats'),
-          fetch(`/api/user/stats?fid=${userFid}`),
-        ]);
+        const userResponse = await fetch(`/api/user/stats?fid=${userFid}`);
 
-        if (!networkResponse.ok) {
-          throw new Error('Failed to fetch network stats');
-        }
         if (!userResponse.ok) {
           throw new Error('Failed to fetch user stats');
         }
 
-        const networkData = await networkResponse.json();
         const userData = await userResponse.json();
-
-        setNetworkStats(networkData);
         setUserStats(userData);
         // Reset active cast index when stats change
         setActiveCastIndex(0);
@@ -399,73 +381,6 @@ export function UserModal({ onClose, userFid, onOpenSupporterModal }: UserModalP
           </div>
         ) : (
           <>
-            {/* Network Stats Section */}
-            {/*<div className="mb-4 pb-3 border-b-2 border-black">
-              <h3 className="text-base font-bold mb-2 text-black">
-                Network Stats
-              </h3>
-              
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-black/70">Total Belief in the Network</span>
-                  <div className="flex items-center gap-1.5">
-                    <img 
-                      src="/higher-logo.png" 
-                      alt="HIGHER" 
-                      className="w-3 h-3 rounded-full"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                    <span className="text-xs font-bold text-black">
-                      {networkStats ? formatTokenAmount(networkStats.totalHigherStaked) : '0.00'}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between pl-3">
-                  <span className="text-xs text-black/60">Belief in self</span>
-                  <div className="flex items-center gap-1.5">
-                    <img 
-                      src="/higher-logo.png" 
-                      alt="HIGHER" 
-                      className="w-2.5 h-2.5 rounded-full"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                    <span className="text-xs font-bold text-black">
-                      {networkStats ? formatTokenAmount(networkStats.totalCasterStaked) : '0.00'}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between pl-3">
-                  <span className="text-xs text-black/60">Belief in others</span>
-                  <div className="flex items-center gap-1.5">
-                    <img 
-                      src="/higher-logo.png" 
-                      alt="HIGHER" 
-                      className="w-2.5 h-2.5 rounded-full"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
-                    <span className="text-xs font-bold text-black">
-                      {networkStats ? formatTokenAmount(networkStats.totalSupporterStaked) : '0.00'}
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/20">
-                  <span className="text-xs text-black/70">Total Casts Cooking</span>
-                  <span className="text-xs font-bold text-black">
-                    {networkStats?.totalCastsStakedOn ?? 0}
-                  </span>
-                </div>
-              </div>
-            </div>*/}
-
             {/* User Stats Section */}
             <div>         
               <div className="space-y-1.5 mb-3">
