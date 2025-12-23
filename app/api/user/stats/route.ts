@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { sql } from '@vercel/postgres';
+import { createClient } from '@vercel/postgres';
 import { fetchAllLatestResults } from '@/lib/dune';
 import { getHigherCast } from '@/lib/services/db-service';
 import { buildInFilter, normalizeAddr, normalizeHash, convertAmount } from '../stakes/utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0; // Never cache
 
 const QUERY_ID = 6214515;
 const COLUMNS = ['sender','lockTime','lockUpId','title','amount','receiver','unlockTime','unlocked'];
@@ -217,20 +219,46 @@ export async function GET(req: NextRequest) {
     let totalSupporterStakesOnUserCasts = BigInt(0);
     const uniqueSupporterFids = new Set<number>();
 
+    // Use non-pooling connection for fresh data
+    let client: ReturnType<typeof createClient> | undefined;
+    
     try {
-      const userCastsResult = await sql`
-        SELECT 
-          caster_stake_amounts,
-          caster_stake_unlocked,
-          caster_stake_unlock_times,
-          supporter_stake_amounts,
-          supporter_stake_fids,
-          supporter_stake_unlocked,
-          supporter_stake_unlock_times
-        FROM leaderboard_entries
-        WHERE creator_fid = ${fid}
-        AND cast_state IN ('higher', 'expired')
-      `;
+      let userCastsResult;
+      
+      if (process.env.POSTGRES_URL_NON_POOLING) {
+        client = createClient({
+          connectionString: process.env.POSTGRES_URL_NON_POOLING,
+        });
+        await client.connect();
+        userCastsResult = await client.sql`
+          SELECT 
+            caster_stake_amounts,
+            caster_stake_unlocked,
+            caster_stake_unlock_times,
+            supporter_stake_amounts,
+            supporter_stake_fids,
+            supporter_stake_unlocked,
+            supporter_stake_unlock_times
+          FROM leaderboard_entries
+          WHERE creator_fid = ${fid}
+          AND cast_state IN ('higher', 'expired')
+        `;
+      } else {
+        // Fallback to pooled connection if non-pooling not available
+        userCastsResult = await sql`
+          SELECT 
+            caster_stake_amounts,
+            caster_stake_unlocked,
+            caster_stake_unlock_times,
+            supporter_stake_amounts,
+            supporter_stake_fids,
+            supporter_stake_unlocked,
+            supporter_stake_unlock_times
+          FROM leaderboard_entries
+          WHERE creator_fid = ${fid}
+          AND cast_state IN ('higher', 'expired')
+        `;
+      }
 
       for (const row of userCastsResult.rows) {
         // Sum caster stakes (stakes the user made on their own casts)
@@ -286,12 +314,26 @@ export async function GET(req: NextRequest) {
 
       // Calculate total from caster + supporter stakes
       totalStakedOnUserCasts = totalCasterStakesOnUserCasts + totalSupporterStakesOnUserCasts;
+      
+      // Close non-pooling connection if used
+      if (client) {
+        await client.end();
+      }
     } catch (dbError: any) {
       console.error('[User Stats API] Error querying user casts:', dbError);
       // Continue with 0 values if query fails
       totalStakedOnUserCasts = BigInt(0);
       totalCasterStakesOnUserCasts = BigInt(0);
       totalSupporterStakesOnUserCasts = BigInt(0);
+      
+      // Ensure connection is closed even on error
+      if (client) {
+        try {
+          await client.end();
+        } catch (closeError) {
+          // Ignore close errors
+        }
+      }
     }
 
     // Convert from wei (18 decimals) to token units
