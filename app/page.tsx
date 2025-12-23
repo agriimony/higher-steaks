@@ -655,6 +655,11 @@ export default function HigherSteakMenu() {
         <UserModal
           onClose={() => setShowUserModal(false)}
           userFid={user.fid}
+          onOpenSupporterModal={(castHash) => {
+            setSelectedCastHash(castHash);
+            setShowUserModal(false);
+            setShowSupporterModal(true);
+          }}
         />
       )}
 

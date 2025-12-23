@@ -6,6 +6,7 @@ import { sdk } from '@farcaster/miniapp-sdk';
 interface UserModalProps {
   onClose: () => void;
   userFid: number;
+  onOpenSupporterModal?: (castHash: string) => void;
 }
 
 interface NetworkStats {
@@ -66,7 +67,7 @@ function formatTimestamp(timestamp: string): string {
   }
 }
 
-export function UserModal({ onClose, userFid }: UserModalProps) {
+export function UserModal({ onClose, userFid, onOpenSupporterModal }: UserModalProps) {
   const [networkStats, setNetworkStats] = useState<NetworkStats | null>(null);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -608,11 +609,16 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                       if (!cast) return null;
                       
                       return (
-                        <a
-                          href={`https://farcaster.xyz/${cast.creatorUsername}/${cast.castHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block bg-[#f9f7f1] p-3 border border-black/20 rounded-none hover:border-black/40 transition-colors relative z-10"
+                        <div
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (onOpenSupporterModal) {
+                              onOpenSupporterModal(cast.castHash);
+                              onClose();
+                            }
+                          }}
+                          className="block bg-[#f9f7f1] p-3 border border-black/20 rounded-none hover:border-black/40 transition-colors relative z-10 cursor-pointer"
                         >
                           <div className="text-xs text-black font-mono mb-2">
                             <span className="hover:text-purple-700 hover:underline transition-colors">
@@ -661,7 +667,7 @@ export function UserModal({ onClose, userFid }: UserModalProps) {
                               Rank: #{cast.rank}
                             </div>
                           )}
-                        </a>
+                        </div>
                       );
                     })()}
                     
