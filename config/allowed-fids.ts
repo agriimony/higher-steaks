@@ -18,6 +18,7 @@ export const ALLOWED_FIDS = [
   318307, // madlog1c
   955747, // cactuslockwood
   7212, // bbroad
+  21024, // terricola
   // Add more FIDs here
 ];
 
