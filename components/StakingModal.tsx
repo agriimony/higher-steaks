@@ -616,7 +616,7 @@ export function StakingModal({
                       disabled={currentPage === 1}
                       className="px-3 py-1.5 bg-black text-white text-xs font-bold border-2 border-black hover:bg-white hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black disabled:hover:text-white"
                     >
-                      ← Previous
+                      ← Prev
                     </button>
                     <span className="text-xs text-black/70 font-mono">
                       Page {currentPage} of {totalPages}
