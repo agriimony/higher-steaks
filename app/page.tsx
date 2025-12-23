@@ -273,33 +273,49 @@ export default function HigherSteakMenu() {
     setDuneStakedData(prev => prev ? { ...prev, loading: true } : { totalStaked: '0', lockups: [], loading: true });
     
     try {
-      const url = `/api/user/stakes?fid=${fid}${connectedAddress ? `&connectedAddress=${connectedAddress}` : ''}&offset=0`;
-      const response = await fetch(url, { cache: 'no-store' });
+      let allLockups: LockupDetail[] = [];
+      let offset = 0;
+      let nextOffset: number | null = 0;
+      let totalStakedFromAPI = '0';
       
-      if (response.ok) {
+      // Fetch all pages
+      while (nextOffset !== null) {
+        const url = `/api/user/stakes?fid=${fid}${connectedAddress ? `&connectedAddress=${connectedAddress}` : ''}&offset=${offset}`;
+        const response = await fetch(url, { cache: 'no-store' });
+        
+        if (!response.ok) {
+          console.error('[fetchDuneStakes] Failed to fetch stakes, status:', response.status);
+          break;
+        }
+        
         const data = await response.json();
         const items = data.items || [];
         
-        // Filter to only include lockups where unlocked === false
-        const lockedLockups = items.filter((item: LockupDetail) => !item.unlocked);
+        // Accumulate lockups from this page
+        allLockups = [...allLockups, ...items];
         
-        // Calculate totalStaked by summing amounts of locked lockups
-        const totalStaked = lockedLockups.reduce((sum: number, lockup: LockupDetail) => {
-          const amount = parseFloat(lockup.amount || '0');
-          return sum + (Number.isFinite(amount) ? amount : 0);
-        }, 0);
+        // Use totals.totalStaked from API (calculated from all items, not just this page)
+        if (data.totals?.totalStaked) {
+          totalStakedFromAPI = data.totals.totalStaked;
+        }
         
-        console.log('[fetchDuneStakes] Locked lockups:', lockedLockups.length, 'Total staked:', totalStaked);
-        
-        setDuneStakedData({
-          totalStaked: totalStaked.toString(),
-          lockups: lockedLockups,
-          loading: false,
-        });
-      } else {
-        console.error('[fetchDuneStakes] Failed to fetch stakes, status:', response.status);
-        setDuneStakedData(prev => prev ? { ...prev, loading: false } : { totalStaked: '0', lockups: [], loading: false });
+        // Check if there are more pages
+        nextOffset = data.nextOffset;
+        if (nextOffset !== null) {
+          offset = nextOffset;
+        }
       }
+      
+      // Filter to only include lockups where unlocked === false
+      const lockedLockups = allLockups.filter((item: LockupDetail) => !item.unlocked);
+      
+      console.log('[fetchDuneStakes] Total lockups fetched:', allLockups.length, 'Locked lockups:', lockedLockups.length, 'Total staked:', totalStakedFromAPI);
+      
+      setDuneStakedData({
+        totalStaked: totalStakedFromAPI,
+        lockups: lockedLockups,
+        loading: false,
+      });
     } catch (error) {
       console.error('[fetchDuneStakes] Error:', error);
       setDuneStakedData(prev => prev ? { ...prev, loading: false } : { totalStaked: '0', lockups: [], loading: false });
