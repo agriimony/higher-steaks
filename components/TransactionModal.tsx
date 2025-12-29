@@ -42,8 +42,9 @@ export function TransactionModal({
     setSignalError(null);
 
     try {
+      const basescanLink = txHash ? `\nhttps://basescan.org/tx/${txHash}` : '';
       await sdk.actions.composeCast({
-        text: '🥩',
+        text: `🥩${basescanLink}`,
         parent: {
           type: 'cast',
           hash: castHash,
