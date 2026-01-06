@@ -25,6 +25,7 @@ export const ALLOWED_FIDS = [
   217780, // 0xsujit
   263373, // onchaindom.eth
   240275, // phoebe-heess
+  12990, // juli
   // Add more FIDs here
 ];
 
