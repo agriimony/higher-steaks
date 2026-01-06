@@ -21,6 +21,10 @@ export const ALLOWED_FIDS = [
   21024, // terricola
   295522, // liorabase
   1118370, // protardio
+  16863, // kuusho
+  217780, // 0xsujit
+  263373, // onchaindom.eth
+  240275, // phoebe-heess
   // Add more FIDs here
 ];
 
