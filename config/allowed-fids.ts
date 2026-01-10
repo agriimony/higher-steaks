@@ -26,6 +26,17 @@ export const ALLOWED_FIDS = [
   263373, // onchaindom.eth
   240275, // phoebe-heess
   12990, // juli
+  210698, // blankspace
+  237973, // fffflood
+  5254, // papajams
+  218957, // genuinejack
+  196328, // r4topunk
+  5260, // nishu
+  482556, // willdias
+  294090, // stustustudio
+  12388, // trh
+  11984, // chamaquito.eth
+  8476, // saintless
   // Add more FIDs here
 ];
 
