@@ -37,6 +37,8 @@ export const ALLOWED_FIDS = [
   12388, // trh
   11984, // chamaquito.eth
   8476, // saintless
+  20721, // skateboard
+  478527, // zimardrp
   // Add more FIDs here
 ];
 
