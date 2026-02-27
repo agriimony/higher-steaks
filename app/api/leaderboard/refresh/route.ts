@@ -28,6 +28,21 @@ function checkRateLimit(ip: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
+    // Protect refresh endpoint with secret auth
+    const refreshSecret = process.env.CRON_SECRET;
+    const authHeader = request.headers.get('authorization');
+    const refreshHeader = request.headers.get('x-refresh-secret');
+
+    if (refreshSecret) {
+      const bearerOk = authHeader === `Bearer ${refreshSecret}`;
+      const headerOk = refreshHeader === refreshSecret;
+      if (!bearerOk && !headerOk) {
+        return NextResponse.json(
+          { error: 'Unauthorized' },
+          { status: 401 }
+        );
+      }
+    }
 
     // Get client IP for rate limiting
     const ip = request.ip || 
@@ -56,11 +71,16 @@ export async function POST(request: NextRequest) {
     const cronUrl = `${baseUrl}/api/cron/update-staking-leaderboard`;
     
     // Forward the request to the cron endpoint (no auth required if CRON_SECRET not set)
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (refreshSecret) {
+      headers.authorization = `Bearer ${refreshSecret}`;
+    }
+
     const cronResponse = await fetch(cronUrl, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
     });
     
     const cronData = await cronResponse.json();

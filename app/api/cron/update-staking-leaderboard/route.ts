@@ -8,16 +8,18 @@ export const maxDuration = 300; // 5 minutes max for cron job
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret (Vercel automatically adds this header)
+    // Verify cron secret (Vercel cron should send Authorization: Bearer <CRON_SECRET>)
     const authHeader = request.headers.get('authorization');
     const cronSecret = process.env.CRON_SECRET;
-    
-    // Only enforce auth if CRON_SECRET is set
-    if (cronSecret && authHeader && authHeader !== `Bearer ${cronSecret}`) {
-      return NextResponse.json(
-        { error: 'Unauthorized - invalid secret' },
-        { status: 401 }
-      );
+
+    // Enforce strict auth when CRON_SECRET is configured
+    if (cronSecret) {
+      if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+        return NextResponse.json(
+          { error: 'Unauthorized - missing or invalid secret' },
+          { status: 401 }
+        );
+      }
     }
     
     console.log('=== Starting staking leaderboard update (Dune-based) ===');
