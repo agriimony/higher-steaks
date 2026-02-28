@@ -13,6 +13,7 @@ import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/compone
 import { useAccount, useConnect } from 'wagmi';
 import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
 const MIN_HIGHER_REQUIRED = 100000;
+const ADMIN_BYPASS_FIDS = new Set<number>([191780]);
 
 interface User {
   fid: number;
@@ -252,6 +253,10 @@ export default function HigherSteakMenu() {
   };
 
   const checkHigherAccess = async (fid: number): Promise<{ allowed: boolean; balanceData: TokenBalance | null }> => {
+    if (ADMIN_BYPASS_FIDS.has(fid)) {
+      return { allowed: true, balanceData: null };
+    }
+
     try {
       const response = await fetch(`/api/user/balance?fid=${fid}`);
       if (!response.ok) {
@@ -500,7 +505,7 @@ export default function HigherSteakMenu() {
     if (isDevelopmentMode && simulatedProfile) {
       // Dev-mode threshold gating mirrors production access logic
       const simulatedTotal = Number(String(simulatedProfile.walletBalance || '0').replace(/,/g, ''));
-      const isAllowed = Number.isFinite(simulatedTotal) && simulatedTotal >= MIN_HIGHER_REQUIRED;
+      const isAllowed = ADMIN_BYPASS_FIDS.has(simulatedProfile.fid) || (Number.isFinite(simulatedTotal) && simulatedTotal >= MIN_HIGHER_REQUIRED);
       setHasAccess(isAllowed);
 
       if (!isAllowed) return;
