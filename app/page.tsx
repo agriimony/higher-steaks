@@ -12,7 +12,7 @@ import { LandingPage } from '@/components/LandingPage';
 import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/components/ProfileSwitcher';
 import { useAccount, useConnect } from 'wagmi';
 import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
-import { ALLOWED_FIDS } from '@/config/allowed-fids';
+const MIN_HIGHER_REQUIRED = 100000;
 
 interface User {
   fid: number;
@@ -251,6 +251,21 @@ export default function HigherSteakMenu() {
     }
   };
 
+  const checkHigherAccess = async (fid: number): Promise<{ allowed: boolean; balanceData: TokenBalance | null }> => {
+    try {
+      const response = await fetch(`/api/user/balance?fid=${fid}`);
+      if (!response.ok) {
+        return { allowed: false, balanceData: null };
+      }
+      const balanceData: TokenBalance = await response.json();
+      const total = Number(String(balanceData.totalBalance ?? balanceData.totalBalanceFormatted ?? '0').replace(/,/g, ''));
+      const allowed = Number.isFinite(total) && total >= MIN_HIGHER_REQUIRED;
+      return { allowed, balanceData };
+    } catch {
+      return { allowed: false, balanceData: null };
+    }
+  };
+
   const fetchCastData = async (fid: number) => {
     try {
       const response = await fetch(`/api/user/casts?fid=${fid}`);
@@ -403,16 +418,19 @@ export default function HigherSteakMenu() {
         const fid = context.user.fid;
         console.log('✅ User FID from context:', fid);
 
-        // Check if FID is in allowed list
-        const isAllowed = ALLOWED_FIDS.includes(fid);
-        setHasAccess(isAllowed);
+        const { allowed, balanceData } = await checkHigherAccess(fid);
+        setHasAccess(allowed);
 
-        if (!isAllowed) {
-          console.log('❌ User FID not in allowed list:', fid);
+        if (!allowed) {
+          console.log('❌ User below HIGHER threshold:', fid);
           return;
         }
 
-        console.log('✅ User FID is allowed, fetching profile...');
+        if (balanceData) {
+          setBalance(balanceData);
+        }
+
+        console.log('✅ User passes HIGHER threshold, fetching profile...');
 
         // Fetch full profile from backend
         const response = await fetch(`/api/user/profile?fid=${fid}`);
@@ -422,7 +440,7 @@ export default function HigherSteakMenu() {
           console.log('Profile data:', profileData);
           setUser(profileData);
           // Fetch token balance and cast data after getting user profile
-          fetchTokenBalance(fid);
+          if (!balanceData) fetchTokenBalance(fid);
           fetchCastData(fid);
           fetchDuneStakes(fid, wagmiAddress);
         } else {
@@ -480,13 +498,12 @@ export default function HigherSteakMenu() {
   // Handle simulated profile changes in development mode
   useEffect(() => {
     if (isDevelopmentMode && simulatedProfile) {
-      // Check if simulated FID is allowed
-      const isAllowed = ALLOWED_FIDS.includes(simulatedProfile.fid);
+      // Dev-mode threshold gating mirrors production access logic
+      const simulatedTotal = Number(String(simulatedProfile.walletBalance || '0').replace(/,/g, ''));
+      const isAllowed = Number.isFinite(simulatedTotal) && simulatedTotal >= MIN_HIGHER_REQUIRED;
       setHasAccess(isAllowed);
-      
-      if (!isAllowed) {
-        return;
-      }
+
+      if (!isAllowed) return;
       
       // Set simulated user data
       setUser({
