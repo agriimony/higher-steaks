@@ -1,5 +1,34 @@
 import { sql, createClient } from '@vercel/postgres';
 
+function expandScientific(input: string): string {
+	const s = String(input || '').trim();
+	if (!/[eE]/.test(s)) return s;
+	const m = s.match(/^([+-]?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/);
+	if (!m) return s;
+	const sign = m[1] || '';
+	const intPart = m[2] || '0';
+	const fracPart = m[3] || '';
+	const exp = parseInt(m[4], 10);
+	if (!Number.isFinite(exp)) return s;
+	const digits = intPart + fracPart;
+	const decimalPos = intPart.length;
+	const newPos = decimalPos + exp;
+	if (newPos <= 0) {
+		return `${sign}0.${'0'.repeat(Math.abs(newPos))}${digits}`.replace(/\.0+$/, '');
+	}
+	if (newPos >= digits.length) {
+		return `${sign}${digits}${'0'.repeat(newPos - digits.length)}`;
+	}
+	return `${sign}${digits.slice(0, newPos)}.${digits.slice(newPos)}`.replace(/\.0+$/, '');
+}
+
+function normalizeNumericString(value: any): string {
+	if (value === null || value === undefined) return '0';
+	const raw = String(value).trim();
+	const expanded = expandScientific(raw);
+	return expanded || '0';
+}
+
 export interface HigherCastData {
 	castHash: string;
 	creatorFid: number;
@@ -126,12 +155,12 @@ export async function getHigherCast(hash: string): Promise<HigherCastData | null
 			usdValue: row.usd_value?.toString() || null,
 			rank: row.rank || null,
 			casterStakeLockupIds: row.caster_stake_lockup_ids || [],
-			casterStakeAmounts: row.caster_stake_amounts?.map((a: any) => a.toString()) || [],
+			casterStakeAmounts: row.caster_stake_amounts?.map((a: any) => normalizeNumericString(a)) || [],
 			casterStakeUnlockTimes: row.caster_stake_unlock_times || [],
 			casterStakeUnlocked: row.caster_stake_unlocked || [],
 			casterStakeLockTimes: row.caster_stake_lock_times || [],
 			supporterStakeLockupIds: row.supporter_stake_lockup_ids || [],
-			supporterStakeAmounts: row.supporter_stake_amounts?.map((a: any) => a.toString()) || [],
+			supporterStakeAmounts: row.supporter_stake_amounts?.map((a: any) => normalizeNumericString(a)) || [],
 			supporterStakeFids: row.supporter_stake_fids || [],
 			supporterStakeUnlockTimes: row.supporter_stake_unlock_times || [],
 			supporterStakeUnlocked: row.supporter_stake_unlocked || [],

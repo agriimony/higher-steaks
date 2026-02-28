@@ -67,7 +67,11 @@ export async function GET(
 
     // Calculate total caster staked (only valid stakes)
     const totalCasterStaked = validCasterStakes.reduce((sum, stake) => {
-      return sum + BigInt(stake.amount);
+      try {
+        return sum + BigInt(String(stake.amount));
+      } catch {
+        return sum;
+      }
     }, BigInt(0)).toString();
 
     // Filter + aggregate valid supporter stakes (no PFPs stored in DB)
