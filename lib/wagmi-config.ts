@@ -25,6 +25,13 @@ const getRpcUrl = (): string => {
   return 'https://mainnet.base.org';
 };
 
+const fcConnector: any = farcasterMiniApp();
+
+// Compatibility shim: some connector builds miss getChainId expected by wagmi write flows.
+if (typeof fcConnector.getChainId !== 'function') {
+  fcConnector.getChainId = async () => base.id;
+}
+
 export const wagmiConfig = createConfig({
   chains: [base],
   transports: {
@@ -36,7 +43,5 @@ export const wagmiConfig = createConfig({
       retryDelay: 1000,
     }),
   },
-  connectors: [
-    farcasterMiniApp(),
-  ],
+  connectors: [fcConnector],
 });
