@@ -13,7 +13,7 @@ import { ProfileSwitcher, SimulatedProfile, SIMULATED_PROFILES } from '@/compone
 import { useAccount, useConnect } from 'wagmi';
 import { HIGHER_TOKEN_ADDRESS } from '@/lib/contracts';
 const MIN_HIGHER_REQUIRED = 100000;
-const ADMIN_BYPASS_FIDS = new Set<number>([191780]);
+const ADMIN_BYPASS_FIDS = new Set<number>([191780, 1553723]);
 
 interface User {
   fid: number;
